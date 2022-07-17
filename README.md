@@ -1,3 +1,3 @@
 # Code_testing
 
-Document the projects I did for others 
+Document the projects I did in Sport Biomechanics Lab
