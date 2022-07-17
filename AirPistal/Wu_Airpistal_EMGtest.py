@@ -52,13 +52,22 @@ def EMG_processing(cvs_file_path):
     data_time = data.iloc[:,0]
     Fs = 1/(data_time[2]-data_time[1]) # sampling frequency
     data = pd.DataFrame(data)
+    # to judge difference sensor placement
+    sensor_place = cvs_file_path.split('\\')[-4]
+    if sensor_place == 'sensor1':
+        sensor = np.arange(1,88,8)
+    elif sensor_place == 'sensor2':
+        sensor = [1, 15, 29, 43, 57, 65, 73, 81, 89, 97, 117]
+    else:
+        sensor = [1, 15, 29, 43, 57, 65, 73, 81, 89, 97, 105]
     # need to change column name or using column number
-    EMG_data = data.iloc[:, np.arange(1,88,8)]
+    
+    EMG_data = data.iloc[:, sensor]
     # exchange data type to float64
     EMG_data = [pd.to_numeric(EMG_data.iloc[:, i], errors = 'coerce') 
                 for i in range(np.shape(EMG_data)[1])]
     EMG_data = pd.DataFrame(np.transpose(EMG_data),
-                            columns=data.iloc[:, np.arange(1,88,8)].columns)
+                            columns=data.iloc[:, sensor].columns)
     # bandpass filter use in signal
     bandpass_sos = signal.butter(2, [20, 500],  btype='bandpass', fs=Fs, output='sos')
     
@@ -99,28 +108,18 @@ def EMG_processing(cvs_file_path):
     return bandpass_filtered_data, rms_data, lowpass_filtered_data
 
 
-#  --------------------writting data to a excel file------------------------ 
-def Excel_writting(file_path, data_save_path, data):
-    # deal with filename and add extension with _ed
-    filepath, tempfilename = os.path.split(file_path)
-    filename, extension = os.path.splitext(tempfilename)
-    # rewrite file name
-    file_name = data_save_path + '\\' + filename + '_ed'
-    file_name = file_name.replace('.', '_') + '.xlsx'
-    # writting data in worksheet
-    DataFrame(data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
-    
+
 def Find_MVC_max(MVC_folder, MVC_save_path):
     # MVC_folder = r'D:\NTSU\TenLab\Archery\Archery_20220225\S1\Processing\MVC'
     # MVC_save_path = r'D:\NTSU\TenLab\Archery\Archery_20220225\S1\Processing'
-    MVC_file_list = os.listdir(MVC_folder)
-    MVC_data = pd.read_excel(MVC_folder + '\\' + MVC_file_list[0])
+    MVC_file_list = Read_File(MVC_folder, '.xlsx', subfolder=True)
+    MVC_data_1 = pd.read_excel(MVC_file_list[0])
     find_max_all = []
-    Columns_name = MVC_data.columns
+    Columns_name = MVC_data_1.columns
     Columns_name = Columns_name.insert(0, 'FileName')
     find_max_all = pd.DataFrame(find_max_all, columns=Columns_name)
     for i in MVC_file_list:
-        MVC_file_path = MVC_folder + '\\' + i
+        MVC_file_path = i
         MVC_data = pd.read_excel(MVC_file_path)
         find_max = MVC_data.max(axis=0)
         find_max = pd.DataFrame(find_max)
@@ -134,26 +133,51 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     MVC_max = np.transpose(MVC_max)
     find_max_all = find_max_all.append(MVC_max)
     # writting data to EXCEl file
-    find_max_name = MVC_save_path + '\\' + 'S1_MVC.xlsx'
+    modify_name = MVC_folder.rsplit('\\', 1)
+    find_max_name = MVC_save_path + '\\' + modify_name[-1] + '_MVC.xlsx'
     DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)    
-# ------------code start-----------------
-# ------------code start-----------------
-
+# ---------------------------code start---------------------------------------
+# ---------------------------code start---------------------------------------
+# defone raw data path
 parent_folder_path = r"D:\NTSU\TenLab\Shooting\Wu_EMG\Shooting_EMG_Data\RawData"
-save_data_path = r"D:\NTSU\TenLab\Shooting\Wu_EMG\Shooting_EMG_Data\ProcessingData"
+raw_data_path = Read_File(parent_folder_path, '.csv', subfolder=True)
+# define save data path
+save_data_path_1 = r"D:\NTSU\TenLab\Shooting\Wu_EMG\Shooting_EMG_Data\ProcessingData"
+# define staging file
+staging_file = r"D:\NTSU\TenLab\Shooting\Wu_EMG\EMG_ShootingStaging_Wu_20220715.xlsx"
+staging_data = pd.read_excel(staging_file)
+EMG_path = staging_data['EMG_path']
+shooting_time = staging_data['EMG-sum']
+
+# read folder list
 folder_list = os.listdir(parent_folder_path)
 
-for forder_name in folder_list:
-    folder_list_path = parent_folder_path + '\\' + forder_name
-    file_list = Read_File(folder_list_path, '.csv', subfolder=True)
-    tic = time.process_time()
-    for file_path in file_list:
-        print(file_path)
-        bandpass_filtered_data, rms_data, lowpass_filtered_data = EMG_processing(file_path)
-        save_data_path_1 = save_data_path + '\\' + forder_name
-        Excel_writting(file_path, save_data_path_1, lowpass_filtered_data)
-    Find_MVC_max(save_data_path + '\\' + forder_name, save_data_path + '\\' + forder_name)
-    print(forder_name)
+for i in range(len(EMG_path)):
+    for raw_data_name in raw_data_path:
+        if EMG_path[i] == raw_data_name:
+            tic = time.process_time()
+            print(EMG_path[i])
+            bandpass_filtered_data, rms_data, lowpass_filtered_data = EMG_processing(raw_data_name)
+            save_data_path_1 = raw_data_name.split()
+            # to seperate stage
+            shooting_period = int(shooting_time[i]*2000)
+            lowpass_filtered_data = lowpass_filtered_data.iloc[shooting_period-6000:shooting_period-1000, :]
+            # deal with filename and add extension with _ed
+            filepath, tempfilename = os.path.split(raw_data_name)
+            filename, extension = os.path.splitext(tempfilename)
+            filepath = filepath.rsplit('\\', 1)
+            # rewrite file name
+            file_name = filepath[0] + '\\Afterfilting\\' + filename + '_ed' + '.xlsx'
+            # writting data in worksheet
+            DataFrame(lowpass_filtered_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+            # Find_MVC_max(save_data_path + '\\' + forder_name, save_data_path + '\\' + forder_name)
+            toc = time.process_time()
+            print("Total Time:",toc-tic)
 
-    toc = time.process_time()
-    print("Total Time:",toc-tic)
+MVC_parent_folder = r"D:\NTSU\TenLab\Shooting\Wu_EMG\Shooting_EMG_Data\ProcessingData"
+parent_folder_list = os.listdir(MVC_parent_folder)
+MVC_save_path = r"D:\NTSU\TenLab\Shooting\Wu_EMG\Shooting_EMG_Data\MVC"
+
+for folder_list in parent_folder_list:
+    MVC_folder = MVC_parent_folder + '\\' + folder_list
+    Find_MVC_max(MVC_folder, MVC_save_path)
