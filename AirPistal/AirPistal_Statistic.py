@@ -71,9 +71,9 @@ for ii in range(len(file_list)):
         dis_y[i, :] = y_data.iloc[i+1, :] - y_data.iloc[i, :]
         dis_z[i, :] = z_data.iloc[i+1, :] - z_data.iloc[i, :]
     
-    sum_dis_x = np.sum(np.abs(dis_x))
-    sum_dis_y = np.sum(np.abs(dis_y))
-    sum_dis_z = np.sum(np.abs(dis_z))
+    sum_dis_x = np.sum(np.abs(dis_x))/np.shape(x_data)[1]
+    sum_dis_y = np.sum(np.abs(dis_y))/np.shape(x_data)[1]
+    sum_dis_z = np.sum(np.abs(dis_z))/np.shape(x_data)[1]
     # writing data in the data matrix
     data[ii, :] = [mean_std_x, mean_std_y, mean_std_z,
                    sum_dis_x, sum_dis_y, sum_dis_z]
