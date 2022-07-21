@@ -57,8 +57,8 @@ for ii in range(len(file_list)):
     # mean_x = np.mean(x_data, axis=1)
     # standard deviation caculate
     std_x = np.std(x_data)
-    std_y = np.std(x_data)
-    std_z = np.std(x_data)
+    std_y = np.std(y_data)
+    std_z = np.std(z_data)
     mean_std_x = np.mean(std_x)
     mean_std_y = np.mean(std_y)
     mean_std_z = np.mean(std_z)
