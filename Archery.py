@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Aug  3 17:50:46 2022
+碩論分析用
 
-@author: user
+@author: Hsin Yang
 """
 import os
 import pandas as pd
