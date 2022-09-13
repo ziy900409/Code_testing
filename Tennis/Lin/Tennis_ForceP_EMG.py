@@ -8,7 +8,6 @@ Created on Sun Sep 11 19:55:41 2022
 3. 標準化 EMG of motion / MVC max
 @author: Hsin Yang
 """
-
 import os
 import pandas as pd
 import numpy as np
@@ -156,11 +155,11 @@ for MVC_folder in MVC_folder_list:
     
 
 # 濾波EMG of motion，並擷取特定區段
-Save_motion_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\motion'
-motion_folder = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\motion'
+Save_motion_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\processing_motion'
+motion_folder = r"D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\RawData_motion"
 motion_folder_list = os.listdir(motion_folder)
 # staging data
-staging_data = pd.read_excel(r"D:\NTSU\TenLab\LinData\tennis EMG+force plate\Tennis_Staging_Lin_Lin_20220912.xlsx")
+staging_data = pd.read_excel(r"D:\NTSU\TenLab\LinData\tennis EMG+force plate\Tennis_Staging_Lin_Lin_20220913.xlsx")
 for folder in motion_folder_list:
     motion_folder_path = motion_folder + '\\' + folder
     motion_file_list = Read_File(motion_folder_path, '.csv', subfolder=False)
@@ -171,6 +170,11 @@ for folder in motion_folder_list:
                 print(motion_file_list[path])
                 print(staging_data['EMG_file_name'][num])
                 bandpass_filtered_data, rms_data, lowpass_filtered_data = EMG_processing(motion_file_list[path])
+                # 寫入時間
+                time_data = pd.read_csv(motion_file_list[path], encoding='UTF-8')
+                time = time_data.iloc[:, 0]
+                # lowpass insert time
+                
                 # 寫資料近excel
                 filepath, tempfilename = os.path.split(motion_file_list[path])
                 filename, extension = os.path.splitext(tempfilename)
@@ -184,10 +188,10 @@ for folder in motion_folder_list:
                     print('ending time is: ', end_time)
                     # load EMG data
                     # trunkcate specific period
-                    shooting_data = lowpass_filtered_data.iloc[start_time:end_time, 1:]
+                    shooting_data = lowpass_filtered_data.iloc[start_time:end_time, :]
                     pd.DataFrame(shooting_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
-                    toc2 = time.process_time()
-                    print("Total Time:",toc2-tic2)
+                toc2 = time.process_time()
+                print("Total Time:",toc2-tic2)
                     
 # 設定資料夾位置
 MVC_max_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\MVC'                    
@@ -210,6 +214,7 @@ for i in range(len(motion_folder_list)):
             print(motion_folder_list[i])
             # 讀取MVC數據
             MVC_path = MVC_max_path + '\\' + MVC_max_folder_list[ii] + '\\' + MVC_max_folder_list[ii] + '_MVC_2.xlsx'
+            
             MVC_value = pd.read_excel(MVC_path)
             MVC_value = MVC_value.iloc[-1, 1:]
             MVC_value = MVC_value.iloc[1:]
@@ -218,7 +223,8 @@ for i in range(len(motion_folder_list)):
             motion_list = Read_File(motion_path, '.xlsx', subfolder=False)
             for iii in motion_list:
                 print(iii)
-                motion_data =  pd.read_excel(iii)
+                print(MVC_path)
+                motion_data =  pd.read_excel(iii)[:, 1:]
                 shooting_iMVC = np.divide(motion_data, MVC_value)*100
                 # 將資料寫進excel
                 filepath, tempfilename = os.path.split(iii)
