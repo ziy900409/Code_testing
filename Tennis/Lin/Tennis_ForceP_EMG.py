@@ -8,6 +8,7 @@ Created on Sun Sep 11 19:55:41 2022
 3. 標準化 EMG of motion / MVC max
 @author: Hsin Yang
 """
+
 import os
 import pandas as pd
 import numpy as np
@@ -190,12 +191,19 @@ for folder in motion_folder_list:
                     
 # 設定資料夾位置
 MVC_max_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\MVC'                    
-motion_folder_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\motion'
-save_file_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\motion'
+motion_folder_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\processing_motion'
+save_file_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\processing_motion'
 # 資料夾清單
 MVC_max_folder_list = os.listdir(MVC_max_path)
 motion_folder_list = os.listdir(motion_folder_path)
 
+all_max_ForcePlate_data = pd.DataFrame({
+               
+                                    })
+
+all_mean_ForcePlate_data = pd.DataFrame({
+               
+                                    })
 for i in range(len(motion_folder_list)):
     for ii in range(len(MVC_max_folder_list)):
         if motion_folder_list[i] == MVC_max_folder_list[ii]:
@@ -210,10 +218,24 @@ for i in range(len(motion_folder_list)):
             motion_list = Read_File(motion_path, '.xlsx', subfolder=False)
             for iii in motion_list:
                 print(iii)
-                moation_data =  pd.read_excel(iii)
-                shooting_iMVC = np.divide(moation_data, MVC_value)*100
+                motion_data =  pd.read_excel(iii)
+                shooting_iMVC = np.divide(motion_data, MVC_value)*100
                 # 將資料寫進excel
                 filepath, tempfilename = os.path.split(iii)
                 save_iMVC_name = save_file_path + '\\' + motion_folder_list[i] + '\\iMVC\\' + 'iMVC_' + tempfilename
                 pd.DataFrame(shooting_iMVC).to_excel(save_iMVC_name, sheet_name='Sheet1', index=False, header=True)
-
+                # 找最大值
+                max_motion = pd.DataFrame(np.max(shooting_iMVC, axis=0))
+                max_motion = np.transpose(max_motion)
+                file_name = pd.DataFrame({
+                                        'file_name': [iii]
+                                          })
+                add_max_motion = pd.concat([file_name, max_motion], ignore_index=True, axis= 1)
+                # 找平均值
+                mean_motion = pd.DataFrame(np.mean(shooting_iMVC, axis=0))
+                mean_motion = np.transpose(mean_motion)
+                add_mean_motion = pd.concat([file_name, mean_motion], ignore_index=True, axis= 1)
+                # 合併資料
+                all_max_ForcePlate_data = pd.concat([all_max_ForcePlate_data, add_max_motion], ignore_index=True, axis= 0)
+                all_mean_ForcePlate_data = pd.concat([all_mean_ForcePlate_data, add_mean_motion], ignore_index=True, axis= 0)
+    
