@@ -10,6 +10,8 @@ https://nbviewer.org/github/BMClab/BMC/blob/master/notebooks/DetectOnset.ipynb
 3. 將結果繪圖，以人工判定結果好壞
 4. 輸出檔案
 
+待改善問題
+1. 消耗內存仍然太大
 @author: Hsin Yang
 """
 
@@ -93,36 +95,37 @@ for data_path in RawData_list:
     cut_force_z = pd.DataFrame(Force_z.iloc[loading_time[0][0]:loading_time[0][1]])
     # time
     time = np.linspace(0, len(Force_z), len(Force_z))
-    # 繪圖確認力版資料
-    plt.figure(1)
-    plt.plot(time, Force_z, 'b', label='原始資料')
-    plt.axvline(x=loading_time[0][0], c='r', ls='--', lw=1)
-    plt.axvline(x=loading_time[0][1], c='r', ls='--', lw=1)
-    plt.axvline(x=loading_time[1][0], c='r', ls='--', lw=1)
-    plt.axvline(x=loading_time[1][1], c='r', ls='--', lw=1)
-    plt.title(file_name)
-    plt.legend()
-    plt.savefig(svae_path  +'//' +  file_name + '.jpg',
-                dpi=300)
-    add_ForcePlate_data = pd.DataFrame({
-                                'file_name': [file_path_split],
-                                'low_file_name': ['lowpass_' + file_name],
-                                '進力版時間1': [loading_time[0][0]],
-                                '出力版時間1': [loading_time[0][1]],
-                                '進力版時間2': [loading_time[1][0]],
-                                '出力版時間2': [loading_time[1][1]],
-                                })
-    # 合併資料
-    save_ForcePlate_data = pd.concat([save_ForcePlate_data, add_ForcePlate_data], ignore_index=True)
+    if np.shape(loading_time)[0] > 1:
+        # 繪圖確認力版資料
+        plt.figure(1)
+        plt.plot(time, Force_z, 'b', label='原始資料')
+        plt.axvline(x=loading_time[0][0], c='r', ls='--', lw=1)
+        plt.axvline(x=loading_time[0][1], c='r', ls='--', lw=1)
+        plt.axvline(x=loading_time[1][0], c='r', ls='--', lw=1)
+        plt.axvline(x=loading_time[1][1], c='r', ls='--', lw=1)
+        plt.title(file_name)
+        plt.legend()
+        plt.savefig(svae_path  +'//' +  file_name + '.jpg',
+                    dpi=300)
+        add_ForcePlate_data = pd.DataFrame({
+                                    'file_name': [file_path_split],
+                                    'low_file_name': ['lowpass_' + file_name],
+                                    '進力版時間1': [loading_time[0][0]],
+                                    '出力版時間1': [loading_time[0][1]],
+                                    '進力版時間2': [loading_time[1][0]],
+                                    '出力版時間2': [loading_time[1][1]],
+                                    })
+        # 合併資料
+        save_ForcePlate_data = pd.concat([save_ForcePlate_data, add_ForcePlate_data], ignore_index=True)
+    else:
+        add_ForcePlate_data = pd.DataFrame({
+                                    'file_name': [file_path_split],
+                                    'low_file_name': ['lowpass_' + file_name],
+                                    '進力版時間1': [None],
+                                    '出力版時間1': [None],
+                                    '進力版時間2': [None],
+                                    '出力版時間2': [None],
+                                    })
+        # 合併資料
+        save_ForcePlate_data = pd.concat([save_ForcePlate_data, add_ForcePlate_data], ignore_index=True)
 pd.DataFrame(save_ForcePlate_data).to_excel(excel_save, sheet_name='Sheet1', index=False, header=True)
-
-
-
-
-
-
-
-
-
-
-
