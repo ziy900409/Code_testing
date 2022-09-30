@@ -3,6 +3,8 @@
 """
 Created on Thu Sep 29 11:43:18 2022
 
+使用力版F1Y去做擊球步態的分期
+
 @author: Hsin Yang
 """
 
