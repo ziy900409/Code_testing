@@ -4,6 +4,11 @@
 Created on Thu Sep 29 11:43:18 2022
 
 使用力版F1Y去做擊球步態的分期
+1. 先使用6 Hz lowpass filter 預處理資料
+2. 使用 detecta onset 來做步態的分期
+https://nbviewer.org/github/BMClab/BMC/blob/master/notebooks/DetectOnset.ipynb
+3. 將結果繪圖，以人工判定結果好壞
+4. 輸出檔案
 
 @author: Hsin Yang
 """
