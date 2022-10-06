@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Apr 24 12:53:32 2022
+Created on Wed Oct  5 12:55:04 2022
 For Dr. Chen's EMG data proccessing
-@author: Hsin Yang, 20221005
+@author: drink
 """
 
 import os
@@ -126,7 +126,7 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     # MVC_folder = r'D:\NTSU\TenLab\Archery\Archery_20220225\S1\Processing\MVC'
     # MVC_save_path = r'D:\NTSU\TenLab\Archery\Archery_20220225\S1\Processing'
     MVC_file_list = os.listdir(MVC_folder)
-    MVC_data = pd.read_excel(MVC_folder + '\\' + MVC_file_list[0])
+    MVC_data = pd.read_excel(MVC_folder + '\\' + MVC_file_list[0], engine='openpyxl')
     find_max_all = []
     Columns_name = MVC_data.columns
     Columns_name = Columns_name.insert(0, 'FileName')
@@ -138,15 +138,17 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
         find_max = pd.DataFrame(find_max)
         find_max = np.transpose(find_max)
         find_max.insert(0, 'FileName', i)
-        find_max_all = find_max_all.append(find_max)
+        # find_max_all = find_max_all.append(find_max)
+        find_max_all = pd.concat([find_max_all, find_max], axis=0, ignore_index=True)
     # find maximum value from each file
     MVC_max = find_max_all.max(axis=0)
     MVC_max[0] = 'Max value'
     MVC_max = pd.DataFrame(MVC_max)
     MVC_max = np.transpose(MVC_max)
-    find_max_all = find_max_all.append(MVC_max)
+    # find_max_all = find_max_all.append(MVC_max)
+    find_max_all = pd.concat([find_max_all, MVC_max], axis=0, ignore_index=True)
     # writting data to EXCEl file
-    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-1] + '_MVC_rms.xlsx'
+    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-1] + '_MVC_move.xlsx'
     DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
 
 ## -----iMVC calculate------------
@@ -164,47 +166,34 @@ def iMVC_calculate(MVC_file, shooting_folder, fatigue_folder, save_file_path, st
     MVC_value = MVC_value.iloc[1:]
     
     for i in range(len(shooting_file_list)):
-        for ii in range(len(staging_data['FileName'])):
-            if shooting_file_list[i] == staging_data['FileName_rms'][ii].split('\\')[-1]:
-                print('shooting_file: ', shooting_file_list[i])
-                print('Staging_file: ', staging_data['FileName_rms'][ii].split('\\')[-1])
-                
-                # loading shooting EMG value
-                shooting_file_name = shooting_folder + '\\' + shooting_file_list[i]
-                # define release time
-                release_time = int(staging_data['Time Frame'][ii])
-                print(release_time)
-                # load EMG data
-                shooting_data = pd.read_excel(shooting_file_name)
-                # trunkcate specific period
-                shooting_EMG = shooting_data.iloc[release_time - 5000:release_time + 1000, 1:]    
-                # calculate iMVC data
-                shooting_iMVC = np.divide(shooting_EMG, MVC_value)*100
-                shooting_iMVC.insert(0, 'time', shooting_data.iloc[:,0])
-                # writting iMVC data in a EXCEL
-                save_iMVC_name = save_file_path + '\\' + 'iMVC_' + shooting_file_list[i]
-                DataFrame(shooting_iMVC).to_excel(save_iMVC_name, sheet_name='Sheet1', index=False, header=True)
+        # loading shooting EMG value
+        shooting_file_name = shooting_folder + '\\' + shooting_file_list[i]
+        # load EMG data
+        shooting_data = pd.read_excel(shooting_file_name)
+        # trunkcate specific period
+        shooting_EMG = shooting_data.iloc[:, 1:]    
+        # calculate iMVC data
+        shooting_iMVC = np.divide(shooting_EMG, MVC_value)*100
+        shooting_iMVC.insert(0, 'time', shooting_data.iloc[:,0])
+        # writting iMVC data in a EXCEL
+        save_iMVC_name = save_file_path + '\\' + 'iMVC_' + shooting_file_list[i]
+        DataFrame(shooting_iMVC).to_excel(save_iMVC_name, sheet_name='Sheet1', index=False, header=True)
+
     
     for i in range(len(fatigue_file_list)):
-            for ii in range(len(staging_data['FileName'])):
-                if fatigue_file_list[i] == staging_data['FileName_rms'][ii].split('\\')[-1]:
-                    print('fatigue_file: ', fatigue_file_list[i])
-                    print('Staging_file: ', staging_data['FileName_rms'][ii].split('\\')[-1])
-                    # loading shooting EMG value
-                    fatigue_file_name = fatigue_folder + '\\' + fatigue_file_list[i]
-                    # define release time
-                    release_time = int(staging_data['Time Frame'][ii])
-                    print(release_time)
-                    # load EMG data
-                    fatigue_data = pd.read_excel(fatigue_file_name)
-                    # trunkcate specific period
-                    fatigue_EMG = fatigue_data.iloc[release_time - 5000:release_time + 1000, 1:]    
-                    # calculate iMVC data
-                    fatigue_iMVC = np.divide(fatigue_EMG, MVC_value)*100
-                    fatigue_iMVC.insert(0, 'time', fatigue_data.iloc[:,0])
-                    # writting iMVC data in a EXCEL
-                    save_iMVC_name = save_file_path + '\\' + 'iMVC_' + fatigue_file_list[i]
-                    DataFrame(fatigue_iMVC).to_excel(save_iMVC_name, sheet_name='Sheet1', index=False, header=True)
+        # loading shooting EMG value
+        fatigue_file_name = fatigue_folder + '\\' + fatigue_file_list[i]
+        # load EMG data
+        fatigue_data = pd.read_excel(fatigue_file_name)
+        # trunkcate specific period
+        fatigue_EMG = fatigue_data.iloc[:, 1:]    
+        # calculate iMVC data
+        fatigue_iMVC = np.divide(fatigue_EMG, MVC_value)*100
+        fatigue_iMVC.insert(0, 'time', fatigue_data.iloc[:,0])
+        # writting iMVC data in a EXCEL
+        save_iMVC_name = save_file_path + '\\' + 'iMVC_' + fatigue_file_list[i]
+        DataFrame(fatigue_iMVC).to_excel(save_iMVC_name, sheet_name='Sheet1', index=False, header=True)
+  
         
 
 
@@ -215,6 +204,8 @@ def iMVC_calculate(MVC_file, shooting_folder, fatigue_folder, save_file_path, st
 # -----------------------loop code starting-----------------------------------
 rowdata_folder_path = r"D:\NTSU\ChenDissertationDataProcessing\EMG_Data\RawData"
 rowdata_folder_list = os.listdir(rowdata_folder_path)
+# 去除有“.“開頭的檔案
+rowdata_folder_list  = [f for f in os.listdir(rowdata_folder_path) if not f.startswith('.')]
 processing_folder_path = r"D:\NTSU\ChenDissertationDataProcessing\EMG_Data\ProcessingData\RMS"
 
 # 處理MVC data
@@ -237,16 +228,16 @@ for i in range(len(rowdata_folder_list)):
         toc = time.process_time()
         print("Total Time:",toc-tic)
 # 找最大值
-MVC_folder_list = Read_File(r'D:\NTSU\TenLab\ChenThesisData\EMG_Data\ProcessingData',
-                            '',
-                            subfolder = False)
-for ii in range(len(MVC_folder_list)):
-    print(ii)
+
+
+for i in range(len(rowdata_folder_list)):
+    print(rowdata_folder_list[i])
     tic = time.process_time()
-    MVC_folder = MVC_folder_list[ii] + '\\MVC'
-    Find_MVC_max(MVC_folder, MVC_folder_list[ii])
+    Find_MVC_max(processing_folder_path + '\\' + rowdata_folder_list[i] + '\\MVC',
+                  processing_folder_path + '\\' + rowdata_folder_list[i])
     toc = time.process_time()
     print("Total Time:",toc-tic)
+
     
 # 處理shooting data
 # ----------------------------------------------------------------------------
@@ -259,11 +250,6 @@ for ii in range(len(MVC_folder_list)):
 # 4.3 依切割檔案計算moving average
 # 4.4 輸出moving average to excel file
 # ----------------------------------------------------------------------------
-rowdata_folder_path = '/Users/hui/Documents/NTSU/ChenData_test/Raw/'
-rowdata_folder_list = os.listdir(rowdata_folder_path)
-# 去除有“.“開頭的檔案
-rowdata_folder_list  = [f for f in os.listdir(rowdata_folder_path) if not f.startswith('.')]
-processing_folder_path = '/Users/hui/Documents/NTSU/ChenData_test/processing/'
 
 for i in range(len(rowdata_folder_list)):
     tic2 = time.process_time()
@@ -355,7 +341,7 @@ for i in range(len(rowdata_folder_list)):
     # define data path
     rhythm_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + '韻律'
     mechanic_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + '機械'
-    MVC_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_MVC_rms.xlsx'
+    MVC_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_MVC_move.xlsx'
     save_file_path = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\iMVC'
     staging_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_ReleaseTiming.xlsx'
     # # read data
@@ -367,7 +353,3 @@ for i in range(len(rowdata_folder_list)):
     print("Total Time:",toc2-tic2)
 toc1 = time.process_time()
 print("Total Time:",toc1-tic1)
-
-
-
-
