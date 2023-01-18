@@ -304,7 +304,7 @@ for i in range(len(rowdata_folder_list)):
                 EMG_data = pd.DataFrame(np.transpose(EMG_data),
                                         columns=data.iloc[:, [1, 9, 17, 25, 33, 41, 49, 57, 65, 73, 81, 89, 97, 105, 113, 121]].columns)
                 # bandpass filter use in signal
-                bandpass_sos = signal.butter(2, [20, 500],  btype='bandpass', fs=Fs, output='sos')
+                bandpass_sos = signal.butter(2, [8/0.802, 450/0.802],  btype='bandpass', fs=Fs, output='sos')
                 bandpass_filtered_data = np.zeros(np.shape(EMG_data))
                 for columns in range(np.shape(EMG_data)[1]):
                     # print(i)
@@ -317,19 +317,19 @@ for i in range(len(rowdata_folder_list)):
                 # 定義分期時間
                 release_time = int(staging_data['Time Frame'][iii])
                 print(release_time)
-                shooting_EMG = abs_data[release_time - 5000:release_time + 1000, :]
+                shooting_EMG = abs_data[release_time - 5000:release_time + 1100, :]
                 # -------Data smoothing. Compute RMS
                 # The user should change window length and overlap length that suit for your experiment design
                 # window width = window length(second)//time period(second)
                 window_width_rms = int(0.05/(1/np.floor(Fs))) #width of the window for computing RMS
                 overlap_len = 0.99 # 百分比
-                rms_data = np.zeros([int((np.shape(bandpass_filtered)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1,
-                                        np.shape(abs_data)[1]])
-                for i in range(np.shape(rms_data)[1]):
-                    for ii in range(np.shape(rms_data)[0]):
-                        data_location = int(ii*(1-overlap_len)*window_width_rms)
+                rms_data = np.zeros([int((np.shape(shooting_EMG)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1,
+                                        np.shape(shooting_EMG)[1]])
+                for rows in range(np.shape(rms_data)[1]):
+                    for columns in range(np.shape(rms_data)[0]):
+                        data_location = int(columns*(1-overlap_len)*window_width_rms)
                         # print(data_location, data_location+window_width_rms)
-                        rms_data[int(ii), i] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width_rms, i])**2)
+                        rms_data[int(columns), rows] = np.sqrt(np.sum((shooting_EMG[data_location:data_location+window_width_rms, rows])**2)
                                                   /window_width_rms)
                 # 定義資料型態與欄位名稱
                 rms_data = pd.DataFrame(rms_data, columns=EMG_data.columns)
