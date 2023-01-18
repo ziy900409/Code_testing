@@ -88,35 +88,20 @@ def EMG_processing(cvs_file_list):
             moving_data[int(ii), i] = (np.sum(abs_data[(ii*window_width_moving+1):(window_width_moving)*(ii+1), i]) 
                                                       /window_width_moving)
         
-        # for ii in range(np.shape(moving_data)[0]):
-        #     print((ii*window_width_moving+1),(window_width_moving)*(ii+1))
-        #     moving_data[int(ii), i] = (np.sum(abs_data[(ii*window_width_moving+1):(window_width_moving)*(ii+1), i]) 
-        #                                               /window_width_moving)
     # -------Data smoothing. Compute RMS
     # The user should change window length and overlap length that suit for your experiment design
     # window width = window length(second)//time period(second)
     window_width_rms = int(0.05/(1/np.floor(Fs))) #width of the window for computing RMS
-    overlap_len = 0.5 # 百分比
+    overlap_len = 0.99 # 百分比
     rms_data = np.zeros([int((np.shape(bandpass_filtered)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1,
                             np.shape(abs_data)[1]])
     for i in range(np.shape(rms_data)[1]):
         for ii in range(np.shape(rms_data)[0]):
             data_location = int(ii*(1-overlap_len)*window_width_rms)
-            print(data_location, data_location+window_width_rms)
+            # print(data_location, data_location+window_width_rms)
             rms_data[int(ii), i] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width_rms, i])**2)
                                       /window_width_rms)
             
-    # rms_data = np.zeros([int((np.shape(bandpass_filtered)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1])
-
-    # for ii in range(np.shape(rms_data)[0]):
-    #     data_location = int(ii*(1-overlap_len)*window_width_rms)
-    #     print(data_location, data_location+window_width_rms)
-    #     rms_data[int(ii)] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width_rms])**2)
-    #                               /window_width_rms)
-            # data_location = int(ii*(1-overlap_len)*window_width_rms)
-            # print(data_location)
-            # rms_data[int(ii), i] = (np.sum(bandpass_filtered_data[data_location:data_location+window_width_rms, i])
-            #                    /window_width_rms)
     # 定義資料型態與欄位名稱
     moving_data = pd.DataFrame(moving_data, columns=EMG_data.columns)
     rms_data = pd.DataFrame(rms_data, columns=EMG_data.columns)
@@ -285,8 +270,6 @@ def find_release_time(folder_path, save_path):
 
 
 
-
-bandpass_filtered_data, moving_data, lowpass_filtered_data, rms_data = EMG_processing(r"D:\NTSU\ChenDissertationDataProcessing\EMG_Data\RawData\S01\射箭\韻律式\S01_Plot_and_Store_Rep_1.18 韻律1.csv")
 # ---------------code staring------------------------------
 # -----------------------loop code starting--------------------
 rowdata_folder_path = r"D:\NTSU\ChenDissertationDataProcessing\EMG_Data\RawData"
@@ -303,7 +286,7 @@ for i in range(len(rowdata_folder_list)):
     for ii in MVC_list:
         tic = time.process_time()
         print(ii)
-        bandpass_filtered_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
+        moving_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
         data_save_path = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\MVC'
         Excel_writting(ii, data_save_path , rms_data)
         toc = time.process_time()
@@ -314,7 +297,7 @@ for i in range(len(rowdata_folder_list)):
     for ii in Shooting_list:
         print(ii)
         tic = time.process_time()
-        bandpass_filtered_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
+        moving_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
         data_save_path = processing_folder_path + '\\' + rowdata_folder_list[i]
         Excel_writting(ii, data_save_path, rms_data)
         # 寫資料近excel
@@ -350,25 +333,25 @@ print("Total Time:",toc1-tic1)
 
 
 
-MVC_folder_list = Read_File(r'D:\NTSU\TenLab\ChenThesisData\EMG_Data\ProcessingData',
-                            '',
-                            subfolder = False)
-for ii in range(len(MVC_folder_list)):
-    print(ii)
-    tic = time.process_time()
-    MVC_folder = MVC_folder_list[ii] + '\\MVC'
-    Find_MVC_max(MVC_folder, MVC_folder_list[ii])
-    toc = time.process_time()
-    print("Total Time:",toc-tic)
+# MVC_folder_list = Read_File(r'D:\NTSU\TenLab\ChenThesisData\EMG_Data\ProcessingData',
+#                             '',
+#                             subfolder = False)
+# for ii in range(len(MVC_folder_list)):
+#     print(ii)
+#     tic = time.process_time()
+#     MVC_folder = MVC_folder_list[ii] + '\\MVC'
+#     Find_MVC_max(MVC_folder, MVC_folder_list[ii])
+#     toc = time.process_time()
+#     print("Total Time:",toc-tic)
 
-release_folder = r'D:\NTSU\ChenThesisData\EMG_Data\RawData'
-release_folder_list = os.listdir(release_folder)
-save_place = r'D:\NTSU\ChenThesisData\EMG_Data\ProcessingData'
-for ii in range(len(release_folder_list)):
-    print(ii)
-    tic = time.process_time()
-    find_release_time(release_folder + '\\' + release_folder_list[ii], save_place)
-    toc = time.process_time()
-    print("Total Time:",toc-tic)
+# release_folder = r'D:\NTSU\ChenThesisData\EMG_Data\RawData'
+# release_folder_list = os.listdir(release_folder)
+# save_place = r'D:\NTSU\ChenThesisData\EMG_Data\ProcessingData'
+# for ii in range(len(release_folder_list)):
+#     print(ii)
+#     tic = time.process_time()
+#     find_release_time(release_folder + '\\' + release_folder_list[ii], save_place)
+#     toc = time.process_time()
+#     print("Total Time:",toc-tic)
 
 
