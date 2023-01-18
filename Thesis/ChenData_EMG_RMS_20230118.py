@@ -280,7 +280,7 @@ for i in range(len(rowdata_folder_list)):
     Shooting_path = rowdata_folder_path + '\\' + rowdata_folder_list[i] + '\\射箭'
     Shooting_list = Read_File(Shooting_path, '.csv', subfolder=True)
     # 讀取staging file
-    staging_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_ReleaseTiming.xlsx'
+    staging_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_ReleaseTiming_1.xlsx'
     
     staging_data = pd.read_excel(staging_file)
     for ii in range(len(Shooting_list)):
@@ -313,38 +313,38 @@ for i in range(len(rowdata_folder_list)):
                     bandpass_filtered_data[:, columns] = bandpass_filtered 
                 
                 # caculate absolute value to rectifiy EMG signal
-                bandpass_filtered_data = abs(bandpass_filtered_data)
-                
+                abs_data = abs(bandpass_filtered_data)
                 # 定義分期時間
                 release_time = int(staging_data['Time Frame'][iii])
                 print(release_time)
-                shooting_EMG = bandpass_filtered_data[release_time - 5000:release_time + 1000, :]
-                # -------Data smoothing Compute moving mean---------
+                shooting_EMG = abs_data[release_time - 5000:release_time + 1000, :]
+                # -------Data smoothing. Compute RMS
                 # The user should change window length and overlap length that suit for your experiment design
                 # window width = window length(second)//time period(second)
-                window_width = int(0.1/(1/np.floor(Fs)))
-                moving_data = np.zeros([int(np.shape(shooting_EMG)[0] / window_width),
-                                        np.shape(shooting_EMG)[1]])
-                for columns_1 in range(np.shape(moving_data)[1]):
-                    for rows_1 in range(np.shape(moving_data)[0]):
-                        data_location = rows_1
-                        moving_data[int(data_location), columns_1] = \
-                        (np.sum(shooting_EMG[rows_1*(rows_1+1):(rows_1+window_width)*(rows_1+1), columns_1]) \
-                         /window_width)
+                window_width_rms = int(0.05/(1/np.floor(Fs))) #width of the window for computing RMS
+                overlap_len = 0.99 # 百分比
+                rms_data = np.zeros([int((np.shape(bandpass_filtered)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1,
+                                        np.shape(abs_data)[1]])
+                for i in range(np.shape(rms_data)[1]):
+                    for ii in range(np.shape(rms_data)[0]):
+                        data_location = int(ii*(1-overlap_len)*window_width_rms)
+                        # print(data_location, data_location+window_width_rms)
+                        rms_data[int(ii), i] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width_rms, i])**2)
+                                                  /window_width_rms)
                 # 定義資料型態與欄位名稱
-                moving_data = pd.DataFrame(moving_data, columns=EMG_data.columns)
-                # 定義moving average的時間
-                moving_time_index = np.linspace(0, np.shape(data_time)[0]-1, np.shape(moving_data)[0])
-                moving_time_index = moving_time_index.astype(int)
-                time_1 = pd.DataFrame(data.iloc[moving_time_index, 0], index = None).reset_index(drop=True)
-                moving_data = pd.concat([time_1, moving_data], axis = 1, ignore_index=False)
+                rms_data = pd.DataFrame(rms_data, columns=EMG_data.columns)
+                # 定義RMS DATA的時間.
+                rms_time_index = np.linspace(0, np.shape(data_time)[0]-1, np.shape(rms_data)[0])
+                rms_time_index = rms_time_index.astype(int)
+                time_2 = pd.DataFrame(data.iloc[rms_time_index, 0], index = None).reset_index(drop=True)
+                rms_data = pd.concat([time_2, pd.DataFrame(rms_data)], axis = 1, ignore_index=False)                
                 # 寫資料進excel
                 filepath, tempfilename = os.path.split(Shooting_list[ii])
                 filename, extension = os.path.splitext(tempfilename)
                 # rewrite file name
                 file_name = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + filename + '_move.xlsx'
                 # writting data in worksheet
-                pd.DataFrame(moving_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+                pd.DataFrame(rms_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
 
         
         

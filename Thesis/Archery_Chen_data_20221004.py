@@ -291,47 +291,80 @@ for i in range(len(rowdata_folder_list)):
         Excel_writting(ii, data_save_path , rms_data)
         toc = time.process_time()
         print("Total Time:",toc-tic)
-    # 預處理shooting data
-    Shooting_path = rowdata_folder_path + '\\' + rowdata_folder_list[i] + '\\射箭'
-    Shooting_list = Read_File(Shooting_path, '.csv', subfolder=True)
-    for ii in Shooting_list:
-        print(ii)
-        tic = time.process_time()
-        moving_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
-        data_save_path = processing_folder_path + '\\' + rowdata_folder_list[i]
-        Excel_writting(ii, data_save_path, rms_data)
-        # 寫資料近excel
-        filepath, tempfilename = os.path.split(ii)
-        filename, extension = os.path.splitext(tempfilename)
-        # rewrite file name
-        file_name = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\射箭\\' + filename + '_RMS.xlsx'
-        # writting data in worksheet
-        pd.DataFrame(rms_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
-        toc = time.process_time()
-        print("Total Time:",toc-tic)
+    # # 預處理shooting data
+    # Shooting_path = rowdata_folder_path + '\\' + rowdata_folder_list[i] + '\\射箭'
+    # Shooting_list = Read_File(Shooting_path, '.csv', subfolder=True)
+    # for ii in Shooting_list:
+    #     print(ii)
+    #     tic = time.process_time()
+    #     moving_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
+    #     data_save_path = processing_folder_path + '\\' + rowdata_folder_list[i]
+    #     Excel_writting(ii, data_save_path, rms_data)
+    #     # 寫資料近excel
+    #     filepath, tempfilename = os.path.split(ii)
+    #     filename, extension = os.path.splitext(tempfilename)
+    #     # rewrite file name
+    #     file_name = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\射箭\\' + filename + '_RMS.xlsx'
+    #     # writting data in worksheet
+    #     pd.DataFrame(rms_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+    #     toc = time.process_time()
+    #     print("Total Time:",toc-tic)
 
-    # Find MVC max (已完成)
-    Find_MVC_max(processing_folder_path + '\\' + rowdata_folder_list[i] + '\\MVC',
-                  processing_folder_path + '\\' + rowdata_folder_list[i])    
+    # # Find MVC max (已完成)
+    # Find_MVC_max(processing_folder_path + '\\' + rowdata_folder_list[i] + '\\MVC',
+    #               processing_folder_path + '\\' + rowdata_folder_list[i])    
 
-    # calculate iMVC data
-    # define data path
-    rhythm_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + '韻律'
-    mechanic_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + '機械'
-    MVC_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_MVC_rms.xlsx'
-    save_file_path = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\iMVC'
-    staging_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_ReleaseTiming_1.xlsx'
-    # # read data
-    # rhythm_file_list = Read_File(rhythm_file, '.xlsx', subfolder=False)
-    # mechanic_file_list = Read_File(mechanic_file, '.xlsx', subfolder=False)
-    # iMVC function
-    iMVC_calculate(MVC_file, rhythm_file, mechanic_file, save_file_path, staging_file)
-    # toc2 = time.process_time()
+    # # calculate iMVC data
+    # # define data path
+    # rhythm_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + '韻律'
+    # mechanic_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + '機械'
+    # MVC_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_MVC_rms.xlsx'
+    # save_file_path = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\iMVC'
+    # staging_file = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + rowdata_folder_list[i] + '_ReleaseTiming_1.xlsx'
+    # # # read data
+    # # rhythm_file_list = Read_File(rhythm_file, '.xlsx', subfolder=False)
+    # # mechanic_file_list = Read_File(mechanic_file, '.xlsx', subfolder=False)
+    # # iMVC function
+    # iMVC_calculate(MVC_file, rhythm_file, mechanic_file, save_file_path, staging_file)
+    # # toc2 = time.process_time()
     # print("Total Time:",toc2-tic2)
 toc1 = time.process_time()
 print("Total Time:",toc1-tic1)
 
+## 
+rowdata_folder_path = r"D:\NTSU\ChenDissertationDataProcessing\EMG_Data\RawData"
+rowdata_folder_list = os.listdir(rowdata_folder_path)
+processing_folder_path = r"D:\NTSU\ChenDissertationDataProcessing\EMG_Data\ProcessingData\RMS"
 
+tic1 = time.process_time()
+for i in range(len(rowdata_folder_list)):
+    tic2 = time.process_time()
+    print(rowdata_folder_list[i])
+    # 預處理shooting data
+    Shooting_path = rowdata_folder_path + '\\' + rowdata_folder_list[i] + '\\射箭'
+    folder_list = os.listdir(Shooting_path)
+    # read staging file
+    staging_file_path = rowdata_folder_path + '\\' + rowdata_folder_list[i] + "\\" + rowdata_folder_list[i] + "_ReleaseTining_1.xlsx"
+    staging_data = pd.read_excel(staging_file_path)
+    for folder in folder_list:
+        Shooting_list = Read_File(Shooting_path + "\\" + folder,
+                                  '.csv', subfolder=True)
+        if 
+        for ii in Shooting_list:
+            print(ii)
+            tic = time.process_time()
+            moving_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
+            data_save_path = processing_folder_path + '\\' + rowdata_folder_list[i]
+            Excel_writting(ii, data_save_path, rms_data)
+            # 寫資料近excel
+            filepath, tempfilename = os.path.split(ii)
+            filename, extension = os.path.splitext(tempfilename)
+            # rewrite file name
+            file_name = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\射箭\\' + folder + "\\" + filename + '_RMS.xlsx'
+            # writting data in worksheet
+            pd.DataFrame(rms_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+            toc = time.process_time()
+            print("Total Time:",toc-tic)
 
 # MVC_folder_list = Read_File(r'D:\NTSU\TenLab\ChenThesisData\EMG_Data\ProcessingData',
 #                             '',
