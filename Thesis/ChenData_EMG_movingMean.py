@@ -64,7 +64,7 @@ def EMG_processing(cvs_file_list):
     EMG_data = pd.DataFrame(np.transpose(EMG_data),
                             columns=data.iloc[:, [1, 9, 17, 25, 33, 41, 49, 57, 65, 73, 81, 89, 97, 105, 113, 121]].columns)
     # bandpass filter use in signal
-    bandpass_sos = signal.butter(2, [20, 500],  btype='bandpass', fs=Fs, output='sos')
+    bandpass_sos = signal.butter(2, [8/0.802, 450/0.802],  btype='bandpass', fs=Fs, output='sos')
     
     bandpass_filtered_data = np.zeros(np.shape(EMG_data))
     for i in range(np.shape(EMG_data)[1]):
@@ -74,31 +74,52 @@ def EMG_processing(cvs_file_list):
         bandpass_filtered_data[:, i] = bandpass_filtered 
     
     # caculate absolute value to rectifiy EMG signal
-    bandpass_filtered_data = abs(bandpass_filtered_data)     
+    abs_data = abs(bandpass_filtered_data)     
+    # -------Data smoothing. Compute Moving mean
+    # without overlap
+    # 更改window length
+    # window width = window length(second)//time period(second)
+    window_width_moving = int(0.1/(1/np.floor(Fs)))
+    moving_data = np.zeros([int(np.shape(abs_data)[0] / window_width_moving),
+                            np.shape(abs_data)[1]])
+    for i in range(np.shape(moving_data)[1]):
+        for ii in range(np.shape(moving_data)[0]):
+            moving_data[int(ii), i] = (np.sum(abs_data[(ii*window_width_moving+1):(window_width_moving)*(ii+1), i]) 
+                                                      /window_width_moving)
+        
     # -------Data smoothing. Compute RMS
     # The user should change window length and overlap length that suit for your experiment design
     # window width = window length(second)//time period(second)
-    window_width = int(0.1/(1/np.floor(Fs)))
-    moving_data = np.zeros([int(np.shape(bandpass_filtered_data)[0] / window_width),
-                            np.shape(bandpass_filtered_data)[1]])
-    for i in range(np.shape(moving_data)[1]):
-        for ii in range(np.shape(moving_data)[0]):
-            data_location = ii
-            moving_data[int(data_location), i] = (np.sum(bandpass_filtered_data[ii*(ii+1):(ii+window_width)*(ii+1), i]) 
-                                                  /window_width)
+    window_width_rms = int(0.05/(1/np.floor(Fs))) #width of the window for computing RMS
+    overlap_len = 0.99 # 百分比
+    rms_data = np.zeros([int((np.shape(bandpass_filtered)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1,
+                            np.shape(abs_data)[1]])
+    for i in range(np.shape(rms_data)[1]):
+        for ii in range(np.shape(rms_data)[0]):
+            data_location = int(ii*(1-overlap_len)*window_width_rms)
+            # print(data_location, data_location+window_width_rms)
+            rms_data[int(ii), i] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width_rms, i])**2)
+                                      /window_width_rms)
+            
     # 定義資料型態與欄位名稱
     moving_data = pd.DataFrame(moving_data, columns=EMG_data.columns)
+    rms_data = pd.DataFrame(rms_data, columns=EMG_data.columns)
     # 定義moving average的時間
     moving_time_index = np.linspace(0, np.shape(data_time)[0]-1, np.shape(moving_data)[0])
     moving_time_index = moving_time_index.astype(int)
     time_1 = pd.DataFrame(data.iloc[moving_time_index, 0], index = None).reset_index(drop=True)
     moving_data = pd.concat([time_1, moving_data], axis = 1, ignore_index=False)
+    # 定義RMS DATA的時間.
+    rms_time_index = np.linspace(0, np.shape(data_time)[0]-1, np.shape(rms_data)[0])
+    rms_time_index = rms_time_index.astype(int)
+    time_2 = pd.DataFrame(data.iloc[rms_time_index, 0], index = None).reset_index(drop=True)
+    rms_data = pd.concat([time_2, pd.DataFrame(rms_data)], axis = 1, ignore_index=False)
     # ------linear envelop analysis-----------                          
     # ------lowpass filter parameter that the user must modify for your experiment        
     lowpass_sos = signal.butter(2, 6, btype='low', fs=Fs, output='sos')        
-    lowpass_filtered_data = np.zeros(np.shape(bandpass_filtered_data))
-    for i in range(np.shape(bandpass_filtered_data)[1]):
-        lowpass_filtered = signal.sosfiltfilt(lowpass_sos, bandpass_filtered_data[:,i])
+    lowpass_filtered_data = np.zeros(np.shape(abs_data))
+    for i in range(np.shape(abs_data)[1]):
+        lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data[:,i])
         lowpass_filtered_data[:, i] = lowpass_filtered
     # add columns name to data frame
     bandpass_filtered_data = pd.DataFrame(bandpass_filtered_data, columns=EMG_data.columns)
@@ -106,8 +127,8 @@ def EMG_processing(cvs_file_list):
     lowpass_filtered_data = pd.DataFrame(lowpass_filtered_data, columns=EMG_data.columns)
     # insert time data in the DataFrame
     lowpass_filtered_data.insert(0, 'time', data_time)
-    bandpass_filtered_data.insert(0, 'time', data_time)    
-    return bandpass_filtered_data, moving_data, lowpass_filtered_data
+
+    return moving_data, rms_data, lowpass_filtered_data
     
 #  --------------------writting data to a excel file------------------------ 
 def Excel_writting(file_path, data_save_path, data):
@@ -222,7 +243,7 @@ for i in range(len(rowdata_folder_list)):
     for ii in MVC_list:
         tic = time.process_time()
         print(ii)
-        bandpass_filtered_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
+        moving_data, rms_data, lowpass_filtered_data = EMG_processing(ii)
         data_save_path = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\MVC'
         Excel_writting(ii, data_save_path , rms_data)
         toc = time.process_time()
