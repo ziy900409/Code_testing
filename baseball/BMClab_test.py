@@ -2,13 +2,8 @@
 """
 Created on Thu Jan 19 22:44:15 2023
 
-@author: drink
+@author: Hsin Yang. 2023.01.20
 """
-
-# import package
-import ezc3d
-import numpy as np
-import pandas as pd
 
 def read_c3d(path):
     """
@@ -27,9 +22,16 @@ def read_c3d(path):
         Contains: frame rate, first frame, last frame, size(number of analog channel).
     FP_data : DataFrame
         data structure like .anc file.
-
+    
+    example:
+        motion_information, motion_data, analog_information, FP_data = read_c3d(Your_Path)
+    
+    Author: Hsin Yang. 2023.01.20
     """
-    import ezc3d    
+    # import library
+    import ezc3d
+    import numpy as np
+    import pandas as pd    
     # 1. read c3d file
     c = ezc3d.c3d(path)
     # 數據的基本資訊，使用dict儲存
@@ -83,47 +85,6 @@ def read_c3d(path):
     # synchronize data (optional)
     return motion_information, motion_data, analog_information, FP_data
     
-    
-    
-file = 'path to your c3d file'
-# read in c3d file and assign to variable c
-c = ezc3d.c3d(r"D:\Github\ziy900409\openbiomechanics\baseball_pitching\data\c3d\000002\000002_003034_73_207_002_FF_809.c3d")
-
-# 數據的基本資訊，使用dict儲存
-# information of motion data
-motion_information = c['header']['points']
-# information of analog data
-analog_information = c['header']['analogs']
-# convert c3d motion data to DataFrame format
-a = c['data']['points']
-# convert c3d analog data to DataFrame format
-## create column's name of motion data
-motion_axis = ['x', 'y', 'z']
-motion_markers = []
-for marker_name in c['parameters']['POINT']['LABELS']['value']:
-    for axis in motion_axis:
-        name = marker_name + '_' + axis
-        motion_markers.append(name)
-## create x, y, z matrix to store motion data
-motion_data = pd.DataFrame(np.zeros([c['header']['points']['last_frame']+1, # last frame + 1
-                                     len(c['parameters']['POINT']['LABELS']['value'])*3]), # marker * 3
-                           columns=motion_markers) 
-## key in data into matrix
-for i in range(len(c['parameters']['POINT']['LABELS']['value'])):
-    # print(1*i*3, 1*i*3+3)
-    # transpose matrix to key in data
-    motion_data.iloc[:, 1*i*3:1*i*3+3] = np.transpose(c['data']['points'][:3, 1*i, :])
-# force plate data
-## FP = force plate
-## create force plate channel name
-FP_channel = c['parameters']['ANALOG']['LABELS']['value']
-## create a matrix to store force plate data
-FP_data = pd.DataFrame(np.zeros([c['header']['analogs']['last_frame']+1, # last frame + 1
-                                     len(FP_channel)]), 
-                           columns=FP_channel)
-FP_data.iloc[:, :] = np.transpose(c['data']['analogs'][0, :, :])
-# synchronize data (optional)
-
 
 
 
