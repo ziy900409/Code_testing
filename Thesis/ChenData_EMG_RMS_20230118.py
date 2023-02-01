@@ -91,7 +91,7 @@ def EMG_processing(cvs_file_list):
     # The user should change window length and overlap length that suit for your experiment design
     # window width = window length(second)//time period(second)
     window_width_rms = int(0.05/(1/np.floor(Fs))) #width of the window for computing RMS
-    overlap_len = 0.99 # 百分比
+    overlap_len = 0 # 百分比
     rms_data = np.zeros([int((np.shape(bandpass_filtered)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1,
                             np.shape(abs_data)[1]])
     for i in range(np.shape(rms_data)[1]):
@@ -322,7 +322,7 @@ for i in range(len(rowdata_folder_list)):
                 # The user should change window length and overlap length that suit for your experiment design
                 # window width = window length(second)//time period(second)
                 window_width_rms = int(0.05/(1/np.floor(Fs))) #width of the window for computing RMS
-                overlap_len = 0.99 # 百分比
+                overlap_len = 0 # 百分比
                 rms_data = np.zeros([int((np.shape(shooting_EMG)[0] - window_width_rms)/  ((1-overlap_len)*window_width_rms)) + 1,
                                         np.shape(shooting_EMG)[1]])
                 for rows in range(np.shape(rms_data)[1]):
