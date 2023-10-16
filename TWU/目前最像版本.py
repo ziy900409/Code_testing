@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy
 import sys
 from scipy.spatial.transform import Rotation as R
-from scipy.signal import butter, lfilter
+from scipy.signal import butter, sosfiltfilt
 
 # Import sensor data
 data = numpy.genfromtxt(
@@ -126,9 +126,10 @@ low = lowcut / nyq
 
 # 创建Butterworth低通滤波器
 b, a = butter(order, low, btype="low")
-
+bandpass_sos = butter(2, 5 / 0.802, btype="lowpass", fs=120, output="sos")
+global_accelerometer = sosfiltfilt(bandpass_sos, global_accelerometer, axis=0)
 # 应用滤波器到陀螺仪数据
-global_accelerometer = lfilter(b, a, global_accelerometer, axis=0)
+
 accx = global_accelerometer[250:, 0]
 accy = global_accelerometer[250:, 1]
 accz = global_accelerometer[250:, 2]
