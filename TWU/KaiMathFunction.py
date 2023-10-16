@@ -94,13 +94,13 @@ class Quaternion:
     還需要再修改
     """
 
-    def __init__(self):
-        self = 1
+    def __init__(self, quaternion):
+        self.quaternion = quaternion
 
     @staticmethod
-    def quaternion_multiply(quaternion1, quaternion2):
-        w1, x1, y1, z1 = quaternion1
-        w2, x2, y2, z2 = quaternion2
+    def quaternion_multiply(q_1, q_2):
+        w1, x1, y1, z1 = q_1
+        w2, x2, y2, z2 = q_2
         w = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
         x = w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2
         y = w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2
@@ -111,126 +111,70 @@ class Quaternion:
     def quaternion_conjugate(quaternion):
         w, x, y, z = quaternion
         return np.array([w, -x, -y, -z])
+    
+    @staticmethod
+    def quaternionToRotMat(q):
+        """
+        Converts a quaternion orientation to a rotation matrix.
+
+        Parameters:
+        q (numpy.array): Input quaternion in the form [w, x, y, z].
+
+        Returns:
+        R (numpy.array): Rotation matrix.
+        """
+        R = np.zeros((len(q), 3, 3))
+        R[:, 0, 0] = 2 * (q[:, 0] ** 2) - 1 + 2 * (q[:, 1] ** 2)
+        R[:, 0, 1] = 2 * (q[:, 1] * q[:, 2] + q[:, 0] * q[:, 3])
+        R[:, 0, 2] = 2 * (q[:, 1] * q[:, 3] - q[:, 0] * q[:, 2])
+        R[:, 1, 0] = 2 * (q[:, 1] * q[:, 2] - q[:, 0] * q[:, 3])
+        R[:, 1, 1] = 2 * (q[:, 0] ** 2 - 1 + 2 * (q[:, 2] ** 2))
+        R[:, 1, 2] = 2 * (q[:, 2] * q[:, 3] + q[:, 0] * q[:, 1])
+        R[:, 2, 0] = 2 * (q[:, 1] * q[:, 3] + q[:, 0] * q[:, 2])
+        R[:, 2, 1] = 2 * (q[:, 2] * q[:, 3] - q[:, 0] * q[:, 1])
+        R[:, 2, 2] = 2 * (q[:, 0] ** 2 - 1 + 2 * (q[:, 3] ** 2))
+
+        return R
 
 
-class MadgwickAHRS:
-    def __init__(self, sample_period=1 / 256, quaternion=[1, 0, 0, 0], beta=1):
-        self.sample_period = sample_period
-        self.quaternion = np.array(quaternion)
-        self.beta = beta
+# %%
+class Quaternion:
+    def __init__(self, real, imag_i, imag_j, imag_k):
+        self.real = real
+        self.imag_i = imag_i
+        self.imag_j = imag_j
+        self.imag_k = imag_k
 
-    def update(self, gyroscope, accelerometer, magnetometer):
-        q = self.quaternion
+    def conjugate(self):
+        self.imag_i = -self.imag_i
+        self.imag_j = -self.imag_j
+        self.imag_k = -self.imag_k
+        return np.array([self.real, self.imag_i, self.imag_j, self.imag_k])
 
-        # Normalise accelerometer measurement
-        accelerometer /= np.linalg.norm(accelerometer)
+    @staticmethod
+    def multiply(q1, q2):
+        real_part = q1.real * q2.real - q1.imag_i * q2.imag_i - q1.imag_j * q2.imag_j - q1.imag_k * q2.imag_k
+        imag_i_part = q1.real * q2.imag_i + q1.imag_i * q2.real + q1.imag_j * q2.imag_k - q1.imag_k * q2.imag_j
+        imag_j_part = q1.real * q2.imag_j - q1.imag_i * q2.imag_k + q1.imag_j * q2.real + q1.imag_k * q2.imag_i
+        imag_k_part = q1.real * q2.imag_k + q1.imag_i * q2.imag_j - q1.imag_j * q2.imag_i + q1.imag_k * q2.real
+        return Quaternion(real_part, imag_i_part, imag_j_part, imag_k_part)
 
-        # Normalise magnetometer measurement
-        magnetometer /= np.linalg.norm(magnetometer)
+    def __str__(self):
+        return "[{}  {}i  {}j  {}k]".format(self.real, self.imag_i, self.imag_j, self.imag_k)
 
-        # Reference direction of Earth's magnetic field
-        h = self.quaternion_multiply(
-            q,
-            self.quaternion_multiply(
-                [0, magnetometer[0], magnetometer[1], magnetometer[2]],
-                self.quaternion_conjugate(q),
-            ),
-        )
-        b = np.array([0, np.linalg.norm([h[1], h[2]]), 0, h[3]])
+# 創建兩個四元素
+quat1 = Quaternion(1, 2, 3, 4)
+quat2 = Quaternion(5, 6, 7, 8)
+# quat2_conJ = Quaternion.conjugate()
+# 計算四元素的乘法
+result = Quaternion.multiply(quat1, quat2)
 
-        # Gradient descent algorithm corrective step
-        f = np.array(
-            [
-                2 * (q[1] * q[3] - q[0] * q[2]) - accelerometer[0],
-                2 * (q[0] * q[1] + q[2] * q[3]) - accelerometer[1],
-                2 * (0.5 - q[1] ** 2 - q[2] ** 2) - accelerometer[2],
-                2 * b[1] * (0.5 - q[2] ** 2 - q[3] ** 2)
-                + 2 * b[3] * (q[1] * q[3] - q[0] * q[2])
-                - magnetometer[0],
-                2 * b[1] * (q[1] * q[2] - q[0] * q[3])
-                + 2 * b[3] * (q[0] * q[1] + q[2] * q[3])
-                - magnetometer[1],
-                2 * b[1] * (q[0] * q[2] + q[1] * q[3])
-                + 2 * b[3] * (0.5 - q[1] ** 2 - q[2] ** 2)
-                - magnetometer[2],
-            ]
-        )
+# 輸出結果
+print("四元素1:", quat1)
+print("四元素2:", quat2)
+print("四元素2 conjugate:", quat2.conjugate())
+print("四元素2 conjugate:", quat2)
+print("四元素乘法結果:", result)
 
-        jacobian = np.array(
-            [
-                [-2 * q[2], 2 * q[3], -2 * q[0], 2 * q[1]],
-                [2 * q[1], 2 * q[0], 2 * q[3], 2 * q[2]],
-                [0, -4 * q[1], -4 * q[2], 0],
-                [
-                    -2 * b[3] * q[2],
-                    2 * b[3] * q[3],
-                    -4 * b[1] * q[2] - 2 * b[3] * q[0],
-                    -4 * b[1] * q[3] + 2 * b[3] * q[1],
-                ],
-                [
-                    -2 * b[1] * q[3] + 2 * b[3] * q[1],
-                    2 * b[1] * q[2] + 2 * b[3] * q[0],
-                    2 * b[1] * q[1] + 2 * b[3] * q[3],
-                    -2 * b[1] * q[0] + 2 * b[3] * q[2],
-                ],
-                [
-                    2 * b[1] * q[2],
-                    2 * b[1] * q[3] - 4 * b[3] * q[1],
-                    2 * b[1] * q[0] - 4 * b[3] * q[2],
-                    2 * b[1] * q[1],
-                ],
-            ]
-        )
 
-        step = np.linalg.solve(jacobian.T, f)
-        step /= np.linalg.norm(step)  # Normalize step magnitude
-
-        # Compute rate of change of quaternion
-        q_dot = (
-            0.5
-            * self.quaternion_multiply(q, [0, gyroscope[0], gyroscope[1], gyroscope[2]])
-            - self.beta * step
-        )
-
-        # Integrate to yield quaternion
-        q += q_dot * self.sample_period
-        self.quaternion = q / np.linalg.norm(q)  # Normalize quaternion
-        return self.quaternion
-
-    def update_imu(self, gyroscope, accelerometer):
-        q = self.quaternion
-
-        # Normalise accelerometer measurement
-        accelerometer /= np.linalg.norm(accelerometer)
-
-        # Gradient descent algorithm corrective step
-        f = np.array(
-            [
-                2 * (q[1] * q[3] - q[0] * q[2]) - accelerometer[0],
-                2 * (q[0] * q[1] + q[2] * q[3]) - accelerometer[1],
-                2 * (0.5 - q[1] ** 2 - q[2] ** 2) - accelerometer[2],
-            ]
-        )
-
-        jacobian = np.array(
-            [
-                [-2 * q[2], 2 * q[3], -2 * q[0], 2 * q[1]],
-                [2 * q[1], 2 * q[0], 2 * q[3], 2 * q[2]],
-                [0, -4 * q[1], -4 * q[2], 0],
-            ]
-        )
-
-        step = np.linalg.solve(jacobian.T, f)
-        step /= np.linalg.norm(step)  # Normalize step magnitude
-
-        # Compute rate of change of quaternion
-        q_dot = (
-            0.5
-            * self.quaternion_multiply(q, [0, gyroscope[0], gyroscope[1], gyroscope[2]])
-            - self.beta * step
-        )
-
-        # Integrate to yield quaternion
-        q += q_dot * self.sample_period
-        self.quaternion = q / np.linalg.norm(q)  # Normalize quaternion
-        return self.quaternion
+# %%
