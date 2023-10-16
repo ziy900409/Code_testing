@@ -2,7 +2,7 @@
 """
 Created on Sun Oct 15 19:09:26 2023
 
-@author: Hsin Yang, 15.10.2023
+@author: Hsin Yang, 15.Oct.2023
 """
 
 import numpy as np
