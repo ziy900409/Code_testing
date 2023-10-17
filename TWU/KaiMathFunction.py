@@ -19,15 +19,6 @@ from mpl_toolkits.mplot3d import Axes3D
 # %% define Math function
 
 
-def QuaternionConjugate(q):
-    """
-    converts a quaternion to its conjugate
-    """
-
-    qConj = np.array([q[:, 0], -q[:, 1], -q[:, 2], -q[:, 3]])
-    return
-
-
 def HessianProduct(q_1, q_2):
     """
     calculate the quaternion product of quaternion q_1 and q_2
@@ -94,26 +85,58 @@ class Quaternion:
     還需要再修改
     """
 
-    def __init__(self, quaternion):
-        self.quaternion = quaternion
+    def __init__(self, real, imag_i, imag_j, imag_k):
+        self.real = real
+        self.imag_i = imag_i
+        self.imag_j = imag_j
+        self.imag_k = imag_k
+
+    def conjugate(self):
+        self.imag_i = -self.imag_i
+        self.imag_j = -self.imag_j
+        self.imag_k = -self.imag_k
+        return np.array([self.real, self.imag_i, self.imag_j, self.imag_k])
+
+    def __str__(self):
+        return "[{}  {}i  {}j  {}k]".format(
+            self.real, self.imag_i, self.imag_j, self.imag_k
+        )
 
     @staticmethod
-    def quaternion_multiply(q_1, q_2):
-        w1, x1, y1, z1 = q_1
-        w2, x2, y2, z2 = q_2
-        w = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
-        x = w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2
-        y = w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2
-        z = w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2
-        return np.array([w, x, y, z])
+    def multiply(q1, q2):
+        real_part = (
+            q1.real * q2.real
+            - q1.imag_i * q2.imag_i
+            - q1.imag_j * q2.imag_j
+            - q1.imag_k * q2.imag_k
+        )
+        imag_i_part = (
+            q1.real * q2.imag_i
+            + q1.imag_i * q2.real
+            + q1.imag_j * q2.imag_k
+            - q1.imag_k * q2.imag_j
+        )
+        imag_j_part = (
+            q1.real * q2.imag_j
+            - q1.imag_i * q2.imag_k
+            + q1.imag_j * q2.real
+            + q1.imag_k * q2.imag_i
+        )
+        imag_k_part = (
+            q1.real * q2.imag_k
+            + q1.imag_i * q2.imag_j
+            - q1.imag_j * q2.imag_i
+            + q1.imag_k * q2.real
+        )
+        return Quaternion(real_part, imag_i_part, imag_j_part, imag_k_part)
 
     @staticmethod
-    def quaternion_conjugate(quaternion):
+    def conjugate(quaternion):
         w, x, y, z = quaternion
         return np.array([w, -x, -y, -z])
-    
+
     @staticmethod
-    def quaternionToRotMat(q):
+    def ToRotMat(q):
         """
         Converts a quaternion orientation to a rotation matrix.
 
@@ -138,29 +161,7 @@ class Quaternion:
 
 
 # %%
-class Quaternion:
-    def __init__(self, real, imag_i, imag_j, imag_k):
-        self.real = real
-        self.imag_i = imag_i
-        self.imag_j = imag_j
-        self.imag_k = imag_k
 
-    def conjugate(self):
-        self.imag_i = -self.imag_i
-        self.imag_j = -self.imag_j
-        self.imag_k = -self.imag_k
-        return np.array([self.real, self.imag_i, self.imag_j, self.imag_k])
-
-    @staticmethod
-    def multiply(q1, q2):
-        real_part = q1.real * q2.real - q1.imag_i * q2.imag_i - q1.imag_j * q2.imag_j - q1.imag_k * q2.imag_k
-        imag_i_part = q1.real * q2.imag_i + q1.imag_i * q2.real + q1.imag_j * q2.imag_k - q1.imag_k * q2.imag_j
-        imag_j_part = q1.real * q2.imag_j - q1.imag_i * q2.imag_k + q1.imag_j * q2.real + q1.imag_k * q2.imag_i
-        imag_k_part = q1.real * q2.imag_k + q1.imag_i * q2.imag_j - q1.imag_j * q2.imag_i + q1.imag_k * q2.real
-        return Quaternion(real_part, imag_i_part, imag_j_part, imag_k_part)
-
-    def __str__(self):
-        return "[{}  {}i  {}j  {}k]".format(self.real, self.imag_i, self.imag_j, self.imag_k)
 
 # 創建兩個四元素
 quat1 = Quaternion(1, 2, 3, 4)
