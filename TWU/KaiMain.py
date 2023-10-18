@@ -28,10 +28,18 @@ gyroscope = data[:, 1:4]
 ahrs = kai.MadgwickAHRS()
 
 ahrs_q = np.empty([len(timestamp), 4])  # quaternion of Earth relative to sensor
-ahrs_R = np.empty([len(timestamp), 3])  # Rotation Matrix of Earth relative to sensor
+ahrs_R = np.empty([len(timestamp), 3, 3])  # Rotation Matrix of Earth relative to sensor
+
+# Using AHRS algorithm to calculate sensor's orientation
+for i in range(len(timestamp)):
+    ahrs_q[i, :] = ahrs.UpdateIMU(gyroscope[i, :], accelerometer[i, :])
+    ahrs_R[i, :, :] = fun.quatern2rotMat(
+        ahrs_q[i, :]
+    ).T  # transpose because ahrs provides Earth relative to sensor
+# %%
+# using rotation matrix to calculate sensor acceleration with respect to Earth frame
+earth_acc = np.empty([len(timestamp), 3])
 
 for i in range(len(timestamp)):
-    ahrs_q[i, :] = ahrs.update_imu(gyroscope[i, :], accelerometer[i, :])
-    ahrs_R[i, :] = fun.quatern2rotMat(ahrs_q[i, :])
-
+    earth_acc[i, :] = np.dot(ahrs_R[i, :], earth_acc[i, :].T)
 # %%
