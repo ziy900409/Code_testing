@@ -19,39 +19,50 @@ from mpl_toolkits.mplot3d import Axes3D
 # %% define Math function
 
 
-def HessianProduct(q_1, q_2):
+def HessianProduct(q_1, q_2, shape="1D"):
     """
     calculate the quaternion product of quaternion q_1 and q_2
 
     Returns:
     Prod (numpy.array): Quaternion product of q_1 and q_2.
     """
-
-    Prod = np.zeros_like(q_1)
-    Prod[:, 0] = (
-        q_1[:, 0] * q_2[:, 0]
-        - q_1[:, 1] * q_2[:, 1]
-        - q_1[:, 2] * q_2[:, 2]
-        - q_1[:, 3] * q_2[:, 3]
-    )
-    Prod[:, 1] = (
-        q_1[:, 0] * q_2[:, 1]
-        + q_1[:, 1] * q_2[:, 0]
-        + q_1[:, 2] * q_2[:, 3]
-        - q_1[:, 3] * q_2[:, 2]
-    )
-    Prod[:, 2] = (
-        q_1[:, 0] * q_2[:, 2]
-        - q_1[:, 1] * q_2[:, 3]
-        + q_1[:, 2] * q_2[:, 0]
-        + q_1[:, 3] * q_2[:, 1]
-    )
-    Prod[:, 3] = (
-        q_1[:, 0] * q_2[:, 3]
-        + q_1[:, 1] * q_2[:, 2]
-        - q_1[:, 2] * q_2[:, 1]
-        + q_1[:, 3] * q_2[:, 0]
-    )
+    # q_1 = np.array(q)
+    # q_2 = np.array([0, gyroscope[0], gyroscope[1], gyroscope[2]])
+    # shape = "1D"
+    if shape == "1D":
+        q_1 = np.array(q_1)
+        q_2 = np.array(q_2)
+        Prod = np.zeros_like(q_1)
+        Prod[0] = q_1[0] * q_2[0] - q_1[1] * q_2[1] - q_1[2] * q_2[2] - q_1[3] * q_2[3]
+        Prod[1] = q_1[0] * q_2[1] + q_1[1] * q_2[0] + q_1[2] * q_2[3] - q_1[3] * q_2[2]
+        Prod[2] = q_1[0] * q_2[2] - q_1[1] * q_2[3] + q_1[2] * q_2[0] + q_1[3] * q_2[1]
+        Prod[3] = q_1[0] * q_2[3] + q_1[1] * q_2[2] - q_1[2] * q_2[1] + q_1[3] * q_2[0]
+    elif shape == "2D":
+        Prod = np.zeros_like(q_1)
+        Prod[:, 0] = (
+            q_1[:, 0] * q_2[:, 0]
+            - q_1[:, 1] * q_2[:, 1]
+            - q_1[:, 2] * q_2[:, 2]
+            - q_1[:, 3] * q_2[:, 3]
+        )
+        Prod[:, 1] = (
+            q_1[:, 0] * q_2[:, 1]
+            + q_1[:, 1] * q_2[:, 0]
+            + q_1[:, 2] * q_2[:, 3]
+            - q_1[:, 3] * q_2[:, 2]
+        )
+        Prod[:, 2] = (
+            q_1[:, 0] * q_2[:, 2]
+            - q_1[:, 1] * q_2[:, 3]
+            + q_1[:, 2] * q_2[:, 0]
+            + q_1[:, 3] * q_2[:, 1]
+        )
+        Prod[:, 3] = (
+            q_1[:, 0] * q_2[:, 3]
+            + q_1[:, 1] * q_2[:, 2]
+            - q_1[:, 2] * q_2[:, 1]
+            + q_1[:, 3] * q_2[:, 0]
+        )
 
     return Prod
 
@@ -162,7 +173,7 @@ class Quaternion:
 
 # %%
 
-
+"""
 # 創建兩個四元素
 quat1 = Quaternion(1, 2, 3, 4)
 quat2 = Quaternion(5, 6, 7, 8)
@@ -176,6 +187,6 @@ print("四元素2:", quat2)
 print("四元素2 conjugate:", quat2.conjugate())
 print("四元素2 conjugate:", quat2)
 print("四元素乘法結果:", result)
-
+"""
 
 # %%
