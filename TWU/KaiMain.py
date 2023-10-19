@@ -42,4 +42,19 @@ earth_acc = np.empty([len(timestamp), 3])
 
 for i in range(len(timestamp)):
     earth_acc[i, :] = np.dot(ahrs_R[i, :], earth_acc[i, :].T)
+
+
+# %%
+import matplotlib.pyplot as plt
+
+plt.figure(num=None, figsize=(8, 6), dpi=80, facecolor="w", edgecolor="k")
+plt.plot(earth_acc[:, 0], "r", label="X")
+plt.plot(earth_acc[:, 1], "g", label="Y")
+plt.plot(earth_acc[:, 2], "b", label="Z")
+plt.xlabel("sample")
+plt.ylabel("g")
+plt.title("Tilt-compensated accelerometer")
+plt.legend()
+plt.show()
+
 # %%
