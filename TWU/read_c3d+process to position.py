@@ -138,6 +138,49 @@ def TX(X, Y, Z):
     return T
 
 
+def transformation_matrix(LCS_0, LCS_1, LCS_2, p, O, rotation="GCStoLCS"):
+    """
+    Parameters
+    ----------
+    LCS_0 : np.array
+        The orgin of LCS.
+    LCS_1 : np.array
+        To create long axis with respect to orgin point.
+    LCS_2 : np.array
+        To create plane axis with respect to orgin point.
+    p : np.array
+        the specific point coordinate with respect to GCS/LCS.
+    rotation : Str, optional
+        To determinate to rotation sequence of transform matrix. The default is 'GCStoLCS'.
+
+    Returns
+    -------
+    p1 : np.array
+        the specific point coordinate with respect to LCS/GCS.
+
+    """
+    # determinate the axis
+    v1 = LCS_1 - LCS_0  # long axis
+    v2 = np.cross(v1, (LCS_2 - LCS_0))  # superior direction
+    v3 = np.cross(v1, v2)  # lateral direction
+
+    # normalize the vector
+    v1 = v1 / np.linalg.norm(v1)
+    v2 = v2 / np.linalg.norm(v2)
+    v3 = v3 / np.linalg.norm(v3)
+
+    # calculate rotation matrix
+    rotation_LCS = np.array([v1, v2, v3])  # or np.vstack((v1, v2, v3)).T
+    # print("\nRotation matrix rotation_LCS:\n", rotation_LCS)
+
+    if rotation == "GCStoLCS":
+        p1 = np.matmul(rotation_LCS, (p - LCS_0))
+    elif rotation == "LCStoGCS":
+        p1 = np.matmul((np.transpose(rotation_LCS)), p) + LCS_0
+
+    return p1
+
+
 # %%
 # motion_information, motion_data, analog_information, FP_data = read_c3d(r'C:\Users\19402\Documents\Kwon3D Projects\disc_golf\Trials\Trials\disc_golf\2023-02-17\golf_Tpose.c3d')
 # motion_information1, motion_data1, analog_information1, FP_data1 = read_c3d(r'C:\Users\19402\Documents\Kwon3D Projects\disc_golf\Trials\Trials\disc_golf\2023-02-17\Ball.c3d')
@@ -158,7 +201,7 @@ rO = motion_data_arrayd[:, 7:10]
 rX = motion_data_arrayd[:, 10:13]
 rY = motion_data_arrayd[:, 1:4]
 rXY = motion_data_arrayd[:, 4:7]
-
+# %%
 s_X = unit_vector(rx, ro)
 s_Y = unit_vector(ry, ro)
 s_Z = np.cross(s_X, s_Y)
@@ -166,6 +209,7 @@ s_T = TX(s_X, s_Y, s_Z)
 average_s_T = np.mean(s_T, axis=0)  # 计算平均值
 num_frames = motion_data_arrayd.shape[0]
 static_tm = np.tile(average_s_T, (num_frames, 1, 1))
+
 
 rs = R.from_matrix(static_tm)
 euler_angless = rs.as_euler("ZYX", degrees=True)
