@@ -16,7 +16,9 @@ import KaiMathFunction as fun
 
 # %% load IMU data
 data = np.genfromtxt(
-    r"E:\git\Code_testing\TWU\data\golf.csv", delimiter=",", skip_header=1
+    "E:\git\Oscillatory-Motion-Tracking-With-x-IMU\LoggedData\LoggedData_CalInertialAndMag.csv",
+    delimiter=",",
+    skip_header=1,
 )
 timestamp = data[:, 0]
 q = data[:, 10:14]
