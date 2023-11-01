@@ -7,7 +7,7 @@ from scipy.signal import butter, sosfiltfilt
 
 # Import sensor data
 data = numpy.genfromtxt(
-    "E:\git\Code_testing\TWU\data\golf.csv", delimiter=",", skip_header=1
+    "E:\Hsin\git\git\Code_testing\TWU\data\golf.csv", delimiter=",", skip_header=1
 )
 
 timestamp = data[:, 0]
