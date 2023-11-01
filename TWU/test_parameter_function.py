@@ -2,9 +2,9 @@ import c3d
 import struct
 import sys
 # %%
-data_path = "D:\python\TWU\KaiCode\DR 2.c3d"
+data_path = "E:\Hsin\git\git\Code_testing\TWU\data\DR 2.c3d"
 with open(data_path, 'rb') as handle:
-    handle.seek(914)  # Parameter section  移動文件指標到位於第 914 個位元組的位置。
+    handle.seek(513)  # Parameter section  移動文件指標到位於第 914 個位元組的位置。
     # 從檔案中讀取特定位置的位元組，並解碼成不同的資料類型：
     # byte1 和 byte2 是單一位元組，分別代表參數名稱中的字符數和參數ID。
     # int(handle.read(1).hex(), 16) 從檔案中讀取一個位元組（即8個位元）的數據，然後將它轉換為16進位表示的整數。
