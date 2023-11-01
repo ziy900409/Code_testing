@@ -113,6 +113,7 @@ class Quaternion:
         self.imag_i = imag_i
         self.imag_j = imag_j
         self.imag_k = imag_k
+        self.values = np.array([real, imag_i, imag_j, imag_k])
 
     def conjugate(self):
         self.imag_i = -self.imag_i
@@ -120,10 +121,28 @@ class Quaternion:
         self.imag_k = -self.imag_k
         return np.array([self.real, self.imag_i, self.imag_j, self.imag_k])
 
-    def __str__(self):
-        return "[{}  {}i  {}j  {}k]".format(
-            self.real, self.imag_i, self.imag_j, self.imag_k
-        )
+    def ToRotMat(q):
+        """
+        Converts a quaternion orientation to a rotation matrix.
+
+        Parameters:
+        q (numpy.array): Input quaternion in the form [w, x, y, z].
+
+        Returns:
+        R (numpy.array): Rotation matrix.
+        """
+        R = np.zeros((len(q), 3, 3))
+        R[:, 0, 0] = 2 * (q.real**2) - 1 + 2 * (q.imag_i**2)
+        R[:, 0, 1] = 2 * (q.imag_i * q.imag_j + q.real * q.imag_k)
+        R[:, 0, 2] = 2 * (q.imag_i * q.imag_k - q.real * q.imag_j)
+        R[:, 1, 0] = 2 * (q.imag_i * q.imag_j - q.real * q.imag_k)
+        R[:, 1, 1] = 2 * (q.real**2 - 1 + 2 * (q.imag_j**2))
+        R[:, 1, 2] = 2 * (q.imag_j * q.imag_k + q.real * q.imag_i)
+        R[:, 2, 0] = 2 * (q.imag_i * q.imag_k + q.real * q.imag_j)
+        R[:, 2, 1] = 2 * (q.imag_j * q.imag_k - q.real * q.imag_i)
+        R[:, 2, 2] = 2 * (q.real**2 - 1 + 2 * (q.imag_k**2))
+
+        return R
 
     @staticmethod
     def multiply(q1, q2):
@@ -153,52 +172,5 @@ class Quaternion:
         )
         return Quaternion(real_part, imag_i_part, imag_j_part, imag_k_part)
 
-    @staticmethod
-    def conjugate(quaternion):
-        w, x, y, z = quaternion
-        return np.array([w, -x, -y, -z])
-
-    @staticmethod
-    def ToRotMat(q):
-        """
-        Converts a quaternion orientation to a rotation matrix.
-
-        Parameters:
-        q (numpy.array): Input quaternion in the form [w, x, y, z].
-
-        Returns:
-        R (numpy.array): Rotation matrix.
-        """
-        R = np.zeros((len(q), 3, 3))
-        R[:, 0, 0] = 2 * (q[:, 0] ** 2) - 1 + 2 * (q[:, 1] ** 2)
-        R[:, 0, 1] = 2 * (q[:, 1] * q[:, 2] + q[:, 0] * q[:, 3])
-        R[:, 0, 2] = 2 * (q[:, 1] * q[:, 3] - q[:, 0] * q[:, 2])
-        R[:, 1, 0] = 2 * (q[:, 1] * q[:, 2] - q[:, 0] * q[:, 3])
-        R[:, 1, 1] = 2 * (q[:, 0] ** 2 - 1 + 2 * (q[:, 2] ** 2))
-        R[:, 1, 2] = 2 * (q[:, 2] * q[:, 3] + q[:, 0] * q[:, 1])
-        R[:, 2, 0] = 2 * (q[:, 1] * q[:, 3] + q[:, 0] * q[:, 2])
-        R[:, 2, 1] = 2 * (q[:, 2] * q[:, 3] - q[:, 0] * q[:, 1])
-        R[:, 2, 2] = 2 * (q[:, 0] ** 2 - 1 + 2 * (q[:, 3] ** 2))
-
-        return R
-
-
-# %%
-
-"""
-# 創建兩個四元素
-quat1 = Quaternion(1, 2, 3, 4)
-quat2 = Quaternion(5, 6, 7, 8)
-# quat2_conJ = Quaternion.conjugate()
-# 計算四元素的乘法
-result = Quaternion.multiply(quat1, quat2)
-
-# 輸出結果
-print("四元素1:", quat1)
-print("四元素2:", quat2)
-print("四元素2 conjugate:", quat2.conjugate())
-print("四元素2 conjugate:", quat2)
-print("四元素乘法結果:", result)
-"""
 
 # %%
