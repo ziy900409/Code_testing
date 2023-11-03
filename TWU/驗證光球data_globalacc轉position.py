@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 # Load data from CSV
-data = np.genfromtxt("光點_gframe_acc_veloicty_position.csv", delimiter=",", skip_header=1)
+data = np.genfromtxt("E:\Hsin\git\git\Code_testing\TWU\data\光點_gframe_acc_veloicty_position.csv", delimiter=",", skip_header=1)
 acc = data[:, 0:3]
 p = data[:, 6:9]
 px = p[:, 0]
