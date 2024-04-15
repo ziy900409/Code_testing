@@ -22,7 +22,7 @@ import gc
 import time
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"D:\BenQ_Project\python\Kao\code")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
 import Kao_Function as func
 
 import math
@@ -35,7 +35,7 @@ from scipy import signal
 import logging
 
 # data path
-data_path = r"D:\BenQ_Project\python\Kao\EMG\\"
+data_path = r"E:\Hsin\NTSU_lab\data\EMG\\"
 rawData_folder = "raw_data"
 processingData_folder = "processing_data"
 MVC_folder = "MVC"
@@ -46,7 +46,7 @@ end_name = "_ed"
 smoothing_method = 'lowpass'
 samplingRate_motion = 250
 # 讀取分期檔
-StagingFile_Exist = pd.read_excel(r"D:\BenQ_Project\python\Kao\Kao_StagingFile.xlsx",
+StagingFile_Exist = pd.read_excel(r"E:\Hsin\NTSU_lab\data\Kao_StagingFile_20240415.xlsx",
                                   sheet_name="工作表4")
 # %% EMG data preprocessing
 # 路徑設置
@@ -343,7 +343,7 @@ gc.collect(generation=2)
     3.1. 5*2個子圖，分別為左、右腳力版，以及各自的 EMG data
     3.2. 時間從 trigger off 到右腳離地 
 '''
-folder_path = r"D:\BenQ_Project\python\Kao\\"
+folder_path = r"E:\Hsin\NTSU_lab\data\\"
 
 # 1. read staging file
 # StagingFile_Exist = pd.read_excel(r"D:\BenQ_Project\python\Kao\Kao_StagingFile.xlsx",
@@ -378,20 +378,14 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             true_force_file.append(force_path)
 # %% 找力版時間
 # 定義圖片儲存路徑
-motion_fig_save = r"D:\BenQ_Project\python\Kao\motion_processing\\"
+motion_fig_save = r"E:\Hsin\NTSU_lab\data\motion_processing\\"
 # 定義資料儲存位置
-data_table = pd.DataFrame({'filename' : [],
-                           'order' : [],
-                           '左腳離地時間': [],
-                           '左腳最大值': [],
-                           '左腳最大值時間': [],
-                           '右腳離地時間': [],
-                           '右腳最大值': [],
-                           '右腳最大值時間':[],
-                           '啟動時間': [],
-                           '啟動左腳力量': [],
-                           'Left_RFD': []
-                                       })
+data_table = pd.DataFrame({}, columns = ['filename', 'order', '左腳離地時間', '左腳最大值',
+                                         '左腳最大值時間', '右腳離地時間', '右腳最大值',
+                                         '右腳最大值時間', '啟動時間', '啟動左腳力量',
+                                         'Left_RFD', '右腳發力時間', '右腳發力值',
+                                         'Right_RFD']
+                                       )
 
 for file_name in range(np.shape(StagingFile_Exist)[0]):
     # 1. 找出 anc, force, emg 的檔案路徑
@@ -457,8 +451,8 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             right_lowpass.iloc[:, i+1] = signal.sosfiltfilt(lowpass_sos,
                                                            np.transpose(rightLeg_FP2.iloc[:, i+1].values))
         # 定義時間區段
-        left_lowpass.iloc[:, 0] = leftLeg_FP1.iloc[:, 0]
-        right_lowpass.iloc[:, 0] = rightLeg_FP2.iloc[:, 0]
+        left_lowpass['#Sample'] = leftLeg_FP1.iloc[:, 0]
+        right_lowpass['#Sample'] = rightLeg_FP2.iloc[:, 0]
         
         # 計算力版三軸合力
         combin_left = np.sqrt((left_lowpass.iloc[:, 1].values)**2 + \
@@ -472,27 +466,50 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         # 因為不是所有人都有time start 所以改為 trigger off
         # analog time 為 samplingRate_motion*10
         ana_time_start = int(time_TriggerOff*10-samplingRate_motion*10*0.3)
-        # ne_start_onset = detect_onset(combin_left[ana_time_start:], # 將資料轉成一維型態
-        #                               np.mean(combin_left[ana_time_start-100:ana_time_start])*0.9,
-        #                               n_above=10, n_below=2, show=True)
         pa_start_onset = detect_onset(combin_left[time_TriggerOff*10:], # 將資料轉成一維型態
                                       np.mean(combin_left[ana_time_start-100:ana_time_start])*1.1,
                                       n_above=10, n_below=2, show=True)
+        # 找第二峰值
+        sec_left_onset = detect_onset(combin_left[time_TriggerOff*10:]*-1, # 將資料轉成一維型態
+                                      np.mean(combin_left[ana_time_start-100:ana_time_start])*-0.9,
+                                      n_above=10, n_below=2, show=True)
+        sec_left_max = (combin_left[time_TriggerOff*10 + sec_left_onset[0, 0]: \
+                                   time_TriggerOff*10 + sec_left_onset[0, 1]]*-1).argmax() + sec_left_onset[0, 0]
         # 找到左腳離地時間
         leftLeg_off = np.where(combin_left[ana_time_start:] < 10)[0][0]
         # 抓取左腳"最大峰值"及"峰值時間"
         left_max = combin_left[ana_time_start:].max()
         left_max_time = combin_left[ana_time_start:].argmax() + ana_time_start + 1 # 因為 python index 會少 1
         # 使用左腳合力，找到動作開始時間
-        time_start = pa_start_onset[0, 0] + time_TriggerOff*10
+        if sec_left_max > pa_start_onset[0, 0] and sec_left_max - pa_start_onset[0, 0] < 500:
+            time_start = sec_left_max + time_TriggerOff*10 
+        else:
+            time_start = pa_start_onset[0, 0] + time_TriggerOff*10
+        # 找右腳發力時間
+        # 先把太小的數字都替換成 0
+        combin_right[combin_right < 10**-20] = 0
+        # 先找 onset 的時間段，再找最大值
+        right_start_onset = detect_onset(combin_right[time_TriggerOff*10:]*-1, # 將資料轉成一維型態
+                                      np.mean(combin_right[ana_time_start-100:ana_time_start])*1.1*-1,
+                                      n_above=10, n_below=2, show=True)
+        first_right_max_value = np.max((combin_right[time_TriggerOff*10:time_TriggerOff*10+right_start_onset[0, 1]]*-1))
+        if first_right_max_value == 0:
+            first_right_max_idx = np.where((combin_right[time_TriggerOff*10:time_TriggerOff*10+right_start_onset[0, 1]]*-1) \
+                                           == first_right_max_value)[0]
+            first_right_max_idx = first_right_max_idx[-1] + time_TriggerOff*10
+        else:
+            first_right_max_idx = time_TriggerOff*10 + \
+                (combin_right[time_TriggerOff*10:time_TriggerOff*10+right_start_onset[0, 1]]*-1).argmax()
+
         # 抓取右腳"最大峰值"及"峰值時間"
-        right_max = combin_right.max()
-        right_time = combin_right.argmax() + 1
+        right_max = combin_right[first_right_max_idx:].max()
+        right_time = combin_right[first_right_max_idx:].argmax() + first_right_max_idx
         # 找到右腳離地時間，由於有右腳離地的情形，所以時間開始從最大值以後開始算
         rightLeg_off = np.where(combin_right[right_time:] < 10)[0][0]
         # 繪一張合力圖
         x_data = pd.Series(analog_data.loc[:, 'Name'])
         y_data = pd.Series(analog_data.loc[:, 'C63'])
+        # 繪圖
         fig, axs = plt.subplots(3, 1, figsize=(7, 8))
         # 子圖一
         axs[0].plot(left_lowpass.iloc[:, 0],
@@ -510,6 +527,8 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         axs[1].plot(right_lowpass.iloc[:, 0],
                     combin_right)
         axs[1].axvline(time_TriggerOff*10, color='red', linestyle='--', linewidth=0.5) # trigger off
+        axs[1].plot(first_right_max_idx, combin_right[first_right_max_idx], # 右腳發力時間
+                    marker = 'o', ms = 10, mec='lime', mfc='none')
         axs[1].plot(rightLeg_off + right_time, combin_right[rightLeg_off + right_time], # 右腳離地時間
                     marker = 'o', ms = 10, mec='c', mfc='none')
         axs[1].plot(right_time, combin_right[right_time], # 右腳力版最大值
@@ -529,10 +548,11 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         # hide tick and tick label of the big axes
         plt.grid(False)
         plt.xlabel("time (second)", fontsize = 14)
-        plt.ylabel("Frequency (Hz)", fontsize = 14)
+        plt.ylabel("Force (N)", fontsize = 14)
         plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-        # plt.savefig(str(motion_fig_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.jpg"),
-        #             dpi=200, bbox_inches = "tight")
+        plt.savefig(str(motion_fig_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.jpg"),
+                    dpi=200, bbox_inches = "tight")
+        plt.show()
         # 儲存資料
         # RFD = (left force max - left start force)/(left_max_time - time_start)/2500
         data_table = pd.concat([data_table, pd.DataFrame({'filename' : StagingFile_Exist.loc[file_name, '.anc'],
@@ -547,163 +567,22 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                                                           '啟動左腳力量': [combin_right[time_start]],
                                                           'Left_RFD': [(combin_left[left_max_time] - combin_right[time_start])/ \
                                                                        ((left_max_time - time_start)/2500)],
+                                                        '右腳發力時間':[first_right_max_idx],
+                                                        '右腳發力值':[combin_right[first_right_max_idx]],
+                                                        'Right_RFD':[combin_right[right_time] - combin_right[first_right_max_idx]/ \
+                                                                     (right_time - first_right_max_idx)/2500]
+                                                        
                                                           }, index=[0])],
                                ignore_index=True)
     
 
-data_table.to_excel(r"D:\BenQ_Project\python\Kao\motion_statistic.xlsx")
-    
-    
-
-    
-
-    # # 3.2. 計算繪圖所需時間
-    # # 重新繪製 force plate 的時間
-    # time_ForcePlate = np.linspace(0, (time_RightOff - time_TriggerOff)*1/samplingRate_motion, (time_RightOff - time_TriggerOff)*10)
-    # # EMG data processing
-    # # EMG 時間換算 (motion - (TriggerOn /10)) * 8
-    # # (EMG samppling rate: 2000; motion sampling rate: 250)
-    # # 擷取時間為 time_start -> time_RightOff
-    # truck_EMG = processing_data.iloc[(time_TriggerOff-int(onset_analog[0,0]/10))*8:(time_RightOff-int(onset_analog[0,0]/10))*8+1, :]
-    # time_EMG = np.linspace(0, (time_RightOff - time_TriggerOff)*1/samplingRate_motion,
-    #                        np.shape(truck_EMG)[0]) # 以 truck_EMG 的長度為時間切分步數
-
-    # # 5. 畫圖
-    # # 創建一個6*2的子圖佈局
-    # fig, axs = plt.subplots(6, 2, figsize=(12, 18))
-    # for i in range(2):
-    #     for j in range(6):
-    #         index = i*5 + j # 因為第一欄是time
-    #         # print(index)
-    #         if j == 0 and i == 0:
-    #             x = time_ForcePlate
-    #             # 由於力板的採樣時間為 motion system 的十倍
-    #             y = leftLeg_FP1.iloc[(time_TriggerOff)*10:(time_RightOff)*10, 1]
-    #             axs[j, i].set_title('ForcePlare 2: Left Leg')
-                
-    #         elif j ==0 and i == 1:
-    #             x = time_ForcePlate
-    #             # 由於力板的採樣時間為 motion system 的十倍
-    #             y = rightLeg_FP2.iloc[(time_TriggerOff)*10:(time_RightOff)*10, 1]
-    #             axs[j, i].set_title('ForcePlare 1: Right Leg')
-                
-    #         else:
-    #             print(index)
-    #             x = time_EMG
-    #             y = truck_EMG.iloc[:, index]
-    #             axs[j, i].set_title(truck_EMG.columns[index])
-               
-    #         axs[j, i].plot(x, y, label=f'Subplot {index+1}')
-    #         axs[j, i].axvline((time_start-time_TriggerOff)/250, color='red', linestyle='--', linewidth=0.5)
-    #         axs[j, i].axvline((time_LeftOff-time_TriggerOff)/250, color='red', linestyle='--', linewidth=0.5)
-    #         axs[j, i].axvline((time_RightOff-time_TriggerOff)/250, color='red', linestyle='--', linewidth=0.5)
-    #         # axs[j, i].set_title(f'Subplot {index+1}')
-    #         axs[j, i].legend()
-    # # 調整子圖之間的距離
-    # plt.tight_layout()
-    # plt.show()
+data_table.to_excel(r"E:\Hsin\NTSU_lab\data\motion_statistic.xlsx")
 
 
 
 # %%
     
-    # if np.shape(analog_data)[0]/2500 >= np.shape(bandpass_filtered_data)[0]/2000:
-    #     analog_time = analog_data.loc[int(onset_analog[0, 0]):\
-    #                                   int(onset_analog[0, 0]) + int(np.shape(bandpass_filtered_data)[0]/2000*2500),
-    #                                   'Name']
-    # else:
-    #     analog_time = analog_data.loc[int(onset_analog[0, 0]):,'Name']    
-    # n = int(math.ceil((np.shape(bandpass_filtered_data)[1] - 1) /2)) + 1 # add force plate data
 
-    # fig, axs = plt.subplots(n, 2, figsize=(2*n+1, 10), sharex='col')
-    # for i in range(2):
-    #     for j in range(6):
-    #         index = i*5 + j # 因為第一欄是time
-    #         # print(index)
-    #         if j == 0 and i == 0:
-    #             x = analog_time
-    #             # 由於力板的採樣時間為 motion system 的十倍
-    #             y = analog_data.loc[int(onset_analog[0, 0]):
-    #                                 int(onset_analog[0, 0]) + len(analog_time), 'F1Z']
-    #             # axs[j, i].set_title('ForcePlare 2: Left Leg')
-    #             print("left", len(x), len(y))
-    #         elif j ==0 and i == 1:
-    #             x = analog_time
-    #             # 由於力板的採樣時間為 motion system 的十倍
-    #             y = analog_data.loc[int(onset_analog[0, 0]):
-    #                                 int(onset_analog[0, 0]) + len(analog_time), 'F2Z']
-    #             print("right", len(x), len(y))
-    #             # axs[j, i].set_title('ForcePlare 1: Right Leg')
-                
-    #         else:
-    #             print(index)
-    #             x = bandpass_filtered_data.iloc[:, 0]
-    #             y = bandpass_filtered_data.iloc[:, index]
-    #             print('emg', len(x), len(y))
-    #             # axs[j, i].set_title(bandpass_filtered_data.columns[index], fontsize=16)
-    #         # print(x, y)
-    #         # print(len(x), len(y))
-    #         plt.plot(x, y)
-    #         plt.show()
-               
-    #         axs[j, i].plot(x, y, label=f'Subplot {index+1}')
-    #         axs[j, i].ticklabel_format(axis='y', style='scientific', scilimits=(-2, 2))
-    #         axs[j, i].axvline(triggerOff/250, color='r')
-    #         axs[j, i].axvline(bodyStart/250, color='r')
-    #         axs[j, i].axvline(leftLegLeave/250, color='r')
-    #         axs[j, i].axvline(rightLegLeave/250, color='r')
-    #         # axs[j, i].set_title(f'Subplot {index+1}')
-    #         axs[j, i].legend()
-    # # 調整子圖之間的距離
-    # plt.tight_layout()
-    # plt.show()
-
-        # 讀取資料
-        
-              
-                
-        # ---------------------------------------------------------------------------         
-        # if release_idx != "Nan":
-        #     # pre-processing data
-            
-        #     # get release time
-               
-        #     # release_samp_freq = int(1/(processing_data.iloc[1, 0] - processing_data.iloc[0, 0]))
-        #     # 去做條件判斷要輸出何種資料
-        #     if smoothing_method == 'lowpass':
-        #         ## 擷取 EMG data
-        #         # 計算MVC值
-        #         emg_iMVC = pd.DataFrame(np.empty([release[0]+release[1], np.shape(processing_data)[1]]),
-        #                                 columns=processing_data.columns)
-        #         emg_iMVC.iloc[:, 0] = processing_data.iloc[release_idx-release[0]:release_idx+release[1], 0].values
-        #         emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[release_idx-release[0]:release_idx+release[1], 1:].values),
-        #                                          MVC_value.values)*100
-        #     elif smoothing_method == 'rms' or smoothing_method == 'moving':
-        #         # 找出最接近秒數的索引值
-        #         start_idx = np.abs(processing_data.iloc[:, 0] - (release_idx - release[0])/down_freq).argmin()
-        #         # # 由於 python 取數字需多 +1
-        #         end_idx = np.abs(processing_data.iloc[:, 0] - (release_idx + release[1])/down_freq).argmin()
-        #         print(processing_data.loc[start_idx, "time"], processing_data.loc[end_idx, "time"])
-        #         if (release_idx + release[1])/down_freq > processing_data.loc[processing_data.index[-1], "time"]:
-        #             warnings.warn("時間開始位置不一", RuntimeWarning)
-        #             print("原始數據短於設定擊發後時間，請減少擊發後時間")
-                    
-        #         # Sep 13 2023.  修正 end_inx 會有不一致的情形, 但是總訊號會少 1 frame
-        #         while int(end_idx - start_idx) > \
-        #             int((sum(release) - down_freq * time_of_window) / (down_freq*time_of_window*(1-overlap_len))) + 1:
-        #             end_idx = end_idx - 1
-        #         while int(end_idx - start_idx) < \
-        #             int((sum(release) - down_freq * time_of_window) / (down_freq*time_of_window*(1-overlap_len))) + 1:
-        #             end_idx = end_idx + 1
-        
-        #         rms_data = processing_data.iloc[start_idx:end_idx, :].reset_index(drop=True)
-    
-        #         emg_iMVC = pd.DataFrame(np.zeros(np.shape(rms_data)),
-        #                                 columns=processing_data.columns)
-        #         emg_iMVC.iloc[:, 0] = rms_data.iloc[:, 0].values
-        #         # 加絕對值，以避免數值趨近 0 時，會出現負數問題
-        #         emg_iMVC.iloc[:, 1:] = np.divide(abs(rms_data.iloc[:, 1:].values),
-        #                                          MVC_value.values)*100
 
 
 

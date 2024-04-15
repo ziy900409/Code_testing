@@ -112,9 +112,9 @@ warnings.filterwarnings('always')
 # ---------------------找放箭時間用----------------------------
 # 設定最接近放箭位置之acc sensor的欄位編號，建議看完三軸資料再選最大的
 # 可設定數字或是欄位名稱：ex: R EXTENSOR GROUP: ACC.Y 1 or 5
-release_acc = 7
+release_acc = 17
 # 設定放箭的振幅大小值
-release_peak = 1.0
+release_peak = 1.5
 # ------------------------------------------------------------
 # ---------------------前處理用--------------------------------
 # downsampling frequency
@@ -130,9 +130,13 @@ overlap_len = 0.5 # 百分比 (%)
 # ------------------------------------------------------------
 # ---------------------繪製疲勞前後比較圖用---------------------
 # 放箭前檔名
-before_fatigue = "SH1"
+before_fatigue = "_1_"
 # 放箭後檔名
-after_fatigue = "SH2"
+after_fatigue = "_2_"
+# 預處理資料可修改檔名，並新增標籤，如：S2_MVC_Rep_1.16 -> S2_MVC_Rep_1.16_low
+end_name = "_ed"
+# 平滑處理方式 ex: lowpass, rms, moving
+smoothing_method = 'lowpass' 
 # example : [秒數*採樣頻率, 秒數*採樣頻率]
 # release = [3*down_freq, 0.5*down_freq]
 # 設定擊發分期時間
@@ -525,6 +529,7 @@ def Fourier_plot(raw_data, savepath, filename):
     None.
 
     '''
+    raw_data = data
     save = savepath + '\\FFT_' + filename + ".jpg"
     num_columns = []
     for i in range(len(raw_data.columns)):
@@ -532,6 +537,12 @@ def Fourier_plot(raw_data, savepath, filename):
             if raw_data.columns[i] == raw_data.columns[raw_data.columns.str.contains("EMG")][ii]:
                 num_columns.append(i)
     n = int(math.ceil(len(num_columns)/2))
+    '''
+    # 是否先濾波
+    
+    '''
+    
+    processing_data, bandpass_filtered_data = EMG_processing(raw_data, smoothing=smoothing_method)
     # due to our data type is series, therefore we need to extract value in the series
     # --------畫圖用與計算FFT----------------------
     # --------------------------------------------
@@ -554,24 +565,29 @@ def Fourier_plot(raw_data, savepath, filename):
         isnan = np.where(np.isnan(raw_data.iloc[:data_len, num_columns[col]]))
         if isnan[0].size == 0:
         # 計算Bandpass filter
-            bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
-            bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
-                                                   raw_data.iloc[:data_len, num_columns[col]].values)
+            processing_data, bandpass_filtered_data = EMG_processing(raw_data.iloc[:data_len, num_columns[col]].values,
+                                                                     smoothing=smoothing_method)
+            # bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            # bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
+            #                                        raw_data.iloc[:data_len, num_columns[col]].values)
         # 設定給斷訊超過 0.1 秒的 sensor 警告
         elif isnan[0].size > 0.1*freq:
             logging.warning(str(raw_data.columns[num_columns[col]] + "sensor 總訊號斷訊超過 0.1 秒，"))
-            bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
-            bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
-                                                   raw_data.iloc[:(np.shape(raw_data)[0] - data_len[col]), num_columns[col]].values)
+            processing_data, bandpass_filtered_data = EMG_processing(raw_data.iloc[:data_len, num_columns[col]].values,
+                                                                     smoothing=smoothing_method)
+            # bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            # bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
+            #                                        raw_data.iloc[:(np.shape(raw_data)[0] - data_len[col]), num_columns[col]].values)
         else:
             logging.warning(str("共發現 " + str(isnan[0].size) + " 個缺值,位置為 " + str(isnan[0])))
             logging.warning("已將 NAN 換為 0")
-            bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
-            bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
-                                                   raw_data.iloc[:data_len, num_columns[col]].fillna(0))
+
+            # bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            # bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
+            #                                        raw_data.iloc[:data_len, num_columns[col]].fillna(0))
         # 2. 資料前處理
         # 計算資料長度
-        N = int(np.prod(bandpass_filtered.shape[0]))#length of the array
+        N = int(np.prod(bandpass_filtered_data.shape[0]))#length of the array
         N2 = 2**(N.bit_length()-1) #last power of 2
         # convert sampling rate to period 
         # 計算取樣週期
@@ -582,7 +598,7 @@ def Fourier_plot(raw_data, savepath, filename):
         # print("# Samples length:",N)
         # print("# Sampling rate:",freq)
         # 開始計算 FFT   
-        yf = fft(bandpass_filtered)
+        yf = fft(bandpass_filtered_data)
         axs[x, y].plot(xf, 2.0/N * abs(yf[0:int(N/2)]))
         axs[x, y].set_title(raw_data.columns[num_columns[col]], fontsize = 16)
         # 設定科學符號 : 小數點後幾位數
@@ -597,7 +613,7 @@ def Fourier_plot(raw_data, savepath, filename):
     plt.grid(False)
     plt.xlabel("Frequency (Hz)", fontsize = 14)
     plt.ylabel("Power", fontsize = 14)
-    plt.savefig(save, dpi=200, bbox_inches = "tight")
+    # plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
     
 
