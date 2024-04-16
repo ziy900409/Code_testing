@@ -22,7 +22,8 @@ import gc
 import time
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"D:\BenQ_Project\python\Kao\code")
+# sys.path.append(r"D:\BenQ_Project\python\Kao\code")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball\kao")
 import Kao_Function as func
 
 import math
@@ -35,7 +36,9 @@ from scipy import signal
 import logging
 
 # data path
-data_path = r"D:\BenQ_Project\python\Kao\EMG\\"
+# computer_path = r"D:\BenQ_Project\python\Kao\\"
+computer_path = r"D:\BenQ_Project\python\Kao\\"
+data_path = computer_path + "EMG\\"
 rawData_folder = "raw_data"
 processingData_folder = "processing_data"
 MVC_folder = "MVC"
@@ -46,8 +49,10 @@ end_name = "_ed"
 smoothing_method = 'lowpass'
 samplingRate_motion = 250
 # 讀取分期檔
-StagingFile_Exist = pd.read_excel(r"D:\BenQ_Project\python\Kao\Kao_StagingFile.xlsx",
+StagingFile_Exist = pd.read_excel(computer_path + "Kao_StagingFile.xlsx",
                                   sheet_name="工作表4")
+# 定義圖片儲存路徑
+motion_fig_save = computer_path + "motion_processing\\"
 # %% EMG data preprocessing
 # 路徑設置
 all_rawdata_folder_path = []
@@ -196,8 +201,8 @@ gc.collect(generation=2)
 ------------------------------------------------------------------------------
 '''
 # 配置日志记录
-logging.basicConfig(filename=r'D:\BenQ_Project\python\Kao\processing_data\example.log',
-                    level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(filename=r'D:\BenQ_Project\python\Kao\processing_data\example.log',
+#                     level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # 记录信息
 tic = time.process_time()
@@ -377,8 +382,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             # print(str(StagingFile_Exist.loc[file_name, 'MotionFileName'] + ".forces"))
             true_force_file.append(force_path)
 # %% 找力版時間
-# 定義圖片儲存路徑
-motion_fig_save = r"D:\BenQ_Project\python\Kao\motion_processing\\"
+
 # 定義資料儲存位置
 data_table = pd.DataFrame({'filename' : [],
                            'order' : [],
@@ -416,12 +420,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                               skiprows=8, delimiter = '	', low_memory=False).iloc[2:, :]
     forcePlate_data = pd.read_csv(read_force,
                                   skiprows=4, delimiter = '	')
-    # 2.1. read EMG data and pre-processing data
-    '''
-    EMG 尚未處理
-    '''
-    # EMG_data = pd.read_csv(read_emg)
-    # processing_data, bandpass_filtered_data = func.EMG_processing(EMG_data, smoothing='lowpass')
+
     # 2.2. 設定左右腳力版
     rightLeg_FP2 = forcePlate_data.loc[:, ['#Sample', 'FX2', 'FY2', 'FZ2']]
     leftLeg_FP1 = forcePlate_data.loc[:, ['#Sample', 'FX1', 'FY1', 'FZ1']]
@@ -549,9 +548,17 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                                                                        ((left_max_time - time_start)/2500)],
                                                           }, index=[0])],
                                ignore_index=True)
-    
+        # ---------------處理 EMG data----------------- 
+        # 2.1. read EMG data and pre-processing data
+        '''
+        EMG 尚未處理
+        '''
+        # EMG_data = pd.read_csv(read_emg)
+        # processing_data, bandpass_filtered_data = func.EMG_processing(EMG_data, smoothing='lowpass')
 
-data_table.to_excel(r"D:\BenQ_Project\python\Kao\motion_statistic.xlsx")
+
+# 儲存資料
+data_table.to_excel(computer_path + "motion_statistic.xlsx")
     
     
 
