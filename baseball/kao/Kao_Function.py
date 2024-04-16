@@ -38,9 +38,9 @@ from scipy.fftpack import fft, fftfreq
 # downsampling frequency
 down_freq = 2000
 # 帶通濾波頻率
-bandpass_cutoff = [10/0.802, 500/0.802]
+bandpass_cutoff = [30/0.802, 450/0.802]
 # 低通濾波頻率
-lowpass_freq = 10/0.802
+lowpass_freq = 6/0.802
 # 設定移動平均數與移動均方根之參數
 # 更改window length, 更改overlap length
 time_of_window = 0.1 # 窗格長度 (單位 second)
@@ -317,6 +317,7 @@ def Fourier_plot(raw_data, savepath, filename):
     None.
 
     '''
+    raw_data = data
     save = savepath + '\\FFT_' + filename + ".jpg"
     num_columns = []
     for i in range(len(raw_data.columns)):
@@ -363,20 +364,21 @@ def Fourier_plot(raw_data, savepath, filename):
                                                    raw_data.iloc[:data_len, num_columns[col]].fillna(0))
         # 2. 資料前處理
         # 計算資料長度
-        N = int(np.prod(bandpass_filtered.shape[0]))#length of the array
+        N = len(bandpass_filtered)#length of the array
+        # N = int(np.prod(fft_data.shape[0]))#length of the array
         N2 = 2**(N.bit_length()-1) #last power of 2
         # convert sampling rate to period 
         # 計算取樣週期
-        T = 1/freq;
+        T = 1.0/freq;
         N = N2 #truncate array to the last power of 2
-        # xf = np.linspace(0.0, np.ceil(1.0/(2.0*T)), N//2)
+        xf = np.linspace(0.0, np.ceil(1.0/(2.0*T)), N//2)
         # print("# caculate Fast Fourier transform")
         # print("# Samples length:",N)
         # print("# Sampling rate:",freq)
         # 開始計算 FFT   
         yf = fft(bandpass_filtered, N)
-        freqs = fftfreq(N, T)  
-        axs[x, y].plot(freqs, 2.0/N * abs(yf[0:int(N/2)]))
+        freqs = fftfreq(N, T) 
+        axs[x, y].plot(freqs[0:int(N/2)], abs(yf[0:int(N/2)])*2/N)
         axs[x, y].set_title(raw_data.columns[num_columns[col]], fontsize = 16)
         # 設定科學符號 : 小數點後幾位數
         axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
@@ -390,7 +392,7 @@ def Fourier_plot(raw_data, savepath, filename):
     plt.grid(False)
     plt.xlabel("Frequency (Hz)", fontsize = 14)
     plt.ylabel("Power", fontsize = 14)
-    plt.savefig(save, dpi=200, bbox_inches = "tight")
+    # plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
 # %% 畫圖用
 
@@ -418,4 +420,23 @@ def plot_plot(data, savepath, filename, filter_type):
     plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
     
-# %%
+# %% 刪除指定資料夾中的特定檔案格式
+
+def remove_file(folder_path, file_format):
+    """
+    Parameters
+    ----------
+    folder_path : str
+        給定預清除檔案的資料夾路徑.
+    file_format : str
+        給定預清除的檔案格式.
+
+    Returns
+    -------
+    None.
+    """
+    for filename in os.listdir(folder_path):
+        if filename.endswith(file_format):
+            print(filename)
+            file_path = os.path.join(folder_path, filename)
+            os.remove(file_path)     

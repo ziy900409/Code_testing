@@ -598,7 +598,7 @@ def Fourier_plot(raw_data, savepath, filename):
         # print("# Samples length:",N)
         # print("# Sampling rate:",freq)
         # 開始計算 FFT   
-        yf = fft(bandpass_filtered_data)
+        yf = fft(bandpass_filtered_data, N)
         axs[x, y].plot(xf, 2.0/N * abs(yf[0:int(N/2)]))
         axs[x, y].set_title(raw_data.columns[num_columns[col]], fontsize = 16)
         # 設定科學符號 : 小數點後幾位數
