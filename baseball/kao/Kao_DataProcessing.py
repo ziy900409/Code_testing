@@ -20,6 +20,7 @@ Created on Mon Mar 11 19:56:19 2024
 import os
 import gc
 import time
+import numpy
 import sys
 # 路徑改成你放自己code的資料夾
 sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
