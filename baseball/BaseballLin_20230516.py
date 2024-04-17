@@ -8,7 +8,7 @@ Created on Tue May 16 15:44:25 2023
 # %% import library
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"C:\Users\Public\BenQ\myPyCode\NPL")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import os
@@ -24,7 +24,7 @@ from decimal import Decimal
 
 # %% 設定自己的資料路徑
 # 資料路徑
-data_path = r"E:\python\Lin\\"
+data_path = r"E:\Hsin\NTSU_lab\Baseball\\"
 # 設定資料夾
 RawData_folder = "\\Raw_Data"
 processingData_folder = "Processing_Data"
@@ -46,12 +46,12 @@ down_freq = 1000
 # release = [2*down_freq, 1*down_freq]
 # 設定移動平均數與移動均方根之參數
 # 更改window length, 更改overlap length
-time_of_window = 0.1 # 窗格長度 (單位 second)
-overlap_len = 0.5 # 百分比 (%)
+time_of_window = 0.02 # 窗格長度 (單位 second)
+overlap_len = 0.0005 # 百分比 (%)
 # 預處理資料可修改檔名，並新增標籤，如：S2_MVC_Rep_1.16 -> S2_MVC_Rep_1.16_low
 end_name = "_ed"
 # 平滑處理方式 ex: lowpass, rms, moving
-smoothing = 'lowpass'
+smoothing_method = 'moving'
 # # median frequency duration
 # duration = 1 # unit : second
 
@@ -62,10 +62,48 @@ rowdata_folder_path = data_path + RawData_folder + "\\" + sub_folder
 rowdata_folder_list  = [f for f in os.listdir(rowdata_folder_path) if not f.startswith('.')]
 processing_folder_path = data_path + "\\" + processingData_folder + "\\" + sub_folder
 processing_folder_list = [f for f in os.listdir(processing_folder_path) if not f.startswith('.')]
+all_processing_folder_path = []
+for ii in range(len(processing_folder_list)):
+    all_processing_folder_path.append((data_path + processingData_folder + "\\" \
+                                       + "\\" + processing_folder_list[ii]))
 # %%
 
-a = af.Read_File(r"E:\python\Lin\Raw_Data\S18\motion",
-                 ".csv")
+def print_warning_banner():
+    print("**************************************************")
+    print("*                                                *")
+    print("*     警告：這是一個警告標語！                     *")
+    print("*     執行將會刪除資料夾下所有 .xlsx 與 .jpg 文件  *")
+    print("*     此步驟無法回復所刪除之檔案                   *")
+    print("*                                                *")
+    print("**************************************************")
+tic = time.process_time()    
+print_warning_banner()
+user_input = input("是否繼續執行刪除文件？(Y/N): ").strip().upper()
+if user_input == "Y":
+    # 在这里写下后续的代码
+    print("繼續執行後續代碼...")
+
+    # 先清除所有 processing data 下 MVC 所有的資料    
+    for i in range(len(all_processing_folder_path)):
+        # 創建儲存資料夾路徑
+        folder_list = []
+        # 列出所有 processing data 下之所有資料夾
+        for dirPath, dirNames, fileNames in os.walk(all_processing_folder_path[i]):
+            if os.path.isdir(dirPath):
+                folder_list.append(dirPath)
+        for ii in folder_list:
+        # 清除所有 .xlsx 檔案
+            print(ii)
+            af.remove_file(ii, ".xlsx")
+            af.remove_file(ii, ".jpg")
+
+elif user_input == "N":
+    print("取消執行後續。")
+else:
+    print("無效輸入，請输入 Y 或 N")
+toc = time.process_time()
+print("刪除檔案總共花費時間: ",toc-tic)
+
 
 # %% 資料前處理 : bandpass filter, absolute value, smoothing, trunkcut data
 # 處理MVC data
@@ -79,7 +117,8 @@ for i in range(len(rowdata_folder_list)):
     for MVC_path in MVC_list:
         print(MVC_path)
         data = pd.read_csv(MVC_path, encoding='UTF-8')
-        moving_data, rms_data, lowpass_filtered_data, bandpass_filtered_data = af.EMG_processing(data)
+        processing_data, bandpass_filtered_data = af.EMG_processing(data, smoothing=smoothing_method)
+        
         data_save_path = processing_folder_path + '\\' + rowdata_folder_list[i] + "\\data\\" + MVC_folder
         # deal with filename and add extension with _ed
         filepath, tempfilename = os.path.split(MVC_path)
@@ -94,18 +133,18 @@ for i in range(len(rowdata_folder_list)):
         # rewrite file name
         file_name = data_save_path + '\\' + filename + end_name + '.xlsx'
         # writting data in worksheet
-        if smoothing == 'lowpass':
-            af.plot_plot(lowpass_filtered_data, fig_save_path,
+        if smoothing_method == 'lowpass':
+            af.plot_plot(processing_data, fig_save_path,
                          filename, "lowpass_")
-            pd.DataFrame(lowpass_filtered_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
-        elif smoothing == 'rms':
-            af.plot_plot(rms_data, fig_save_path,
+            pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+        elif smoothing_method == 'rms':
+            af.plot_plot(processing_data, fig_save_path,
                          filename, "rms_")
-            pd.DataFrame(rms_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
-        elif smoothing == 'moving':
-            af.plot_plot(moving_data, fig_save_path,
+            pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+        elif smoothing_method == 'moving':
+            af.plot_plot(processing_data, fig_save_path,
                          filename, "moving_")
-            pd.DataFrame(moving_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+            pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
     toc = time.process_time()
     print("Total Time:",toc-tic)  
 # 找最大值
@@ -149,7 +188,7 @@ for iii in range(len(rowdata_folder_list)):
     # 讀取 .anc data list
     anc_folder_path = data_path + RawData_folder + "\\" + rowdata_folder_list[iii] + "\\" + anc_folder
     anc_file_list = af.Read_File(anc_folder_path, ".anc")
-    Staging_file = pd.read_excel(r"E:/python/Lin/motion分期.xlsx", sheet_name=rowdata_folder_list[iii])
+    Staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240317.xlsx", sheet_name=rowdata_folder_list[iii])
     for anc_path in anc_file_list:
         # 處理 .ANC 檔案
         # 判讀.anc 時間
@@ -185,7 +224,12 @@ for iii in range(len(rowdata_folder_list)):
                 data = pd.read_csv(data_path + RawData_folder + "\\" + rowdata_folder_list[iii] +
                                    "\\motion\\" + Staging_file["EMG檔案"][emg_name] + ".csv",
                                    encoding='UTF-8')
-                moving_data, rms_data, lowpass_filtered_data, bandpass_filtered_data = af.EMG_processing(data)                
+                processing_data, bandpass_filtered_data = af.EMG_processing(data, smoothing=smoothing_method)  
+                # 設定分期時間
+                Kneetop = (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240
+                footcontact = (Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240
+                shoulder = (Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240
+                release = (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240
                 # 畫 bandpass filter 的圖
                 save = fig_save_path + '\\' + "Bandpass_" + Staging_file["EMG檔案"][emg_name] + ".jpg"
                 n = int(math.ceil((np.shape(bandpass_filtered_data)[1] - 1) /2))
@@ -194,7 +238,8 @@ for iii in range(len(rowdata_folder_list)):
                 for i in range(np.shape(bandpass_filtered_data)[1]-1):
                     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
                     # 設定子圖之參數
-                    axs[x, y].plot(bandpass_filtered_data.iloc[:, 0], bandpass_filtered_data.iloc[:, i+1])
+                    axs[x, y].plot(bandpass_filtered_data.iloc[int(Kneetop-2)*1000:int(release+2)*1000, 0],
+                                   bandpass_filtered_data.iloc[int(Kneetop-2)*1000:int(release+2)*1000, i+1])
                     axs[x, y].set_title(bandpass_filtered_data.columns[i+1], fontsize=16)
                     # 設定科學符號 : 小數點後幾位數
                     axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
@@ -225,91 +270,95 @@ for iii in range(len(rowdata_folder_list)):
 
                 # 寫入資料位置
                 save_file_name = data_save_path + "\\" + Staging_file["EMG檔案"][emg_name] + "_ed.xlsx"
-                if smoothing == 'lowpass':
-                    # af.plot_plot(lowpass_filtered_data, fig_save_path,
-                    #              Staging_file["EMG檔案"][emg_name],
-                    #              "lowpass_")
-                    # 繪圖確認用
-                    save = fig_save_path + '\\' + "lowpass_" + Staging_file["EMG檔案"][emg_name] + ".jpg"
-                    n = int(math.ceil((np.shape(lowpass_filtered_data)[1] - 1) /2))
-                    plt.figure(figsize=(2*n+1,10))
-                    fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')
-                    for i in range(np.shape(lowpass_filtered_data)[1]-1):
-                        x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
-                        # 設定子圖之參數
-                        axs[x, y].plot(lowpass_filtered_data.iloc[:, 0], lowpass_filtered_data.iloc[:, i+1])
-                        axs[x, y].set_title(lowpass_filtered_data.columns[i+1], fontsize=16)
-                        # 設定科學符號 : 小數點後幾位數
-                        axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
-                        axs[x, y].axvline((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
-                        axs[x, y].axvline((Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
-                        axs[x, y].axvline((Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
-                        axs[x, y].axvline((Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
-                        a_t = Decimal((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).quantize(Decimal("0.01"), rounding = "ROUND_HALF_UP")
-                        axs[x, y].annotate(a_t,
-                                           xy = (0, max(lowpass_filtered_data.iloc[:, i+1])), fontsize = 10, color='b')
-                        axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
-                    # 設定整張圖片之參數
-                    plt.suptitle(Staging_file["EMG檔案"][emg_name] + "_lowpass", fontsize = 16)
-                    plt.tight_layout()
-                    fig.add_subplot(111, frameon=False)
-                    # hide tick and tick label of the big axes
-                    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-                    plt.grid(False)
-                    plt.xlabel("time (second)", fontsize = 14)
-                    plt.ylabel("Voltage (V)", fontsize = 14)
-                    plt.savefig(save, dpi=200, bbox_inches = "tight")
-                    plt.show()
+                band_save_file_name = data_save_path + "\\" + Staging_file["EMG檔案"][emg_name] + "_bandpass.xlsx"
+                if smoothing_method == 'lowpass':
                     # 使用秒數找尋最接近時間的引數
-                    kneetop_idx = np.abs(lowpass_filtered_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    foot_contact_idx = np.abs(lowpass_filtered_data.iloc[:, 0] \
+                    kneetop_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    foot_contact_idx = np.abs(processing_data.iloc[:, 0] \
                                               - (Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    shoulder_ER_idx = np.abs(lowpass_filtered_data.iloc[:, 0] \
+                    shoulder_ER_idx = np.abs(processing_data.iloc[:, 0] \
                                               - (Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    release_idx = np.abs(lowpass_filtered_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    release_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
                     # 計算 iMVC
-                    emg_iMVC = pd.DataFrame(np.zeros(np.shape(lowpass_filtered_data)),
-                                            columns=rms_data.columns)
-                    emg_iMVC.iloc[:, 0] = lowpass_filtered_data.values
-                    emg_iMVC.iloc[:, 1:] = np.divide(abs(lowpass_filtered_data.iloc[:, 1:].values),
+                    emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
+                                            columns=processing_data.columns)
+                    emg_iMVC.iloc[:, 0] = processing_data.values
+                    emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
                                                           MVC_value.values)*100
-                elif smoothing == 'rms':
-                    af.plot_plot(rms_data, fig_save_path,
-                                 Staging_file["EMG檔案"][emg_name],
-                                 "rms_")
+                elif smoothing_method == 'rms':
                     # 使用秒數找尋最接近時間的引數
-                    kneetop_idx = np.abs(rms_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    foot_contact_idx = np.abs(rms_data.iloc[:, 0] \
+                    kneetop_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    foot_contact_idx = np.abs(processing_data.iloc[:, 0] \
                                               - (Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    shoulder_ER_idx = np.abs(rms_data.iloc[:, 0] \
+                    shoulder_ER_idx = np.abs(processing_data.iloc[:, 0] \
                                               - (Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    release_idx = np.abs(rms_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    release_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
                     
-                    emg_iMVC = pd.DataFrame(np.zeros(np.shape(rms_data)),
-                                            columns=rms_data.columns)
-                    emg_iMVC.iloc[:, 0] = rms_data.values
-                    emg_iMVC.iloc[:, 1:] = np.divide(abs(rms_data.iloc[:, 1:].values),
+                    emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
+                                            columns=processing_data.columns)
+                    emg_iMVC.iloc[:, 0] = processing_data.values
+                    emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
                                                      MVC_value.values)*100
-                elif smoothing == 'moving':
-                    af.plot_plot(moving_data, fig_save_path,
-                                 Staging_file["EMG檔案"][emg_name],
-                                 "moving_")
+                elif smoothing_method == 'moving':
                     # 使用秒數找尋最接近時間的引數
-                    kneetop_idx = np.abs(moving_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    foot_contact_idx = np.abs(moving_data.iloc[:, 0] \
+                    kneetop_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    foot_contact_idx = np.abs(processing_data.iloc[:, 0] \
                                               - (Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    shoulder_ER_idx = np.abs(moving_data.iloc[:, 0] \
+                    shoulder_ER_idx = np.abs(processing_data.iloc[:, 0] \
                                               - (Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    release_idx = np.abs(moving_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    
-                    emg_iMVC.iloc[:, 0] = moving_data.values
-                    emg_iMVC.iloc[:, 1:] = np.divide(abs(moving_data.iloc[:, 1:].values),
+                    release_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    # 繪圖確認用
+                    emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
+                                            columns=processing_data.columns)
+                    emg_iMVC.iloc[:, 0] = processing_data.values
+                    emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
                                                      MVC_value.values)*100
-                # 將資料寫進不同 EXCEL 分頁
+                # 繪圖用
+                save = fig_save_path + '\\' + smoothing_method + "_" + Staging_file["EMG檔案"][emg_name] + ".jpg"
+                n = int(math.ceil((np.shape(processing_data)[1] - 1) /2))
+                plt.figure(figsize=(2*n+1,10))
+                fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')
+                for i in range(np.shape(processing_data)[1]-1):
+                    x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
+                    # 設定子圖之參數
+                    axs[x, y].plot(processing_data.iloc[:, 0], processing_data.iloc[:, i+1])
+                    axs[x, y].set_title(processing_data.columns[i+1], fontsize=16)
+                    # 設定科學符號 : 小數點後幾位數
+                    axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+                    axs[x, y].axvline((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linewidth=0.5)
+                    axs[x, y].axvline((Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linewidth=0.5)
+                    axs[x, y].axvline((Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linewidth=0.5)
+                    axs[x, y].axvline((Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linewidth=0.5)
+                    a_t = Decimal((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).quantize(Decimal("0.01"), rounding = "ROUND_HALF_UP")
+                    axs[x, y].annotate(a_t,
+                                       xy = (0, max(processing_data.iloc[:, i+1])), fontsize = 10, color='b')
+                    axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+                # 設定整張圖片之參數
+                plt.suptitle(Staging_file["EMG檔案"][emg_name] + "_lowpass", fontsize = 16)
+                plt.tight_layout()
+                fig.add_subplot(111, frameon=False)
+                # hide tick and tick label of the big axes
+                plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+                plt.grid(False)
+                plt.xlabel("time (second)", fontsize = 14)
+                plt.ylabel("Voltage (V)", fontsize = 14)
+                plt.savefig(save, dpi=200, bbox_inches = "tight")
+                plt.show()
+                # 將資料寫進不同 EXCEL 分頁 iMVC
                 with pd.ExcelWriter(save_file_name) as Writer:
                     emg_iMVC.iloc[kneetop_idx:foot_contact_idx].to_excel(Writer, sheet_name="Stage1", index=False)
                     emg_iMVC.iloc[foot_contact_idx:shoulder_ER_idx].to_excel(Writer, sheet_name="Stage2", index=False)
                     emg_iMVC.iloc[shoulder_ER_idx:release_idx].to_excel(Writer, sheet_name="Stage3", index=False)
+                # 儲存 bandpass data
+                bandpass_filtered_data = abs(bandpass_filtered_data)
+                with pd.ExcelWriter(band_save_file_name) as Writer:
+                    bandpass_filtered_data.iloc[kneetop_idx:foot_contact_idx].to_excel(Writer, sheet_name="Stage1", index=False)
+                    bandpass_filtered_data.iloc[foot_contact_idx:shoulder_ER_idx].to_excel(Writer, sheet_name="Stage2", index=False)
+                    bandpass_filtered_data.iloc[shoulder_ER_idx:release_idx].to_excel(Writer, sheet_name="Stage3", index=False)
 
 gc.collect(generation=2)                    
                     
@@ -343,7 +392,7 @@ for iii in range(len(rowdata_folder_list)):
     # 讀取 .anc data list
     anc_folder_path = data_path + RawData_folder + "\\" + rowdata_folder_list[iii] + "\\" + anc_folder
     anc_file_list = af.Read_File(anc_folder_path, ".anc")
-    Staging_file = pd.read_excel(r"E:/python/Lin/motion分期.xlsx", sheet_name=rowdata_folder_list[iii])
+    Staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240317.xlsx", sheet_name=rowdata_folder_list[iii])
     for anc_path in anc_file_list:
         # 處理 .ANC 檔案
         # 判讀.anc 時間
@@ -379,7 +428,12 @@ for iii in range(len(rowdata_folder_list)):
                 data = pd.read_csv(data_path + RawData_folder + "\\" + rowdata_folder_list[iii] +
                                    "\\motion\\" + Staging_file["EMG檔案"][emg_name] + ".csv",
                                    encoding='UTF-8')
-                moving_data, rms_data, lowpass_filtered_data, bandpass_filtered_data = af.EMG_processing(data)                
+                moving_data, rms_data, lowpass_filtered_data, bandpass_filtered_data = af.EMG_processing(data)
+                print(motion_path)   
+                print('Kneetop: ', Staging_file['Kneetop'][emg_name])
+                print('foot contact: ', Staging_file['foot contact'][emg_name])
+                print('shoulder external rotation: ', Staging_file['shoulder external rotation'][emg_name])
+                print('release: ', Staging_file['release'][emg_name])
                 # 畫 bandpass filter 的圖
                 save = fig_save_path + '\\' + "Bandpass_" + Staging_file["EMG檔案"][emg_name] + ".jpg"
                 n = int(math.ceil((np.shape(bandpass_filtered_data)[1] - 1) /2))
@@ -419,7 +473,7 @@ for iii in range(len(rowdata_folder_list)):
 
                 # 寫入資料位置
                 save_file_name = data_save_path + "\\" + Staging_file["EMG檔案"][emg_name] + "_ed.xlsx"
-                if smoothing == 'lowpass':
+                if smoothing_method == 'lowpass':
                     # af.plot_plot(lowpass_filtered_data, fig_save_path,
                     #              Staging_file["EMG檔案"][emg_name],
                     #              "lowpass_")
@@ -461,13 +515,18 @@ for iii in range(len(rowdata_folder_list)):
                     shoulder_ER_idx = np.abs(lowpass_filtered_data.iloc[:, 0] \
                                               - (Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
                     release_idx = np.abs(lowpass_filtered_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    print('kneetop_idx: ', kneetop_idx)
+                    print('foot_contact_idx: ', foot_contact_idx)
+                    print('shoulder_ER_idx: ', shoulder_ER_idx)
+                    print('release_idx: ', release_idx)
+                    
                     # 計算 iMVC
                     emg_iMVC = pd.DataFrame(np.zeros(np.shape(lowpass_filtered_data)),
                                             columns=rms_data.columns)
                     emg_iMVC.iloc[:, 0] = lowpass_filtered_data.values
                     emg_iMVC.iloc[:, 1:] = np.divide(abs(lowpass_filtered_data.iloc[:, 1:].values),
                                                           MVC_value.values)*100
-                elif smoothing == 'rms':
+                elif smoothing_method == 'rms':
                     af.plot_plot(rms_data, fig_save_path,
                                  Staging_file["EMG檔案"][emg_name],
                                  "rms_")
@@ -484,7 +543,7 @@ for iii in range(len(rowdata_folder_list)):
                     emg_iMVC.iloc[:, 0] = rms_data.values
                     emg_iMVC.iloc[:, 1:] = np.divide(abs(rms_data.iloc[:, 1:].values),
                                                      MVC_value.values)*100
-                elif smoothing == 'moving':
+                elif smoothing_method == 'moving':
                     af.plot_plot(moving_data, fig_save_path,
                                  Staging_file["EMG檔案"][emg_name],
                                  "moving_")
