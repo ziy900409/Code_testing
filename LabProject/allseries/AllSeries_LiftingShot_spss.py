@@ -37,7 +37,24 @@ left_group = left_group.loc[:, emg_muscle]
 remove_left = gen.removeoutliers(left_group)
 
 remove_left.isna().sum()
-a = raw_data['subject'].value_counts()
+subject_number = raw_data['subject'].value_counts().index
+
+# 找到同肌肉名稱的 columns 的 index
+index_dict = {col: raw_data.columns.get_loc(col) for col in emg_muscle}
+# 創建資料儲存的地方
+
+for subject in subject_number:
+    for direction in ['R', 'L']:
+        temp_idx = []
+        for i in range(len(raw_data)):    
+            if subject == raw_data["subject"][i] and \
+                direction == raw_data['direction'][i]:
+                print(raw_data["subject"][i], raw_data['direction'][i])
+                temp_idx.append(i)
+        subject_data = raw_data.loc[temp_idx, emg_muscle]
+        remove_data = gen.removeoutliers(subject_data)
+        remove_data.isna().sum()
+                
 
 
 

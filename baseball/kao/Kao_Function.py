@@ -317,7 +317,7 @@ def Fourier_plot(raw_data, savepath, filename):
     None.
 
     '''
-    raw_data = data
+    # raw_data = data
     save = savepath + '\\FFT_' + filename + ".jpg"
     num_columns = []
     for i in range(len(raw_data.columns)):
@@ -392,7 +392,7 @@ def Fourier_plot(raw_data, savepath, filename):
     plt.grid(False)
     plt.xlabel("Frequency (Hz)", fontsize = 14)
     plt.ylabel("Power", fontsize = 14)
-    # plt.savefig(save, dpi=200, bbox_inches = "tight")
+    plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
 # %% 畫圖用
 
