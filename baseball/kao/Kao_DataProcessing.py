@@ -20,6 +20,7 @@ Created on Mon Mar 11 19:56:19 2024
 import os
 import gc
 import time
+import numpy
 import sys
 # 路徑改成你放自己code的資料夾
 sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
@@ -49,9 +50,11 @@ smoothing_method = 'lowpass'
 samplingRate_motion = 250
 # 讀取分期檔
 StagingFile_Exist = pd.read_excel(computer_path + "Kao_StagingFile.xlsx",
-                                  sheet_name="工作表4")
+                                  sheet_name="工作表2")
 # 定義圖片儲存路徑
 motion_fig_save = computer_path + "motion_processing\\"
+# 定義圖片儲存路徑
+motion_fig_save = r"E:\Hsin\NTSU_lab\data\motion_processing\\"
 # %% EMG data preprocessing
 # 路徑設置
 all_rawdata_folder_path = []
@@ -80,6 +83,49 @@ for ii in range(len(processing_folder_list)):
         
 del rowdata_folder_list, processing_folder_list
 gc.collect(generation=2)
+
+# %% 1. 清除所有 processing data 下.xlsx 與 .jpg 檔案
+"""
+1. 刪除檔案 (本動作刪除之檔案皆無法復原)
+    1.1. 刪除processing data 資料夾下所有 .xlsx 與 .jpg 檔案
+    1.2. 僅需執行一次
+
+"""
+def print_warning_banner():
+    print("**************************************************")
+    print("*                                                *")
+    print("*     警告：這是一個警告標語！                     *")
+    print("*     執行將會刪除資料夾下所有 .xlsx 與 .jpg 文件  *")
+    print("*     此步驟無法回復所刪除之檔案                   *")
+    print("*                                                *")
+    print("**************************************************")
+tic = time.process_time()    
+print_warning_banner()
+user_input = input("是否繼續執行刪除文件？(Y/N): ").strip().upper()
+if user_input == "Y":
+    # 在这里写下后续的代码
+    print("繼續執行後續代碼...")
+
+    # 先清除所有 processing data 下 MVC 所有的資料    
+    for i in range(len(all_processing_folder_path)):
+        # 創建儲存資料夾路徑
+        folder_list = []
+        # 列出所有 processing data 下之所有資料夾
+        for dirPath, dirNames, fileNames in os.walk(all_processing_folder_path[i]):
+            if os.path.isdir(dirPath):
+                folder_list.append(dirPath)
+        for ii in folder_list:
+        # 清除所有 .xlsx 檔案
+            print(ii)
+            func.remove_file(ii, ".xlsx")
+            func.remove_file(ii, ".jpg")
+
+elif user_input == "N":
+    print("取消執行後續。")
+else:
+    print("無效輸入，請输入 Y 或 N")
+toc = time.process_time()
+print("刪除檔案總共花費時間: ",toc-tic)
 
 # %% 資料前處理 : bandpass filter, absolute value, smoothing
 """
@@ -116,7 +162,7 @@ for i in range(len(all_rawdata_folder_path)):
         # 讀取資料
         data = pd.read_csv(MVC_path, encoding='UTF-8')
         # EMG data 前處理
-        processing_data, bandpass_filtered_data = func.EMG_processing(data, smoothing=smoothing_method)
+        processing_data, bandpass_filtered_data = func.EMG_processing(MVC_path, smoothing=smoothing_method)
         # 將檔名拆開
         filepath, tempfilename = os.path.split(MVC_path)
         filename, extension = os.path.splitext(tempfilename)
@@ -138,38 +184,38 @@ for i in range(len(all_rawdata_folder_path)):
     
     # 預處理shooting data
     # for mac version replace "\\" by '/'
-    Shooting_path = all_rawdata_folder_path[i] + "\\" + motion_folder
-    Shooting_list = func.Read_File(Shooting_path, '.csv')
-    for ii in range(len(Shooting_list)):
-        # 印出說明
-        x = PrettyTable()
-        x.field_names = ["平滑方法", "folder", "shooting_file"]
-        x.add_row([smoothing_method, all_rawdata_folder_path[i].split("\\")[-1],
-                   Shooting_list[ii].split('\\')[-1]])
-        print(x)
-        # 讀取資料
-        data = pd.read_csv(Shooting_list[ii], encoding='UTF-8')
-        # EMG data 前處理
-        processing_data, bandpass_filtered_data = func.EMG_processing(data, smoothing="lowpass")
-        # 設定 EMG data 資料儲存路徑
-        # 將檔名拆開
-        filepath, tempfilename = os.path.split(Shooting_list[ii])
-        filename, extension = os.path.splitext(tempfilename)
-        # 畫 FFT analysis 的圖
-        func.Fourier_plot(data,
-                        (fig_save_path + "\\FFT\\motion"),
-                        filename)
-        # 畫 bandpass 後之資料圖
-        func.plot_plot(bandpass_filtered_data, str(fig_save_path + "\\processing\\bandpass\\" + motion_folder),
-                     filename, "Bandpass_")
-        # 畫前處理後之資料圖
-        func.plot_plot(processing_data, str(fig_save_path + "\\processing\\smoothing\\" + motion_folder),
-                     filename, str("_" + smoothing_method))
+    # Shooting_path = all_rawdata_folder_path[i] + "\\" + motion_folder
+    # Shooting_list = func.Read_File(Shooting_path, '.csv')
+    # for ii in range(len(Shooting_list)):
+    #     # 印出說明
+    #     x = PrettyTable()
+    #     x.field_names = ["平滑方法", "folder", "shooting_file"]
+    #     x.add_row([smoothing_method, all_rawdata_folder_path[i].split("\\")[-1],
+    #                Shooting_list[ii].split('\\')[-1]])
+    #     print(x)
+    #     # 讀取資料
+    #     data = pd.read_csv(Shooting_list[ii], encoding='UTF-8')
+    #     # EMG data 前處理
+    #     processing_data, bandpass_filtered_data = func.EMG_processing(data, smoothing="lowpass")
+    #     # 設定 EMG data 資料儲存路徑
+    #     # 將檔名拆開
+    #     filepath, tempfilename = os.path.split(Shooting_list[ii])
+    #     filename, extension = os.path.splitext(tempfilename)
+    #     # 畫 FFT analysis 的圖
+    #     func.Fourier_plot(data,
+    #                     (fig_save_path + "\\FFT\\motion"),
+    #                     filename)
+    #     # 畫 bandpass 後之資料圖
+    #     func.plot_plot(bandpass_filtered_data, str(fig_save_path + "\\processing\\bandpass\\" + motion_folder),
+    #                  filename, "Bandpass_")
+    #     # 畫前處理後之資料圖
+    #     func.plot_plot(processing_data, str(fig_save_path + "\\processing\\smoothing\\" + motion_folder),
+    #                  filename, str("_" + smoothing_method))
 toc = time.process_time()
 print("Total Time:",toc-tic)  
 gc.collect(generation=2)
         
-# %% 找 MVC 最大值
+# 找 MVC 最大值
 """
 4. 
 """
@@ -381,8 +427,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             # print(str(StagingFile_Exist.loc[file_name, 'MotionFileName'] + ".forces"))
             true_force_file.append(force_path)
 # %% 找力版時間
-# 定義圖片儲存路徑
-motion_fig_save = r"E:\Hsin\NTSU_lab\data\motion_processing\\"
+
 # 定義資料儲存位置
 data_table = pd.DataFrame({}, columns = ['filename', 'order', '左腳離地時間', '左腳最大值',
                                          '左腳最大值時間', '右腳離地時間', '右腳最大值',
@@ -508,11 +553,12 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         # 繪一張合力圖
         x_data = pd.Series(analog_data.loc[:, 'Name'])
         y_data = pd.Series(analog_data.loc[:, 'C63'])
-        # 繪圖
+        # force plate 繪圖
         fig, axs = plt.subplots(3, 1, figsize=(7, 8))
         # 子圖一
-        axs[0].plot(left_lowpass.iloc[:, 0],
-                    combin_left)
+        # 只畫動作開始前1秒，到右腳離地後0.5秒
+        axs[0].plot(left_lowpass.iloc[time_start-2500:rightLeg_off + right_time+1250, 0],
+                    combin_left[time_start-2500:rightLeg_off + right_time+1250])
         axs[0].axvline(time_TriggerOff*10, color='red', linestyle='--', linewidth=0.5) # trigger off
         axs[0].plot(leftLeg_off + ana_time_start, combin_left[leftLeg_off + ana_time_start], # 找左腳離地時間
                     marker = 'o', ms = 10, mec='c', mfc='none')
@@ -523,8 +569,9 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         axs[0].set_title('ForcePlare 1: Left Leg')
         axs[0].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
         # 子圖二
-        axs[1].plot(right_lowpass.iloc[:, 0],
-                    combin_right)
+        # 只畫動作開始前1秒，到右腳離地後0.5秒
+        axs[1].plot(right_lowpass.iloc[time_start-2500:rightLeg_off + right_time+1250, 0],
+                    combin_right[time_start-2500:rightLeg_off + right_time+1250])
         axs[1].axvline(time_TriggerOff*10, color='red', linestyle='--', linewidth=0.5) # trigger off
         axs[1].plot(first_right_max_idx, combin_right[first_right_max_idx], # 右腳發力時間
                     marker = 'o', ms = 10, mec='lime', mfc='none')
@@ -536,6 +583,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         axs[1].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
         # 子圖三
         axs[2].plot(right_lowpass.iloc[:, 0], y_data)
+        axs[2].axvline(onset_analog[0, 0], color='red', linestyle='--', linewidth=0.5) # trigger off
         axs[2].axvline(time_TriggerOff*10, color='red', linestyle='--', linewidth=0.5) # trigger off
         axs[2].set_title('Trigger C63')
         # 設定科學符號 : 小數點後幾位數
@@ -549,9 +597,111 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         plt.xlabel("time (second)", fontsize = 14)
         plt.ylabel("Force (N)", fontsize = 14)
         plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-        plt.savefig(str(motion_fig_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.jpg"),
-                    dpi=200, bbox_inches = "tight")
+        # plt.savefig(str(motion_fig_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.jpg"),
+        #             dpi=200, bbox_inches = "tight")
         plt.show()
+        # ---------------處理 EMG data--------------------------------------
+        # 2.1. read EMG data and pre-processing data
+        '''
+        1. 需要輸出 FFT，檢查資料
+        '''
+        EMG_data = pd.read_csv(read_emg)
+        processing_data, bandpass_filtered_data = func.EMG_processing(read_emg, smoothing='lowpass')
+        # 計算iMVC
+        # 讀取 all MVC data
+        parent_dir = os.path.dirname(read_emg.replace("raw_data", "processing_data")).replace("motion", "")
+        MVC_value = pd.read_excel(parent_dir + parent_dir.split("\\")[-2] + '_all_MVC.xlsx')
+        # 只取 all MVC data 數字部分
+        MVC_value = MVC_value.iloc[-1, 2:]
+        # 計算 iMVC，分別為 processing data and vandpass data
+        bandpass_iMVC = pd.DataFrame(np.empty(np.shape(bandpass_filtered_data)),
+                                     columns=bandpass_filtered_data.columns)
+        # 取得時間
+        bandpass_iMVC.iloc[:, 0] = bandpass_filtered_data.iloc[:, 0].values
+        # 除以 MVC 最大值
+        bandpass_iMVC.iloc[:, 1:] = np.divide(abs(bandpass_filtered_data.iloc[:, 1:].values),
+                                              MVC_value.values)*100
+        # processing data
+        processing_iMVC = pd.DataFrame(np.empty(np.shape(processing_data)),
+                                       columns=processing_data.columns)
+        # 取得時間
+        processing_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
+        # 除以 MVC 最大值
+        processing_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
+                                                MVC_value.values)*100
+        # EMG 與 motion 時間換算
+        motion_start = int((time_start - onset_analog[0, 0])/2500*2000)
+        leftLeave = int((leftLeg_off + ana_time_start - onset_analog[0, 0])/2500*2000)
+        right_start = int((first_right_max_idx - onset_analog[0, 0])/2500*2000)
+        rightLeave = int((rightLeg_off + right_time - onset_analog[0, 0])/2500*2000)
+        # 將資料寫進 EXCEL
+        save_file_name = os.path.dirname(read_emg.replace("raw_data", "processing_data")) + "\\" + \
+            StagingFile_Exist.loc[file_name, 'EMG_Name'] + "_ed.xlsx"
+        with pd.ExcelWriter(save_file_name) as Writer:
+            processing_iMVC.iloc[motion_start:leftLeave].to_excel(Writer, sheet_name="Stage1", index=False)
+            processing_iMVC.iloc[right_start:rightLeave].to_excel(Writer, sheet_name="Stage2", index=False)
+
+        # 設置資料儲存路徑 JPG
+        filepath_fig = os.path.dirname(read_emg.replace("raw_data", "processing_data")\
+                                       .replace("motion", r"figure\processing\smoothing\motion"))
+        save_fig = filepath_fig + "\\" + StagingFile_Exist.loc[file_name, 'EMG_Name'] + "_Bandpass.jpg"
+        # EMG 繪圖
+        n = int(math.ceil((np.shape(bandpass_filtered_data)[1] - 1) /2)) + 1
+        fig, axs = plt.subplots(n, 2, figsize = ((2*n+1,10)), sharex=False)
+        for i in range(np.shape(bandpass_filtered_data)[1]+1):
+            xx, yy = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
+            print(i-1*yy)
+            print(xx ,yy)
+            if xx == 0 and yy == 0:
+                axs[xx, yy].plot(left_lowpass.iloc[time_start-2500:rightLeg_off + right_time+1250, 0],
+                                 combin_left[time_start-2500:rightLeg_off + right_time+1250])
+                axs[xx, yy].axvline(time_TriggerOff*10, color='red', linestyle='--', linewidth=0.5) # trigger off
+                axs[xx, yy].plot(leftLeg_off + ana_time_start, combin_left[leftLeg_off + ana_time_start], # 找左腳離地時間
+                                 marker = 'o', ms = 10, mec='c', mfc='none')
+                axs[xx, yy].plot(time_start, combin_left[time_start], # 找啟動時間點
+                                 marker = '*', color = 'r')
+                axs[xx, yy].plot(left_max_time, combin_left[left_max_time], # 找最大值
+                                 marker = 'o', ms = 10, mec='b', mfc='none')
+                axs[xx, yy].set_title('ForcePlare 1: Left Leg')
+                axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+            elif xx == 0 and yy == 1:
+                # 子圖二
+                axs[xx, yy].plot(right_lowpass.iloc[time_start-2500:rightLeg_off + right_time+1250, 0],
+                                 combin_right[time_start-2500:rightLeg_off + right_time+1250])
+                axs[xx, yy].axvline(time_TriggerOff*10, color='red', linestyle='--', linewidth=0.5) # trigger off
+                axs[xx, yy].plot(first_right_max_idx, combin_right[first_right_max_idx], # 右腳發力時間
+                            marker = 'o', ms = 10, mec='lime', mfc='none')
+                axs[xx, yy].plot(rightLeg_off + right_time, combin_right[rightLeg_off + right_time], # 右腳離地時間
+                            marker = 'o', ms = 10, mec='c', mfc='none')
+                axs[xx, yy].plot(right_time, combin_right[right_time], # 右腳力版最大值
+                            marker = 'o', ms = 10, mec='b', mfc='none')
+                axs[xx, yy].set_title('ForcePlare 2: Right Leg')
+                axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+            else:
+                # 設定子圖之參數
+                # EMG 繪圖從 啟動前一秒開始畫，到右腳離地後0.5秒
+                axs[xx, yy].plot(processing_iMVC.iloc[motion_start-2000:rightLeave+1000, 0],
+                                 processing_iMVC.iloc[motion_start-2000:rightLeave+1000, i-1*yy])
+                axs[xx, yy].set_title(processing_iMVC.columns[i-1*yy], fontsize=16)
+                # 設定科學符號 : 小數點後幾位數
+                axs[xx, yy].axvline(motion_start/2000, color='r')
+                axs[xx, yy].axvline(leftLeave/2000, color='r')
+                axs[xx, yy].axvline(right_start/2000, color='r')
+                axs[xx, yy].axvline(rightLeave/2000, color='r')
+                # axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+        # 設定整張圖片之參數
+        plt.suptitle(StagingFile_Exist.loc[file_name, 'EMG_Name'] + "_Bandpass", fontsize = 16)
+        plt.tight_layout()
+        fig.add_subplot(111, frameon=False)
+        # hide tick and tick label of the big axes
+        plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+        plt.grid(False)
+        plt.xlabel("time (second)", fontsize = 14)
+        plt.ylabel("Muscle Activation (%)", fontsize = 14)
+        # plt.savefig(save_fig, dpi=200, bbox_inches = "tight")
+        plt.show()
+        
+        
         # 儲存資料
         # RFD = (left force max - left start force)/(left_max_time - time_start)/2500
         data_table = pd.concat([data_table, pd.DataFrame({'filename' : StagingFile_Exist.loc[file_name, '.anc'],
@@ -582,12 +732,6 @@ data_table.to_excel(r"E:\Hsin\NTSU_lab\data\motion_statistic.xlsx")
 # %%
     
 
-
-
-
-
-
-# %%
 
 
 
