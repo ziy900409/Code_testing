@@ -499,7 +499,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             MVC_value = pd.read_excel(parent_dir + parent_dir.split("\\")[-2] + '_all_MVC.xlsx')
             # 只取 all MVC data 數字部分
             MVC_value = MVC_value.iloc[-1, 2:]
-            # 計算 iMVC，分別為 processing data and vandpass data
+            # 計算 iMVC，分別為 processing data and bandpass data
             bandpass_iMVC = pd.DataFrame(np.empty(np.shape(bandpass_filtered_data)),
                                          columns=bandpass_filtered_data.columns)
             # 取得時間
@@ -617,7 +617,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                             dpi=200, bbox_inches = "tight")
             plt.show()
         # -----------------儲存資料-------------------------------
-        # 儲存 EMG data
+        # 儲存 EMG table data
         emg_data_table = pd.concat([emg_data_table, add_emg_statics],
                                    ignore_index=True)
         if np.size(onset_analog) > 0:

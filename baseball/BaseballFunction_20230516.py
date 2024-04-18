@@ -42,7 +42,7 @@ bandpass_cutoff = [30/0.802, 450/0.802]
 # 低通濾波頻率
 lowpass_freq = 6/0.802
 # downsampling frequency
-down_freq = 1000
+down_freq = 2000
 
 # 設定最接近放箭位置之acc sensor的欄位編號，建議看完三軸資料再選最大的
 # 可設定數字或是欄位名稱：ex: R EXTENSOR GROUP: ACC.Y 1 or 5

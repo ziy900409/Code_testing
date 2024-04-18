@@ -2,13 +2,17 @@
 """
 Created on Tue May 16 15:44:25 2023
 
+April 18 2024
+    修改掉 moving mean，尚未修改 EMG processing function，僅使用 rolling 修改主程式
+
 @author: Hsin.YH.Yang
 """
 
 # %% import library
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import os
@@ -21,10 +25,12 @@ from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 import math
 from decimal import Decimal
+from scipy.integrate import cumtrapz, trapz
 
 # %% 設定自己的資料路徑
 # 資料路徑
-data_path = r"E:\Hsin\NTSU_lab\Baseball\\"
+# data_path = r"E:\Hsin\NTSU_lab\Baseball\\"
+data_path = r"D:\BenQ_Project\python\Lin\\"
 # 設定資料夾
 RawData_folder = "\\Raw_Data"
 processingData_folder = "Processing_Data"
@@ -113,9 +119,9 @@ for i in range(len(rowdata_folder_list)):
     MVC_folder_path = rowdata_folder_path + "\\" + rowdata_folder_list[i] + "\\" + MVC_folder
     MVC_list = af.Read_File(MVC_folder_path, ".csv")
     fig_save_path = processing_folder_path + "\\" + rowdata_folder_list[i] + fig_save
-    print("Now processing MVC data in " + rowdata_folder_list[i])
+    # print("Now processing MVC data in " + rowdata_folder_list[i])
     for MVC_path in MVC_list:
-        print(MVC_path)
+        # print(MVC_path)
         data = pd.read_csv(MVC_path, encoding='UTF-8')
         processing_data, bandpass_filtered_data = af.EMG_processing(data, smoothing=smoothing_method)
         
@@ -123,6 +129,8 @@ for i in range(len(rowdata_folder_list)):
         # deal with filename and add extension with _ed
         filepath, tempfilename = os.path.split(MVC_path)
         filename, extension = os.path.splitext(tempfilename)
+        file_name = data_save_path + '\\' + filename + end_name + '.xlsx'
+        print(file_name)
         # 畫圖
         af.plot_plot(bandpass_filtered_data, fig_save_path,
                      filename, "Bandpass_")
@@ -132,22 +140,35 @@ for i in range(len(rowdata_folder_list)):
                      filename)
         # rewrite file name
         file_name = data_save_path + '\\' + filename + end_name + '.xlsx'
+
         # writting data in worksheet
         if smoothing_method == 'lowpass':
             af.plot_plot(processing_data, fig_save_path,
-                         filename, "lowpass_")
+                          filename, "lowpass_")
             pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
         elif smoothing_method == 'rms':
             af.plot_plot(processing_data, fig_save_path,
-                         filename, "rms_")
+                          filename, "rms_")
             pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
         elif smoothing_method == 'moving':
             af.plot_plot(processing_data, fig_save_path,
-                         filename, "moving_")
+                          filename, "moving_")
             pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+            # 取絕對值
+            abs_data = abs(bandpass_filtered_data)
+            # 計算移動平均
+            moving_process_iMVC = pd.DataFrame(np.empty(np.shape(abs_data)), # 創建資料儲存位置
+                                               columns = abs_data.columns)
+            moving_process_iMVC.iloc[:, 0] = abs_data.iloc[:, 0] # 定義時間
+            for i in range(np.shape(bandpass_filtered_data)[1]-1):
+                moving_process_iMVC.iloc[:, i+1] = abs_data.iloc[:, i+1].rolling(int(0.02*2000)).mean()
+            
+            af.plot_plot(moving_process_iMVC, fig_save_path,
+                         filename, "_moving")
+            pd.DataFrame(moving_process_iMVC).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
     toc = time.process_time()
     print("Total Time:",toc-tic)  
-# 找最大值
+# %%找最大值
 for i in range(len(rowdata_folder_list)):
     print("To fing the maximum value of all of MVC data in: " + rowdata_folder_list[i])
     tic = time.process_time()
@@ -177,6 +198,10 @@ gc.collect(generation=2)
 
 anc_time = pd.DataFrame({"file_name": [],
                          "idx": []})
+emg_data_table = pd.DataFrame({}, columns = ['task','trial', 'time', 'R BICEPS BRACHII: EMG 1', 'R TRICEPS BRACHII: EMG 2',
+                                             'R EXTENSOR CARPI RADIALIS: EMG.A 4', 'R EXTENSOR CARPI RADIALIS: EMG.B 4',
+                                             'R EXTENSOR CARPI RADIALIS: EMG.C 4', 'R EXTENSOR CARPI RADIALIS: EMG.D 4']
+                              )
 for iii in range(len(rowdata_folder_list)):
     # print(rowdata_folder_list[iii])
     # #  先處理 motion file
@@ -188,10 +213,12 @@ for iii in range(len(rowdata_folder_list)):
     # 讀取 .anc data list
     anc_folder_path = data_path + RawData_folder + "\\" + rowdata_folder_list[iii] + "\\" + anc_folder
     anc_file_list = af.Read_File(anc_folder_path, ".anc")
-    Staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240317.xlsx", sheet_name=rowdata_folder_list[iii])
+    # Staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240317.xlsx", sheet_name=rowdata_folder_list[iii])
+    Staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240317.xlsx",
+                                 sheet_name=rowdata_folder_list[iii])
     for anc_path in anc_file_list:
         # 處理 .ANC 檔案
-        # 判讀.anc 時間
+        # 判讀 .anc 時間
         filepath, tempfilename = os.path.split(anc_path)
         list_filename, extension = os.path.splitext(tempfilename)
         anc_data = pd.read_csv(anc_path,
@@ -243,14 +270,17 @@ for iii in range(len(rowdata_folder_list)):
                     axs[x, y].set_title(bandpass_filtered_data.columns[i+1], fontsize=16)
                     # 設定科學符號 : 小數點後幾位數
                     axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
-                    axs[x, y].axvline((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
-                    axs[x, y].axvline((Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
-                    axs[x, y].axvline((Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
-                    axs[x, y].axvline((Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240, color='r')
+                    axs[x, y].axvline((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linestyle='--', linewidth=0.5)
+                    axs[x, y].axvline((Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linestyle='--', linewidth=0.5)
+                    axs[x, y].axvline((Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linestyle='--', linewidth=0.5)
+                    axs[x, y].axvline((Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240,
+                                      color='r', linestyle='--', linewidth=0.5)
                     a_t = Decimal((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).quantize(Decimal("0.01"), rounding = "ROUND_HALF_UP")
                     axs[x, y].annotate(a_t,
                                        xy = (0, max(bandpass_filtered_data.iloc[:, i+1])), fontsize = 10, color='b')
-                    axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
                 # 設定整張圖片之參數
                 plt.suptitle(Staging_file["EMG檔案"][emg_name] + "Bandpass_", fontsize = 16)
                 plt.tight_layout()
@@ -301,18 +331,31 @@ for iii in range(len(rowdata_folder_list)):
                                                      MVC_value.values)*100
                 elif smoothing_method == 'moving':
                     # 使用秒數找尋最接近時間的引數
-                    kneetop_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    foot_contact_idx = np.abs(processing_data.iloc[:, 0] \
-                                              - (Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    shoulder_ER_idx = np.abs(processing_data.iloc[:, 0] \
-                                              - (Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
-                    release_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    # kneetop_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    # foot_contact_idx = np.abs(processing_data.iloc[:, 0] \
+                    #                           - (Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    # shoulder_ER_idx = np.abs(processing_data.iloc[:, 0] \
+                    #                           - (Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    # release_idx = np.abs(processing_data.iloc[:, 0] - (Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240).argmin() 
+                    # 取絕對值
+                    abs_data = abs(bandpass_filtered_data)
+                    # 計算移動平均
+                    moving_process_iMVC = pd.DataFrame(np.empty(np.shape(abs_data)), # 創建資料儲存位置
+                                                       columns = abs_data.columns)
+                    moving_process_iMVC.iloc[:, 0] = abs_data.iloc[:, 0] # 定義時間
+                    for i in range(np.shape(bandpass_filtered_data)[1]-1):
+                        moving_process_iMVC.iloc[:, i+1] = abs_data.iloc[:, i+1].rolling(int(0.02*2000)).mean()
                     # 繪圖確認用
-                    emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
-                                            columns=processing_data.columns)
-                    emg_iMVC.iloc[:, 0] = processing_data.values
-                    emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
+                    emg_iMVC = pd.DataFrame(np.zeros(np.shape(moving_process_iMVC)),
+                                            columns=moving_process_iMVC.columns)
+                    emg_iMVC.iloc[:, 0] = moving_process_iMVC.values
+                    emg_iMVC.iloc[:, 1:] = np.divide(abs(moving_process_iMVC.iloc[:, 1:].values),
                                                      MVC_value.values)*100
+                # 定義各時間點
+                kneetop = int((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240*2000)
+                footcontact = int((Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240*2000)
+                ser = int((Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240*2000)
+                release = int((Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240*2000)
                 # 繪圖用
                 save = fig_save_path + '\\' + smoothing_method + "_" + Staging_file["EMG檔案"][emg_name] + ".jpg"
                 n = int(math.ceil((np.shape(processing_data)[1] - 1) /2))
@@ -321,22 +364,22 @@ for iii in range(len(rowdata_folder_list)):
                 for i in range(np.shape(processing_data)[1]-1):
                     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
                     # 設定子圖之參數
-                    axs[x, y].plot(processing_data.iloc[:, 0], processing_data.iloc[:, i+1])
+                    axs[x, y].plot(emg_iMVC.iloc[kneetop-2000:release+2000, 0],
+                                   emg_iMVC.iloc[:, i+1])
                     axs[x, y].set_title(processing_data.columns[i+1], fontsize=16)
                     # 設定科學符號 : 小數點後幾位數
                     axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
                     axs[x, y].axvline((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240,
-                                      color='r', linewidth=0.5)
+                                      color='r', linestyle='--', linewidth=0.5)
                     axs[x, y].axvline((Staging_file['foot contact'][emg_name] - Staging_file['trigger'][emg_name])/240,
-                                      color='r', linewidth=0.5)
+                                      color='r', linestyle='--', linewidth=0.5)
                     axs[x, y].axvline((Staging_file['shoulder external rotation'][emg_name] - Staging_file['trigger'][emg_name])/240,
-                                      color='r', linewidth=0.5)
+                                      color='r', linestyle='--', linewidth=0.5)
                     axs[x, y].axvline((Staging_file['release'][emg_name] - Staging_file['trigger'][emg_name])/240,
-                                      color='r', linewidth=0.5)
+                                      color='r', linestyle='--', linewidth=0.5)
                     a_t = Decimal((Staging_file['Kneetop'][emg_name] - Staging_file['trigger'][emg_name])/240).quantize(Decimal("0.01"), rounding = "ROUND_HALF_UP")
                     axs[x, y].annotate(a_t,
                                        xy = (0, max(processing_data.iloc[:, i+1])), fontsize = 10, color='b')
-                    axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
                 # 設定整張圖片之參數
                 plt.suptitle(Staging_file["EMG檔案"][emg_name] + "_lowpass", fontsize = 16)
                 plt.tight_layout()
@@ -348,6 +391,64 @@ for iii in range(len(rowdata_folder_list)):
                 plt.ylabel("Voltage (V)", fontsize = 14)
                 plt.savefig(save, dpi=200, bbox_inches = "tight")
                 plt.show()
+                # ----------------計算資料-----------------------------------
+                # 計算 iMVC，分別為 processing data and bandpass data
+                bandpass_iMVC = pd.DataFrame(np.empty(np.shape(bandpass_filtered_data)),
+                                             columns=bandpass_filtered_data.columns)
+                # 取得時間
+                bandpass_iMVC.iloc[:, 0] = bandpass_filtered_data.iloc[:, 0].values
+                # 除以 MVC 最大值
+                bandpass_iMVC.iloc[:, 1:] = np.divide(abs(bandpass_filtered_data.iloc[:, 1:].values),
+                                                      MVC_value.values)*100
+                # 1. 計算每個期別的積分面積
+                temp_stage1_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[kneetop:footcontact, :], axis=0)],
+                                            columns=bandpass_iMVC.columns[:])
+                temp_stage2_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[footcontact:ser, :], axis=0)],
+                                            columns=bandpass_iMVC.columns[:])
+                temp_stage3_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[ser:release, :], axis=0)],
+                                            columns=bandpass_iMVC.columns[:])
+                temp_stage1_Atrap.insert(0, 'task', 'stage1 intergated')
+                temp_stage1_Atrap.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                temp_stage2_Atrap.insert(0, 'task', 'stage2 intergated')
+                temp_stage2_Atrap.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                temp_stage3_Atrap.insert(0, 'task', 'stage3 intergated')
+                temp_stage3_Atrap.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                # 2. 20 ms running mean，找出各期別的最大值，以及最大值時間
+                # 找到每個期別 moving mean 的最大值
+                temp_stage1_max = pd.DataFrame([emg_iMVC.iloc[kneetop:footcontact, :].max()],
+                                               columns = moving_process_iMVC.columns)
+                temp_stage2_max = pd.DataFrame([emg_iMVC.iloc[footcontact:ser, :].max()],
+                                               columns = moving_process_iMVC.columns)
+                temp_stage3_max = pd.DataFrame([emg_iMVC.iloc[ser:release, :].max()],
+                                               columns = moving_process_iMVC.columns)
+                # 插入 task 名稱以做區隔
+                temp_stage1_max.insert(0, 'task', 'stage1 max')
+                temp_stage1_max.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                temp_stage2_max.insert(0, 'task', 'stage2 max')
+                temp_stage2_max.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                temp_stage3_max.insert(0, 'task', 'stage3 max')
+                temp_stage3_max.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                # 找到每個期別 moving mean 的最大值時間
+                temp_stage1_max_time = pd.DataFrame([emg_iMVC.iloc[kneetop:footcontact, :].values.argmax(axis=0)],
+                                                    columns = moving_process_iMVC.columns)
+                temp_stage2_max_time = pd.DataFrame([emg_iMVC.iloc[footcontact:ser, :].max()],
+                                                    columns = moving_process_iMVC.columns)
+                temp_stage3_max_time = pd.DataFrame([emg_iMVC.iloc[ser:release, :].max()],
+                                                    columns = moving_process_iMVC.columns)
+                # 插入 task 名稱以做區隔
+                temp_stage1_max_time.insert(0, 'task', 'stage1 max time')
+                temp_stage1_max_time.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                temp_stage2_max_time.insert(0, 'task', 'stage2 max time')
+                temp_stage2_max_time.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                temp_stage3_max_time.insert(0, 'task', 'stage3 max time')
+                temp_stage3_max_time.insert(1, 'trial', Staging_file["EMG檔案"][emg_name])
+                # 合併資料
+                add_emg_statics = pd.concat([temp_stage1_Atrap, temp_stage2_Atrap, temp_stage3_Atrap,
+                                             temp_stage1_max, temp_stage2_max, temp_stage3_max,
+                                             temp_stage1_max_time, temp_stage2_max_time, temp_stage3_max_time])
+                # 儲存 EMG table data
+                emg_data_table = pd.concat([emg_data_table, add_emg_statics],
+                                           ignore_index=True)
                 # 將資料寫進不同 EXCEL 分頁 iMVC
                 with pd.ExcelWriter(save_file_name) as Writer:
                     emg_iMVC.iloc[kneetop_idx:foot_contact_idx].to_excel(Writer, sheet_name="Stage1", index=False)
