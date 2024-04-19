@@ -9,6 +9,8 @@ import ezc3d
 import pandas as pd
 import numpy as np
 import os
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 # %% Reading all of data path
 # using a recursive loop to traverse each folder
@@ -147,3 +149,258 @@ def read_c3d(path):
     analog_data.insert(0, 'Frame', analog_time)
     # synchronize data (optional)
     return motion_info, motion_data, analog_info, analog_data, np_motion_data
+# %%
+
+def removeoutliers_array(datain):
+# REMOVEOUTLIERS   Remove outliers from data using the Thompson Tau method.
+#    For vectors, REMOVEOUTLIERS(datain) removes the elements in datain that
+#    are considered outliers as defined by the Thompson Tau method. This
+#    applies to any data vector greater than three elements in length, with
+#    no upper limit (other than that of the machine running the script).
+#    Additionally, the output vector is sorted in ascending order.
+# 
+#    Example: If datain = [1 34 35 35 33 34 37 38 35 35 36 150]
+# 
+#    then removeoutliers(datain) will return the vector:
+#        dataout = 33 34 34 35 35 35 35 36 37 38
+# 
+#    See also MEDIAN, STD, MIN, MAX, VAR, COV, MODE.
+#    This function was written by Vince Petaccio on July 30, 2009.
+    tau = [1.150, 1.393, 1.572, 1.656, 1.711, 1.749, 1.777, 1.798, 1.815, \
+           1.829, 1.840, 1.849, 1.858, 1.865, 1.871, 1.876, 1.881, 1.885, \
+        1.889, 1.893, 1.896, 1.899, 1.902, 1.904, 1.906, 1.908, 1.910, \
+        1.911, 1.913, 1.914, 1.916, 1.917, 1.919, 1.920, 1.921, 1.922, \
+        1.923, 1.924]
+    n = len(datain); #Determine the number of samples in datain
+    if n < 3:
+        print('ERROR: There must be at least 3 samples in the' \
+            ' data set in order to use the removeoutliers function.')
+    else:
+        S = np.std(datain); #Calculate S, the sample standard deviation
+        xbar = np.mean(datain) #Calculate the sample mean
+        #tau is a vector containing values for Thompson's Tau
+
+        #Determine the value of S times Tau
+        if n > len(tau):
+            TS = 1.960*S #For n > 40
+        else:
+            TS = tau[n]*S #For samples of size 3 < n < 40
+        
+        #Sort the input data vector so that removing the extreme values
+        #becomes an arbitrary task
+        dataout = np.sort(datain)
+        #Compare the values of extreme high data points to TS
+        while abs((max(dataout)-xbar)) > TS:
+            dataout = dataout[1:(len(dataout)-1)]
+            #Determine the NEW value of S times Tau
+            S = np.std(dataout)
+            xbar = np.mean(dataout)
+            if len(dataout) > len(tau):
+                TS = 1.960*S; #For n > 40
+            else:
+                TS = tau(len(dataout))*S #For samples of size 3 < n < 40
+            
+        
+        # Compare the values of extreme low data points to TS.
+        # Begin by determining the NEW value of S times Tau
+            S = np.std(dataout)
+            xbar = np.mean(dataout)
+            if len(dataout) > len(tau):
+                TS=1.960*S; # For n > 40
+            else:
+                TS=tau(len(dataout))*S; #For samples of size 3 < n < 40
+            
+        while abs((min(dataout)-xbar)) > TS:
+            dataout = dataout[2:(len(dataout))]
+            #Determine the NEW value of S times Tau
+            S = np.std(dataout)
+            xbar = np.mean(dataout)
+            if len(dataout) > len(tau):
+                TS = 1.960*S # For n > 40
+            else:
+                TS = tau(len(dataout))*S #For samples of size 3 < n < 40
+    return dataout
+# %%
+def removeoutliers(datain):
+    '''
+    REMOVEOUTLIERS   
+        Remove outliers from data using the Thompson Tau method.
+        For vectors, REMOVEOUTLIERS(datain) removes the elements in datain that
+        are considered outliers as defined by the Thompson Tau method. This
+        applies to any data vector greater than three elements in length, with
+        no upper limit (other than that of the machine running the script).
+        Additionally, the output vector is sorted in ascending order.
+
+        Example: If datain = [1 34 35 35 33 34 37 38 35 35 36 150]
+
+        then removeoutliers(datain) will return the vector:
+            dataout = 33 34 34 35 35 35 35 36 37 38
+
+        See also MEDIAN, STD, MIN, MAX, VAR, COV, MODE.
+        This function was written by Vince Petaccio on July 30, 2009.
+        
+        remove data by column in pd.DataFrame type
+        modify by Hsin.Yang April 16, 2024
+
+    Parameters
+    ----------
+    datain : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
+    tau = [1.150, 1.393, 1.572, 1.656, 1.711, 1.749, 1.777, 1.798, 1.815, \
+           1.829, 1.840, 1.849, 1.858, 1.865, 1.871, 1.876, 1.881, 1.885, \
+        1.889, 1.893, 1.896, 1.899, 1.902, 1.904, 1.906, 1.908, 1.910, \
+        1.911, 1.913, 1.914, 1.916, 1.917, 1.919, 1.920, 1.921, 1.922, \
+        1.923, 1.924]
+    n = len(datain) #Determine the number of samples in datain
+    dataout = datain
+    
+    if n < 3:
+        print('ERROR: There must be at least 3 samples in the' \
+            ' data set in order to use the removeoutliers function.')
+    else:
+
+        
+        for column in range(np.shape(datain)[1]):
+            S = np.std(datain.iloc[:, column]) # Calculate S, the sample standard deviation
+            xbar = np.mean(datain.iloc[:, column]) # Calculate the sample mean
+            #tau is a vector containing values for Thompson's Tau
+
+            #Determine the value of S times Tau
+            if n > len(tau):
+                TS = 1.960*S #For n > 40
+            else:
+                TS = tau[n]*S #For samples of size 3 < n < 40
+            # Sort the input data vector so that removing the extreme values
+            # becomes an arbitrary task
+            # dataout = np.sort(datain)
+            #Compare the values of extreme high data points to TS
+            while abs((dataout.iloc[:, column].max() - xbar)) > TS:
+                dataout.iloc[dataout.iloc[:, column].argmax(), column] = np.nan
+                # dataout = dataout[1:(len(dataout)-1)]
+                #Determine the NEW value of S times Tau
+                S = np.std(dataout.iloc[:, column])
+                xbar = np.mean(dataout.iloc[:, column])
+                if len(dataout.iloc[:, column].dropna()) > len(tau):
+                    TS = 1.960*S; #For n > 40
+                else:
+                    TS = tau[len(dataout.iloc[:, column].dropna())]*S #For samples of size 3 < n < 40
+                
+            
+            # Compare the values of extreme low data points to TS.
+            # Begin by determining the NEW value of S times Tau
+                S = np.std(dataout.iloc[:, column])
+                xbar = np.mean(dataout.iloc[:, column])
+                if len(dataout.iloc[:, column].dropna()) > len(tau):
+                    TS=1.960*S; # For n > 40
+                else:
+                    TS=tau[len(dataout.iloc[:, column].dropna())]*S; #For samples of size 3 < n < 40
+                
+            while abs((dataout.iloc[:, column].min() - xbar)) > TS:
+                # dataout = dataout[2:(len(dataout))]
+                dataout.iloc[dataout.iloc[:, column].argmin(), column] = np.nan
+                #Determine the NEW value of S times Tau
+                S = np.std(dataout.iloc[:, column])
+                xbar = np.mean(dataout.iloc[:, column])
+                if len(dataout) > len(tau):
+                    TS = 1.960*S # For n > 40
+                else:
+                    TS = tau[len(dataout.iloc[:, column].dropna())]*S #For samples of size 3 < n < 40
+    return dataout
+            
+            
+ 
+# %% iqr_removeoutlier
+def iqr_removeoutlier(datain, show=False):
+    """
+    This function uses the interquartile range (IQR) method to identify and remove outliers from
+    the input dataframe. Outliers are identified for each column in the dataframe and replaced
+    with NaN values.
+    
+    
+    Parameters
+    ----------
+    datain : pandas.DataFrame
+        Input dataframe containing the data with potential outliers.
+        
+    show : bool
+        A flag to determine whether to draw a Box Plot figure. Default is False.
+
+    Returns
+    -------
+    dataout : pandas.DataFrame
+        The data from datain with removed outliers based on the interquartile range (IQR) method.
+        Outliers are replaced with NaN values.
+        
+        
+    This function was written by Hsin Yang on April 18, 2024.
+    """
+    # Using the interquartile range to find outliers
+    # datain = subject_data
+    dataout = datain
+    for column in range(np.shape(datain)[1]):
+        # caculate q1
+        q1 = np.percentile(datain.iloc[:, column], 25)
+        # caculate q3
+        q3 = np.percentile(datain.iloc[:, column], 75)
+        # cacualte IQR
+        iqr = q3 - q1
+        # To find the data position which samll than qi - 1.5*iqr
+        q1_positions = list(np.where(datain.iloc[:, column] < (q1 - 1.5*iqr))[0])
+        q3_positions = list(np.where(datain.iloc[:, column] > (q3 + 1.5*iqr))[0])
+        # Outliers are replaced with NaN values
+        dataout.iloc[[q1_positions + q3_positions], column] = np.nan
+    # draw figure
+    if show:
+        # Box plot
+        plt.figure(figsize=(10, 6))
+        datain.boxplot(patch_artist=True, meanline=False, showmeans=False,
+                       boxprops=dict(facecolor='lightblue', edgecolor='black', linewidth=1.5),
+                       flierprops=dict(marker='o', markerfacecolor='r', markersize=6))
+        plt.title('Box Plot of Multiple Datasets with IQR Highlighted', fontsize=14)
+        plt.xlabel('Dataset', fontsize=12)
+        plt.ylabel('Value', fontsize=12)
+        plt.xticks(rotation=45)
+        
+    return dataout
+
+# %% Statistical outlier detection
+
+def zscore_removeoutlier(datain):
+    dataout = datain
+    for column in range(np.shape(datain)[1]):
+        # 计算数据的平均值和标准差
+        data_mean = np.mean(datain.iloc[:, column])
+        data_std = np.std(datain.iloc[:, column])
+        
+        # caculate Z-score
+        z_scores = (datain.iloc[:, column] - data_mean) / data_std
+        # To find the data position which samll than qi - 1.5*iqr
+        small_positions = list(np.where(z_scores.iloc[:, column] < 3)[0])
+        big_positions = list(np.where(z_scores.iloc[:, column] > 3)[0])
+
+        # Outliers are replaced with NaN values
+        dataout.iloc[[small_positions + big_positions], column] = np.nan
+    return dataout
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -11,8 +11,8 @@ April 18 2024
 # %% import library
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import os
@@ -29,8 +29,8 @@ from scipy.integrate import cumtrapz, trapz
 
 # %% 設定自己的資料路徑
 # 資料路徑
-data_path = r"E:\Hsin\NTSU_lab\Baseball\\"
-# data_path = r"D:\BenQ_Project\python\Lin\\"
+# data_path = r"E:\Hsin\NTSU_lab\Baseball\\"
+data_path = r"D:\BenQ_Project\python\Lin\\"
 # 設定資料夾
 RawData_folder = "\\Raw_Data"
 processingData_folder = "Processing_Data"
@@ -213,9 +213,9 @@ for iii in range(len(rowdata_folder_list)):
     # 讀取 .anc data list
     anc_folder_path = data_path + RawData_folder + "\\" + rowdata_folder_list[iii] + "\\" + anc_folder
     anc_file_list = af.Read_File(anc_folder_path, ".anc")
-    Staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240317.xlsx", sheet_name=rowdata_folder_list[iii])
-    # Staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240317.xlsx",
-    #                              sheet_name=rowdata_folder_list[iii])
+    # Staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240317.xlsx", sheet_name=rowdata_folder_list[iii])
+    Staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240317.xlsx",
+                                  sheet_name=rowdata_folder_list[iii])
     for anc_path in anc_file_list:
         # 處理 .ANC 檔案
         # 判讀 .anc 時間
