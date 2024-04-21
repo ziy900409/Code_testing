@@ -19,7 +19,7 @@ folder_path = r"E:\Hsin\NTSU_lab\Baseball\Processing_Data"
 data_sheet = ["Stage2", "Stage3"]
 
 # %% 1. read staging file
-staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240317.xlsx",
+staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
                              sheet_name='memo2') # 改變要找stage2 or stage3
 staging_file = staging_file.dropna(axis=0, thresh=14)
 folder_file_list = os.listdir(folder_path)
@@ -29,7 +29,10 @@ for folder in folder_file_list:
     file_list = af.Read_File(folder_path + "\\" + folder + "\data\motion",
                              ".xlsx",
                              subfolder=False)
-    all_file_list.extend(file_list)
+    for file in file_list:
+        if "_ed" in file:
+            # print(file)
+            all_file_list.append(file)
 
 ture_file_path = []
 for file_name in staging_file["EMG_File"]:
@@ -69,7 +72,8 @@ for i in range(np.shape(arr_muscle_data)[0]):
     for ii in range(np.shape(arr_muscle_data)[2]):
         arr_muscle_data[i, :, ii] = muscle_data[ii, :, i]
 
-
+# 修改儲存檔名
+# save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx"
 save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx"
 
 with pd.ExcelWriter(save_file_name) as Writer:
@@ -80,7 +84,7 @@ with pd.ExcelWriter(save_file_name) as Writer:
     pd.DataFrame(arr_muscle_data[4, :, :]).to_excel(Writer, sheet_name="muscle5", index=False)
     pd.DataFrame(arr_muscle_data[5, :, :]).to_excel(Writer, sheet_name="muscle6", index=False)
 
-# %%
+# %% T1 快轉 VS 慢轉
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -109,20 +113,29 @@ parameters = {'axes.labelsize': 24, # x 和 y 標籤的字型大小
 plt.rcParams.update(parameters)
 
 # 讀資料
-data = arr_muscle_data
+# data = arr_muscle_data
+excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx")
 
-columns_name = ["R BICEPS BRACHII: EMG 1", "R TRICEPS BRACHII: EMG 2", "R EXTENSOR CARPI RADIALIS: EMG.A 4",
-                "R EXTENSOR CARPI RADIALIS: EMG.B 4", "R EXTENSOR CARPI RADIALIS: EMG.C 4",
-                "R EXTENSOR CARPI RADIALIS: EMG.D 4"]
-n = int(math.ceil((np.shape(arr_muscle_data)[0]) /2))
+# 获取所有分页（sheet）的名称
+sheet_names = excel_file.sheet_names
+t1_data = np.zeros([6, 202, len(ture_file_path)])
+
+
+for name in range(len(sheet_names)):
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx",
+                                      sheet_name = sheet_names[name])
+data = t1_data
+columns_name = ['Briceps Brachii','Triceps Brachii', 'Extensor Carpi Radialis',
+                'Extensor Carpi Ulnaris', 'Flexor Carpi Radialis', 'Flexor Carpi Ulnaris']
+n = int(math.ceil((np.shape(data)[0]) /2))
 fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')
-for i in range(np.shape(arr_muscle_data)[0]):
+for i in range(np.shape(data)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
     color = palette(0) # 設定顏色
     
-    data1 = pd.DataFrame(data[i, :, [5, 8, 9, 10, 12, 13, 14, 15, 17, 18]].T) #設定資料欄位
-    data2 = pd.DataFrame(data[i, :, [0, 1, 2, 3, 4, 6, 7, 11, 16]].T) #設定資料欄位
+    data1 = pd.DataFrame(data[i, :, [5, 8, 9, 10, 12, 13, 14, 15, 17, 18]].T) #設定資料欄位 快轉
+    data2 = pd.DataFrame(data[i, :, [0, 1, 2, 3, 4, 6, 7, 11, 16]].T) #設定資料欄位 慢轉
     data1 = data1.dropna(axis=0) #丟棄NAN的值
     data2 = data2.dropna(axis=0) #丟棄NAN的值
     iters = list(range(len(data1)))
@@ -160,9 +173,47 @@ plt.xlabel("time (second)", fontsize = 14)
 plt.ylabel("muscle activation (%)", fontsize = 14)
 # plt.savefig(save, dpi=200, bbox_inches = "tight")
 plt.show()
+# %% spm T1 快轉 VS 慢轉
+import spm1d
+dataset    = spm1d.data.uv1d.t1.Random()
+Y,mu       = dataset.get_data()
+t  = spm1d.stats.ttest(Y, mu)  #mu is 0 by default
+ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
+ti.plot()
+
+for i in range(np.shape(data)[0]):
+    data1 = pd.DataFrame(data[i, :, [5, 8, 9, 10, 12, 13, 14, 15, 17, 18]]) #設定資料欄位 快轉
+    data2 = pd.DataFrame(data[i, :, [0, 1, 2, 3, 4, 6, 7, 11, 16]]) #設定資料欄位 慢轉
+
+    # t  = spm1d.stats.ttest2(data1, data2, equal_var=False)
+    # ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
+    # ti.plot()
+    # plt.show()
+    plt.figure(figsize=(5,6))
+    plt.subplot(2,1,1)
+    spm1d.plot.plot_mean_sd(data1,
+                            linecolor='r',
+                            facecolor=(1,0.7,0.7),
+                            edgecolor='r',
+                            label='快轉組')
+    spm1d.plot.plot_mean_sd(data2,
+                            linecolor='b',
+                            facecolor=(0.7,0.7,1),
+                            edgecolor='b',
+                            label='慢轉組')
+    plt.legend(loc = "upper left")
+
+    plt.subplot(2,1,2)
+    t  = spm1d.stats.ttest2(data1,
+                            data2,
+                            equal_var=False)
+    ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
+    ti.plot()
+    plt.suptitle(str(columns_name[i]), fontsize=16)
+    plt.tight_layout()
 
 
-# %%
+# %% T1 vs T2
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -209,9 +260,8 @@ plt.rcParams.update(parameters)
 # 讀資料
 data = arr_muscle_data
 
-columns_name = ["R BICEPS BRACHII: EMG 1", "R TRICEPS BRACHII: EMG 2", "R EXTENSOR CARPI RADIALIS: EMG.A 4",
-                "R EXTENSOR CARPI RADIALIS: EMG.B 4", "R EXTENSOR CARPI RADIALIS: EMG.C 4",
-                "R EXTENSOR CARPI RADIALIS: EMG.D 4"]
+columns_name = ['Briceps Brachii','Triceps Brachii', 'Extensor Carpi Radialis',
+                'Extensor Carpi Ulnaris', 'Flexor Carpi Radialis', 'Flexor Carpi Ulnaris']
 n = int(math.ceil((np.shape(arr_muscle_data)[0]) /2))
 fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')
 for i in range(np.shape(arr_muscle_data)[0]):
@@ -259,6 +309,49 @@ plt.ylabel("muscle activation (%)", fontsize = 14)
 # plt.savefig(save, dpi=200, bbox_inches = "tight")
 plt.show()
 
+# %% spm T1 vs T2
+
+t1_data = np.zeros([6, 202, len(ture_file_path)])
+t2_data = np.zeros([6, 202, len(ture_file_path)])
+
+for name in range(len(sheet_names)):
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx",
+                                      sheet_name = sheet_names[name])
+  t2_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx",
+                                      sheet_name = sheet_names[name])
+  
+for i in range(np.shape(data)[0]):
+    data1 = pd.DataFrame(t1_data[i, :, :].T) #設定資料欄位 T1
+    data2 = pd.DataFrame(t2_data[i, :, :].T) #設定資料欄位 T2
+    data1 = data1.dropna(axis=0) #丟棄NAN的值
+    data2 = data2.dropna(axis=0) #丟棄NAN的值
+
+    # t  = spm1d.stats.ttest2(data1, data2, equal_var=False)
+    # ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
+    # ti.plot()
+    # plt.show()
+    plt.figure(figsize=(5,6))
+    plt.subplot(2,1,1)
+    spm1d.plot.plot_mean_sd(data1,
+                            linecolor='r',
+                            facecolor=(1,0.7,0.7),
+                            edgecolor='r',
+                            label='T1')
+    spm1d.plot.plot_mean_sd(data2,
+                            linecolor='b',
+                            facecolor=(0.7,0.7,1),
+                            edgecolor='b',
+                            label='T2')
+    plt.legend(loc = "upper left")
+
+    plt.subplot(2,1,2)
+    t  = spm1d.stats.ttest2(data1,
+                            data2,
+                            equal_var=False)
+    ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
+    ti.plot()
+    plt.suptitle(str(columns_name[i]), fontsize=16)
+    plt.tight_layout()
 
 
 
