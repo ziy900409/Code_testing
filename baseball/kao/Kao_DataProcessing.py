@@ -23,8 +23,8 @@ import time
 import numpy
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball\kao")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball\kao")
 import Kao_Function as func
 
 import math
@@ -36,10 +36,11 @@ from prettytable import PrettyTable
 from scipy import signal
 from scipy.integrate import cumtrapz, trapz
 import logging
+from datetime import datetime
 
 # data path
+computer_path = r"E:\Hsin\NTSU_lab\data\\"
 # computer_path = r"D:\BenQ_Project\python\Kao\\"
-computer_path = r"D:\BenQ_Project\python\Kao\\"
 data_path = computer_path + "EMG\\"
 rawData_folder = "raw_data"
 processingData_folder = "processing_data"
@@ -54,12 +55,19 @@ samplingRate_motion = 250
 StagingFile_Exist = pd.read_excel(computer_path + "Kao_StagingFile_20240415.xlsx",
                                   sheet_name="工作表2")
 # 定義圖片儲存路徑
-motion_fig_save = computer_path + "motion_processing\\"
+motion_fig_save = computer_path + "motion_processing\\force_figure\\"
+force_data_save = computer_path + "motion_processing\\force_data\\"
+emg_figure_save = computer_path + "motion_processing\\EMG\\"
 # 定義圖片儲存路徑
-# motion_fig_save = r"E:\Hsin\NTSU_lab\data\motion_processing\\"
-motion_fig_save = r"D:\BenQ_Project\python\Kao\motion_processing\\"
-# folder_path = r"E:\Hsin\NTSU_lab\data\\"
-folder_path = r"D:\BenQ_Project\python\Kao\\"
+folder_path = r"E:\Hsin\NTSU_lab\data\\"
+# folder_path = r"D:\BenQ_Project\python\Kao\\"
+# 获取当前日期和时间
+now = datetime.now()
+# 将日期转换为指定格式
+formatted_date = now.strftime("%Y-%m-%d-%H%M")
+
+# 输出格式化后的日期
+print("当前日期：", formatted_date)
 # %% EMG data preprocessing
 # 路徑設置
 all_rawdata_folder_path = []
@@ -483,9 +491,22 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         plt.xlabel("time (second)", fontsize = 14)
         plt.ylabel("Force (N)", fontsize = 14)
         plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-        plt.savefig(str(motion_fig_save + "FP\\" + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.jpg"),
+        plt.savefig(str(motion_fig_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.jpg"),
                     dpi=200, bbox_inches = "tight")
         plt.show()
+        # 輸出力版資料
+        left_data = pd.DataFrame({'#Sample':left_lowpass.iloc[time_start:leftLeg_off + ana_time_start, 0],
+                                  'combine_left':combin_left[time_start:leftLeg_off + ana_time_start]})
+        right_data_g = pd.DataFrame({'#Sample':right_lowpass.iloc[first_right_max_idx:rightLeg_off + right_time, 0],
+                                     'combine_right_g':combin_right[first_right_max_idx:rightLeg_off + right_time]})
+        right_data_r = pd.DataFrame({'#Sample':right_lowpass.iloc[slope_idx:rightLeg_off + right_time, 0],
+                                     'combine_right_g':combin_right[slope_idx:rightLeg_off + right_time]})
+        # 將 force plate data 資料寫進 EXCEL
+        save_file_name = str(force_data_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.xlsx")
+        with pd.ExcelWriter(save_file_name) as Writer:
+            left_data.to_excel(Writer, sheet_name="Stage1", index=False)
+            right_data_g.to_excel(Writer, sheet_name="Stage2_g", index=False)
+            right_data_r.to_excel(Writer, sheet_name="Stage2_r", index=False)
         # ---------------處理 EMG data--------------------------------------
         # 2.1. read EMG data and pre-processing data
         '''
@@ -621,7 +642,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             plt.grid(False)
             plt.xlabel("time (second)", fontsize = 14)
             plt.ylabel("Muscle Activation (%)", fontsize = 14)
-            plt.savefig(str(motion_fig_save + "EMG\\" + StagingFile_Exist.loc[file_name, '.anc'] + "_emg.jpg"),
+            plt.savefig(str(emg_figure_save + StagingFile_Exist.loc[file_name, '.anc'] + "_emg.jpg"),
                             dpi=200, bbox_inches = "tight")
             plt.show()
         # -----------------儲存資料-------------------------------
@@ -645,22 +666,27 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                                                           '啟動左腳力量': [combin_right[time_start]],
                                                           'Left_RFD': [(combin_left[left_max_time] - combin_right[time_start])/ \
                                                                        ((left_max_time - time_start)/2500)],
+                                                        'Left_DRFD': [(combin_left[int(time_start+2500*0.1)] - combin_right[time_start])/ \
+                                                                     ((2500*0.1)/2500)],
                                                         '右腳發力時間_g':[first_right_max_idx],
                                                         '右腳發力值_g':[combin_right[first_right_max_idx]],
-                                                        'Right_RFD_g':[combin_right[right_time] - combin_right[first_right_max_idx]/ \
-                                                                     (right_time - first_right_max_idx)/2500],
+                                                        'Right_RFD_g':[(combin_right[right_time] - combin_right[first_right_max_idx])/ \
+                                                                     ((right_time - first_right_max_idx)/2500)],
+                                                        'Right_DRFD_g':[(combin_right[int(first_right_max_idx+2500*0.1)] - combin_right[first_right_max_idx])/ \
+                                                                     ((2500*0.1)/2500)],
                                                         '右腳發力時間_r':[slope_idx],
                                                         '右腳發力值_r':[combin_right[slope_idx]],
-                                                        'Right_RFD_r':[combin_right[right_time] - combin_right[slope_idx]/ \
-                                                                       (right_time - slope_idx)/2500],
+                                                        'Right_RFD_r':[(combin_right[right_time] - combin_right[slope_idx])/ \
+                                                                       ((right_time - slope_idx)/2500)],
+                                                        'Right_DRFD_r':[(combin_right[int(slope_idx+2500*0.1)] - combin_right[slope_idx])/ \
+                                                                       ((2500*0.1)/2500)],
                                                         'onset time': [onset]
-                                                        
                                                           }, index=[0])],
                                ignore_index=True)
     
-
-data_table.to_excel(r"D:\BenQ_Project\python\Kao\motion_statistic.xlsx")
-emg_data_table.to_excel(r"D:\BenQ_Project\python\Kao\emg_data_statistic.xlsx")
+# 將資料輸出成 EXCEL TABLE
+data_table.to_excel(computer_path + "motion_statistic_" + formatted_date + ".xlsx")
+emg_data_table.to_excel(computer_path + "emg_data_statistic_" + formatted_date + ".xlsx")
 
 
 
