@@ -19,6 +19,9 @@ emg_muscle = ['Extensor carpi radialis_RMS', 'Flexor Carpi Radialis_RMS',
               'Extensor Indicis_RMS', 'Biceps_RMS']
 mouse_name = ['EC', 'FK', 'S', 'U', 'ZA', 'Gpro']
 
+angle = ['Thumb angle', 'Little finger angle', 'Wrist angle']
+
+
 # 獲取當前的日期及時間
 now = datetime.now()
 
@@ -88,7 +91,70 @@ for sub in subject_number:
 file_name = "LiftingShot_statistic_auto_" + formatted_date + ".xlsx"
 path = r'D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\\'
 emg_data_table.to_excel(path + file_name,
-                    sheet_name='Sheet1', index=False, header=True)                  
+                    sheet_name='Sheet1', index=False, header=True)       
+
+# %% remove outlier hand angle
+raw_data = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\LiftingShot_angle_data_2024-04-24.xlsx",
+                         sheet_name="Sheet1")
+
+mouse_group = raw_data.loc[:, 'file_name'].str.split("_")
+mouse_element = pd.DataFrame(mouse_group.str[2])
+subject = pd.DataFrame(mouse_group.str[0])
+
+raw_data["mouse"] = mouse_element
+raw_data["subject"] = subject
+
+angle_data = raw_data.loc[:, angle]
+right_group = raw_data[raw_data['direction'] == 'R']
+right_group = right_group.loc[:, angle]
+left_group = raw_data[raw_data['direction'] == 'L']
+left_group = left_group.loc[:, angle]
+
+
+# remove_left = gen.removeoutliers(left_group)
+
+# remove_left.isna().sum()
+subject_number = raw_data['subject'].value_counts().index
+
+# 找到同肌肉名稱的 columns 的 index
+index_dict = {col: raw_data.columns.get_loc(col) for col in angle}
+# 創建資料儲存的地方
+angle_data_table = pd.DataFrame({}, columns = list(['subject','direction', 'mouse'] + angle)
+                              )
+for sub in subject_number:
+    for direction in ['R', 'L']:
+        temp_idx = []
+        for i in range(len(raw_data)):    
+            if sub == raw_data["subject"][i] and \
+                direction == raw_data['direction'][i]:
+                print(raw_data["subject"][i], raw_data['direction'][i])
+                temp_idx.append(i)
+        if np.size(raw_data.loc[temp_idx, angle]) > 0:
+            subject_data = raw_data.loc[temp_idx, :].reset_index(drop=True)
+            remove_data = gen.iqr_removeoutlier(raw_data.loc[temp_idx, angle])
+            subject_data.loc[:, angle] = remove_data.values
+            remove_data.isna().sum()
+        for mouse in mouse_name:
+            temp_mouse_data = pd.DataFrame(columns = subject_data.columns)
+            for ii in range(np.shape(subject_data)[0]):
+                if mouse == subject_data['mouse'][ii]:
+                    print(subject_data['mouse'][ii])
+                    add_data = pd.DataFrame([subject_data.iloc[ii, :].values],
+                                            columns = subject_data.columns)
+                    temp_mouse_data = pd.concat([temp_mouse_data, add_data],
+                                                ignore_index=True)
+            mean_temp = pd.DataFrame([np.mean(temp_mouse_data.loc[:, angle], axis=0)],
+                                              columns = angle)
+            mean_temp.insert(0, 'subject', sub)
+            mean_temp.insert(1, 'direction', direction)
+            mean_temp.insert(2, 'mouse', mouse)
+            angle_data_table = pd.concat([angle_data_table, mean_temp])
+                    
+file_name = "LiftingShot_angle_statistic_" + formatted_date + ".xlsx"
+path = r'D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\\'
+angle_data_table.to_excel(path + file_name,
+                    sheet_name='Sheet1', index=False, header=True) 
+           
                 
 
 

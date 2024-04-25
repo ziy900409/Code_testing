@@ -390,7 +390,41 @@ def zscore_removeoutlier(datain):
     return dataout
 
 
+# %%
+import numpy as np  # 引入NumPy庫用於數學運算
 
+def included_angle(x0, x1, x2):
+    # 將參數轉換為NumPy陣列以進行向量運算
+    x0 = np.array(x0)
+    x1 = np.array(x1)
+    x2 = np.array(x2)
+    
+    # 計算向量A和向量B
+    vector_A = x0 - x1  # 向量A是從x1到x0的差
+    vector_B = x2 - x1  # 向量B是從x1到x2的差
+    
+    # 計算向量A和向量B的點積
+    dot_product = np.sum(vector_A * vector_B, axis=1)
+    
+    # 計算向量A和向量B的大小或模長度
+    magnitude_A = np.linalg.norm(vector_A, axis=1)
+    magnitude_B = np.linalg.norm(vector_B, axis=1)
+    
+    # 計算夾角的cosine值
+    cosines = dot_product / (magnitude_A * magnitude_B)
+    
+    # 確保cosine值在合法範圍內（-1到1之間）
+    cosines = np.clip(cosines, -1, 1)
+    
+    # 計算夾角的弧度和角度
+    angle_radians = np.arccos(cosines)
+    angle_degrees = np.degrees(angle_radians)
+    
+    # 將角度範圍調整為0到360度
+    angle_degrees_360 = (angle_degrees + 360) % 360
+    
+    # 返回調整後的夾角值
+    return angle_degrees_360
 
 
 

@@ -237,7 +237,7 @@ print("MVC Data Total Time Spent: ",toc-tic)
 gc.collect(generation=2)
 
 
- # %% read data
+# %% 找出分期檔所在路徑
 '''
 1. 流程
  1.1. 讀取 staging file，獲得所需要的 EMG、.anc、.force 檔案名稱
@@ -294,8 +294,10 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
 data_table = pd.DataFrame({}, columns = ['filename', 'order', '左腳離地時間', '左腳最大值',
                                          '左腳最大值時間', '右腳離地時間', '右腳最大值',
                                          '右腳最大值時間', '啟動時間', '啟動左腳力量',
-                                         'Left_RFD', '右腳發力時間', '右腳發力值',
-                                         'Right_RFD']
+                                         'Left_RFD', '右腳發力時間_g', '右腳發力值_g',
+                                         'Right_RFD_g', '右腳發力時間_r', '右腳發力值_r',
+                                         'Right_RFD_r']
+
                           )
 emg_data_table = pd.DataFrame({}, columns = ['task','trial', 'time', 'L RECTUS FEMORIS: EMG 1', 'L VASTUS LATERALIS: EMG 2',
                                              'L BICEPS FEMORIS: EMG 3', 'L SEMITENDINOSUS: EMG 4',
@@ -518,17 +520,22 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             # EMG 與 motion 時間換算
             motion_start = int((time_start - onset_analog[0, 0])/2500*2000)
             leftLeave = int((leftLeg_off + ana_time_start - onset_analog[0, 0])/2500*2000)
-            right_start = int((first_right_max_idx - onset_analog[0, 0])/2500*2000)
+            right_start_g = int((first_right_max_idx - onset_analog[0, 0])/2500*2000)
+            right_start_r = int((slope_idx - onset_analog[0, 0])/2500*2000)
             rightLeave = int((rightLeg_off + right_time - onset_analog[0, 0])/2500*2000)
             # 計算積分面積
             temp_stage1_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[motion_start:leftLeave, :], axis=0)],
                                         columns=bandpass_iMVC.columns[:])
-            temp_stage2_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start:rightLeave, :], axis=0)],
+            temp_stage2_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_g:rightLeave, :], axis=0)], # 右腳啟動綠色
+                                        columns=bandpass_iMVC.columns[:])
+            temp_stage3_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_r:rightLeave, :], axis=0)], #右腳啟動紅色
                                         columns=bandpass_iMVC.columns[:])
             temp_stage1_Atrap.insert(0, 'task', 'stage1 intergated')
             temp_stage1_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
-            temp_stage2_Atrap.insert(0, 'task', 'stage2 intergated')
+            temp_stage2_Atrap.insert(0, 'task', 'stage2 intergated_g')
             temp_stage2_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            temp_stage3_Atrap.insert(0, 'task', 'stage2 intergated_r')
+            temp_stage3_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
             # 計算移動平均
             moving_process_iMVC = pd.DataFrame(np.empty(np.shape(processing_iMVC)), # 創建資料儲存位置
                                                columns = processing_iMVC.columns)
@@ -538,7 +545,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             # 找到兩個stage的最大值
             temp_stage1_max = pd.DataFrame([moving_process_iMVC.iloc[motion_start:leftLeave, :].max()],
                                            columns = moving_process_iMVC.columns)
-            temp_stage2_max = pd.DataFrame([moving_process_iMVC.iloc[right_start:rightLeave, :].max()],
+            temp_stage2_max = pd.DataFrame([moving_process_iMVC.iloc[right_start_g:rightLeave, :].max()],
                                            columns = moving_process_iMVC.columns)
             # 插入 task 名稱以做區隔
             temp_stage1_max.insert(0, 'task', 'stage1 max')
@@ -552,7 +559,8 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                 "\\" + StagingFile_Exist.loc[file_name, 'EMG_Name'] + "_ed.xlsx"
             with pd.ExcelWriter(save_file_name) as Writer:
                 processing_iMVC.iloc[motion_start:leftLeave].to_excel(Writer, sheet_name="Stage1", index=False)
-                processing_iMVC.iloc[right_start:rightLeave].to_excel(Writer, sheet_name="Stage2", index=False)
+                processing_iMVC.iloc[right_start_g:rightLeave].to_excel(Writer, sheet_name="Stage2_g", index=False)
+                processing_iMVC.iloc[right_start_r:rightLeave].to_excel(Writer, sheet_name="Stage2_r", index=False)
     
             # 設置資料儲存路徑 JPG
             filepath_fig = os.path.dirname(read_emg.replace("raw_data", "processing_data")\
@@ -599,7 +607,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                     # 設定科學符號 : 小數點後幾位數
                     axs[xx, yy].axvline(motion_start/2000, color='r', linestyle='--')
                     axs[xx, yy].axvline(leftLeave/2000, color='r', linestyle='--')
-                    axs[xx, yy].axvline(right_start/2000, color='c', linestyle='--')
+                    axs[xx, yy].axvline(right_start_g/2000, color='c', linestyle='--')
                     axs[xx, yy].axvline(rightLeave/2000, color='c', linestyle='--')
                     # axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
             # 設定整張圖片之參數
@@ -637,10 +645,14 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                                                           '啟動左腳力量': [combin_right[time_start]],
                                                           'Left_RFD': [(combin_left[left_max_time] - combin_right[time_start])/ \
                                                                        ((left_max_time - time_start)/2500)],
-                                                        '右腳發力時間':[first_right_max_idx],
-                                                        '右腳發力值':[combin_right[first_right_max_idx]],
-                                                        'Right_RFD':[combin_right[right_time] - combin_right[first_right_max_idx]/ \
+                                                        '右腳發力時間_g':[first_right_max_idx],
+                                                        '右腳發力值_g':[combin_right[first_right_max_idx]],
+                                                        'Right_RFD_g':[combin_right[right_time] - combin_right[first_right_max_idx]/ \
                                                                      (right_time - first_right_max_idx)/2500],
+                                                        '右腳發力時間_r':[slope_idx],
+                                                        '右腳發力值_r':[combin_right[slope_idx]],
+                                                        'Right_RFD_r':[combin_right[right_time] - combin_right[slope_idx]/ \
+                                                                       (right_time - slope_idx)/2500],
                                                         'onset time': [onset]
                                                         
                                                           }, index=[0])],
@@ -648,7 +660,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
     
 
 data_table.to_excel(r"D:\BenQ_Project\python\Kao\motion_statistic.xlsx")
-emg_data_table.to_excel(r"D:\BenQ_Project\python\Kao\emg_data_static.xlsx")
+emg_data_table.to_excel(r"D:\BenQ_Project\python\Kao\emg_data_statistic.xlsx")
 
 
 
@@ -671,132 +683,7 @@ emg_data_table.to_excel(r"D:\BenQ_Project\python\Kao\emg_data_static.xlsx")
 # logging.basicConfig(filename=r'D:\BenQ_Project\python\Kao\processing_data\example.log',
 #                     level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 记录信息
-tic = time.process_time()
 
-# a = []
-# 開始處理 motion 資料
-for i in range(len(all_rawdata_folder_path)):
-    
-    # 讀取路徑下所有的 shooting motion file
-    emg_folder_path = all_rawdata_folder_path[i] + "\\" + motion_folder
-    anc_folder_path = all_rawdata_folder_path[i].replace("EMG\\\\raw_data", "GRF")
-    emg_list = func.Read_File(emg_folder_path, '.csv')
-    anc_list = func.Read_File(anc_folder_path, '.anc')
-    # 設定儲存照片路徑
-    fig_save_path = all_rawdata_folder_path[i].replace(rawData_folder, "Processing_Data") \
-         + "\\" + fig_save        
-    # 讀取 all MVC data
-    MVC_value = pd.read_excel(all_rawdata_folder_path[i].replace(rawData_folder, processingData_folder) \
-                              + '\\' + all_rawdata_folder_path[i].split("\\")[-1] \
-                                  + '_all_MVC.xlsx')
-    # 只取 all MVC data 數字部分
-    MVC_value = MVC_value.iloc[-1, 2:]
-    # ---------------------------------------------------------------------------------------
-    for motion_file in range(len(emg_list)):
-        filepath, tempfilename = os.path.split(emg_list[motion_file])
-        filename, extension = os.path.splitext(tempfilename)
-        emg_path = ""
-        for iii in range(len(StagingFile_Exist['EMG_Name'])):
-            if StagingFile_Exist.loc[iii, 'EMG_Name'] in emg_list[motion_file]:
-                emg_path = emg_list[motion_file]
-                print(iii, emg_list[motion_file])
-                break
-        if len(emg_path) != 0:
-            for anc_path in range(len(anc_list)):
-                if StagingFile_Exist['.anc'][iii] in anc_list[anc_path]:
-                    read_anc = anc_list[anc_path]
-                    print(anc_path, anc_list[anc_path])
-                    break
-        if len(emg_path) != 0 and len(read_anc) != 0:
-            # 設置資料儲存路徑 EXCEL
-            filepath_1 = filepath.replace(rawData_folder, processingData_folder).replace("motion", "data\\motion")
-            save_file_name = filepath_1 + "\\" + filename + "_ed.xlsx"
-            # 設置資料儲存路徑 JPG
-            filepath_fig = filepath_1.replace("data\\motion", r"figure\processing\bandpass\motion\\")
-            save_fig = filepath_fig + "\\" + filename + "_Bandpass.jpg"
-            # 讀取 analog data and detect onset
-            analog_data = pd.read_csv(anc_list[anc_path],
-                                      skiprows=8, delimiter = '	', low_memory=False).iloc[2:, :]
-            
-            onset_analog = detect_onset(analog_data.loc[:, ['C63']].values.reshape(-1),
-                                        np.mean(analog_data.loc[:50, ['C63']].values)*1.1,
-                                        n_above=10, n_below=2, show=True)
-
-                
-            if len(onset_analog) == 0:
-                logging.info('找不到 trigger on: ', read_anc)
-                logging.warning('找不到 trigger on: ', read_anc)
-            else:
-                # 繪製 onset 的時間
-                plt.figure()
-                plt.plot(analog_data.loc[:, ['C63']].values.reshape(-1))
-                plt.axvline(onset_analog[0, 0], color='r')
-                plt.title(anc_list[anc_path])
-                plt.savefig(filepath_fig + "\\" + filename + "_onset.jpg",
-                            dpi=200, bbox_inches = "tight")
-                # 定義分期時間點
-                triggerOff = StagingFile_Exist.loc[iii, '起點trigger off'] - int(onset_analog[0, 0]/10)
-                bodyStart = StagingFile_Exist.loc[iii, '啟動'] - int(onset_analog[0, 0]/10)
-                leftLegLeave = StagingFile_Exist.loc[iii, '左腳離地'] - int(onset_analog[0, 0]/10)
-                rightLegLeave = StagingFile_Exist.loc[iii, '右腳離地'] - int(onset_analog[0, 0]/10)
-                # 讀取 EMG data
-                emg_data = pd.read_csv(emg_path)
-                processing_data, bandpass_filtered_data = func.EMG_processing(emg_list[motion_file],
-                                                                              smoothing=smoothing_method)
-                # 計算 iMVC
-                emg_iMVC = pd.DataFrame(np.empty([rightLegLeave - triggerOff, np.shape(processing_data)[1]]),
-                                        columns=processing_data.columns)
-                emg_iMVC.iloc[:, 0] = processing_data.iloc[triggerOff:rightLegLeave, 0].values
-                emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[triggerOff:rightLegLeave, 1:].values),
-                                                 MVC_value.values)*100
-                # writting data in worksheet
-
-                print(save_file_name)
-                save_file_name = save_file_name.replace(rawData_folder, processingData_folder)
-                with pd.ExcelWriter(save_file_name) as Writer:
-                    emg_iMVC.iloc[triggerOff:bodyStart].to_excel(Writer, sheet_name="Stage1", index=False)
-                    emg_iMVC.iloc[bodyStart:leftLegLeave].to_excel(Writer, sheet_name="Stage2", index=False)
-                    emg_iMVC.iloc[leftLegLeave:rightLegLeave].to_excel(Writer, sheet_name="Stage3", index=False)
-                
-                # 畫 bandpass filter 的圖
-
-                n = int(math.ceil((np.shape(bandpass_filtered_data)[1] - 1) /2)) # add force plate data
-        
-                fig, axs = plt.subplots(n, 2, figsize = ((2*n+1,10)), sharex='col')
-                for i in range(np.shape(bandpass_filtered_data)[1]-1):
-                    xx, yy = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
-        
-                    # 設定子圖之參數
-                    axs[xx, yy].plot(bandpass_filtered_data.iloc[:, 0], bandpass_filtered_data.iloc[:, i+1])
-                    axs[xx, yy].set_title(bandpass_filtered_data.columns[i+1], fontsize=16)
-                    # 設定科學符號 : 小數點後幾位數
-                    axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
-                    axs[xx, yy].axvline(triggerOff/250, color='r')
-                    axs[xx, yy].axvline(bodyStart/250, color='r')
-                    axs[xx, yy].axvline(leftLegLeave/250, color='r')
-                    axs[xx, yy].axvline(rightLegLeave/250, color='r')
-                    # a_t = Decimal((StagingFile_Exist['Kneetop'][emg_name] - StagingFile_Exist['trigger'][emg_name])/250).quantize(Decimal("0.01"), rounding = "ROUND_HALF_UP")
-                    # axs[x, y].annotate(a_t,
-                    #                    xy = (0, max(bandpass_filtered_data.iloc[:, i+1])), fontsize = 10, color='b')
-                    axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
-                # 設定整張圖片之參數
-                plt.suptitle(filename + "Bandpass_", fontsize = 16)
-                plt.tight_layout()
-                fig.add_subplot(111, frameon=False)
-                # hide tick and tick label of the big axes
-                plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-                plt.grid(False)
-                plt.xlabel("time (second)", fontsize = 14)
-                plt.ylabel("Voltage (V)", fontsize = 14)
-                plt.savefig(save_fig, dpi=200, bbox_inches = "tight")
-                plt.show()
-
-
-
-toc = time.process_time()
-print("Motion Data Total Time Spent: ",toc-tic)
-gc.collect(generation=2)
 
 
 

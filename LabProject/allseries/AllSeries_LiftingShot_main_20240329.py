@@ -83,8 +83,7 @@ for folder in rowdata_folder_list:
     # 讀資料夾下的 c3d data
     c3d_list = gen.Read_File(rowdata_folder + folder,
                              ".c3d", subfolder=False)
-    motion_info, motion_data, analog_info, analog_data, np_motion_data = gen.read_c3d(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\1. Motion Analysis\raw_data\S5\S5_LiftingShotL_EC_1.c3d")
-    
+   
     # 讀分期檔
     if folder not in ["S5", "S6", "S7"]:
         staging_file = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\ZowieAllSeries_StagingFile_20240326.xlsx",

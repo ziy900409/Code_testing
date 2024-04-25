@@ -124,154 +124,154 @@ for folder_name in motion_folder_list:
 '''
 
     
-# # 在不同的受試者資料夾下執行
-# for folder_name in motion_folder_list:
-#     # 1.1.1. 讀 all 分期檔
-#     all_table = pd.read_excel(r"E:\BenQ_Project\U3\07_EMGrecording\U3-research_staging_v1.xlsx",
-#                               sheet_name=folder_name)
-#     Fitts_table = pd.read_csv(Fitts_path + folder_name + "\\" + folder_name + ".csv")
-#     c3d_list = func.Read_File(motion_path + folder_name, ".c3d")
-#     # 第一次loop先計算tpose的問題
-#     for num in range(len(c3d_list)):
-#         for i in range(len(all_table['c3d'])):
-#             if c3d_list[num].split('\\')[-1] == all_table['c3d'][i]:
-#                 # 1.2.0. ---------使用tpose計算 手肘內上髁 Virtual marker 之位置 --------------
-#                 if "tpose" in c3d_list[num].lower() and all_table["motion"][i] == "elbow":
-#                     print(c3d_list[num])
-#                     motion_info, motion_data, analog_info, FP_data, np_motion_data = func.read_c3d(c3d_list[num])
-#                     # 1. 設定輸入計算 Virtual marker 參數 : 手肘內上髁, 外上髁, UA1, UA3
-#                     R_Elbow_Med = motion_data.loc[:, "EC2 Wight_Elbow:R.Elbow.Med_x":"EC2 Wight_Elbow:R.Elbow.Med_z"].dropna(axis=0)
-#                     R_Elbow_Lat = motion_data.loc[:, "EC2 Wight_Elbow:R.Elbow.Lat_x":"EC2 Wight_Elbow:R.Elbow.Lat_z"].dropna(axis=0)
-#                     UA1 = motion_data.loc[:, "EC2 Wight_Elbow:UA1_x":"EC2 Wight_Elbow:UA1_z"].dropna(axis=0)
-#                     UA3 = motion_data.loc[:, "EC2 Wight_Elbow:UA3_x":"EC2 Wight_Elbow:UA3_z"].dropna(axis=0)
-#                     # 2. 避免數量中出現NAN，請造成不同變數見長短不一致，因此找出最短數列的 index
-#                     ind_frame = min([np.shape(R_Elbow_Med)[0], np.shape(R_Elbow_Lat)[0], np.shape(UA1)[0], np.shape(UA3)[0]])
-#                     for i in [R_Elbow_Med, R_Elbow_Lat, UA1, UA3]:
-#                         if ind_frame == np.shape(i)[0]:
-#                             ind_frame = i.index
-#                             break
-#                     # 3. 計算手肘內上髁在 LCS 之位置
-#                     p1_all = pd.DataFrame(np.zeros([len(ind_frame), 3]))
-#                     for frame in ind_frame:
-#                         p1_all.iloc[frame :] = (func.transformation_matrix(R_Elbow_Lat.iloc[frame, :].values, UA1.iloc[frame, :].values, UA3.iloc[frame, :].values,
-#                                                                            R_Elbow_Med.iloc[frame, :].values, np.array([0, 0, 0]),
-#                                                                            rotation='GCStoLCS'))
-#                     # 4. 清除不需要的變數
-#                     del motion_info, motion_data, analog_info, FP_data, R_Elbow_Med, UA1, UA3, np_motion_data
-#                     gc.collect()
-#     # 第二次loop計算motion
-#     for num in range(len(c3d_list)):
-#         for i in range(len(all_table['c3d'])):
-#             if c3d_list[num].split('\\')[-1] == all_table['c3d'][i]:
-#                 # 1.2.1. ---------找到Analog data 中 trigger 的起始時間-----------------------------
-#                 if "Fitts" in c3d_list[num] or "Blink" in c3d_list[num] or "Spider" in c3d_list[num]:
-#                     print(c3d_list[num])
-#                     # 1. read c3d file
-#                     motion_info, motion_data, analog_info, analog_data, np_motion_data = func.read_c3d(c3d_list[num])
-#                     # 2. find peak with threshold (please parameter setting)
-#                     peaks, _ = find_peaks(analog_data.loc[:, "trigger1"], height=ana_threshold)
-#                     # 繪出 analog data 的起始時間
-#                     plt.plot(analog_data.loc[:, "Frame"], analog_data.loc[:, "trigger1"], label='Signal')
-#                     plt.plot(analog_data.loc[peaks, "Frame"], analog_data.loc[peaks, "trigger1"], 'ro', label='Peaks')
-#                     plt.legend()
-#                     plt.show()
-#                     # 3. 找出 analog, motion 兩個時間最接近的 frame, 並定義 start index
-#                     for ii, x in enumerate(motion_data.loc[:, "Frame"]):
-#                         # 每個 frame 減去 peak value，以找到最接近列表的索引
-#                         if abs(motion_data.loc[ii, "Frame"] - analog_data.loc[peaks, "Frame"].values) == \
-#                             min(abs(motion_data.loc[:, "Frame"] - analog_data.loc[peaks, "Frame"].values)):
-#                             # 定義 motion data 的起始索引
-#                             motion_start_ind = ii
-#                             print("Analog", analog_data.loc[peaks, "Frame"])
-#                             print("Frame", ii)
-#                             break
-#                     # 1.2.2. ---------Fitts law data 處理-----------------------------
-#                     # 計算開始與結束的索引位置
-#                     # 判斷是否為 Fitts data 並且 Fitts end 有數值
-#                     if "Fitts" in all_table['c3d'][i] and all_table['Fitts_end'][num]:
-#                         print(all_table['c3d'][i])
-#                         for ii, x in enumerate(motion_data.loc[:, "Frame"]):
-#                             # 利用 staging file 判斷截止時間
-#                             # 結束時間 = Fitts所花時間 + analog 開始時間
-#                             Fitts_end_time = (all_table['Fitts_end'][i] / 1000 + motion_start_ind/int(motion_info["frame_rate"]))
-#                             # 每個 frame 減去 end value，以找到最接近列表的索引
-#                             if abs(motion_data.loc[ii, "Frame"] - Fitts_end_time) == \
-#                                 min(abs(motion_data.loc[:, "Frame"] - Fitts_end_time)):
-#                                 # print(all_table['Fitts_end'][i])
-#                                 # 定義 motion data 的結束索引
-#                                 motion_end_ind = ii
-#                                 print("end", ii)
-#                                 break
-#                     # 1.2.3. ---------Blink 與 Spyder 資料處理-----------------------------
-#                     # 計算開始與結束的索引位置
-#                     elif "Blink" in all_table['c3d'][i] or "Spider" in all_table['c3d'][i]:
-#                         print(0)
-#                         # 開始索引從analog begin後加三秒
-#                         task_start_ind = int(motion_start_ind + motion_info["frame_rate"]*5)
-#                         # 開始索引從 motion start 加 58 秒 (多截斷一些數值，避免動作上的誤差)
-#                         task_end_ind = int(motion_start_ind + motion_info["frame_rate"]*(3+55))
-#                     # 1.2.4. ---------truncate motion data--------------------------------
-#                     trun_motion = np_motion_data[:, task_start_ind:task_end_ind, :]
+# 在不同的受試者資料夾下執行
+for folder_name in motion_folder_list:
+    # 1.1.1. 讀 all 分期檔
+    all_table = pd.read_excel(r"E:\BenQ_Project\U3\07_EMGrecording\U3-research_staging_v1.xlsx",
+                              sheet_name=folder_name)
+    Fitts_table = pd.read_csv(Fitts_path + folder_name + "\\" + folder_name + ".csv")
+    c3d_list = func.Read_File(motion_path + folder_name, ".c3d")
+    # 第一次loop先計算tpose的問題
+    for num in range(len(c3d_list)):
+        for i in range(len(all_table['c3d'])):
+            if c3d_list[num].split('\\')[-1] == all_table['c3d'][i]:
+                # 1.2.0. ---------使用tpose計算 手肘內上髁 Virtual marker 之位置 --------------
+                if "tpose" in c3d_list[num].lower() and all_table["motion"][i] == "elbow":
+                    print(c3d_list[num])
+                    motion_info, motion_data, analog_info, FP_data, np_motion_data = func.read_c3d(c3d_list[num])
+                    # 1. 設定輸入計算 Virtual marker 參數 : 手肘內上髁, 外上髁, UA1, UA3
+                    R_Elbow_Med = motion_data.loc[:, "EC2 Wight_Elbow:R.Elbow.Med_x":"EC2 Wight_Elbow:R.Elbow.Med_z"].dropna(axis=0)
+                    R_Elbow_Lat = motion_data.loc[:, "EC2 Wight_Elbow:R.Elbow.Lat_x":"EC2 Wight_Elbow:R.Elbow.Lat_z"].dropna(axis=0)
+                    UA1 = motion_data.loc[:, "EC2 Wight_Elbow:UA1_x":"EC2 Wight_Elbow:UA1_z"].dropna(axis=0)
+                    UA3 = motion_data.loc[:, "EC2 Wight_Elbow:UA3_x":"EC2 Wight_Elbow:UA3_z"].dropna(axis=0)
+                    # 2. 避免數量中出現NAN，請造成不同變數見長短不一致，因此找出最短數列的 index
+                    ind_frame = min([np.shape(R_Elbow_Med)[0], np.shape(R_Elbow_Lat)[0], np.shape(UA1)[0], np.shape(UA3)[0]])
+                    for i in [R_Elbow_Med, R_Elbow_Lat, UA1, UA3]:
+                        if ind_frame == np.shape(i)[0]:
+                            ind_frame = i.index
+                            break
+                    # 3. 計算手肘內上髁在 LCS 之位置
+                    p1_all = pd.DataFrame(np.zeros([len(ind_frame), 3]))
+                    for frame in ind_frame:
+                        p1_all.iloc[frame :] = (func.transformation_matrix(R_Elbow_Lat.iloc[frame, :].values, UA1.iloc[frame, :].values, UA3.iloc[frame, :].values,
+                                                                            R_Elbow_Med.iloc[frame, :].values, np.array([0, 0, 0]),
+                                                                            rotation='GCStoLCS'))
+                    # 4. 清除不需要的變數
+                    del motion_info, motion_data, analog_info, FP_data, R_Elbow_Med, UA1, UA3, np_motion_data
+                    gc.collect()
+    # 第二次loop計算motion
+    for num in range(len(c3d_list)):
+        for i in range(len(all_table['c3d'])):
+            if c3d_list[num].split('\\')[-1] == all_table['c3d'][i]:
+                # 1.2.1. ---------找到Analog data 中 trigger 的起始時間-----------------------------
+                if "Fitts" in c3d_list[num] or "Blink" in c3d_list[num] or "Spider" in c3d_list[num]:
+                    print(c3d_list[num])
+                    # 1. read c3d file
+                    motion_info, motion_data, analog_info, analog_data, np_motion_data = func.read_c3d(c3d_list[num])
+                    # 2. find peak with threshold (please parameter setting)
+                    peaks, _ = find_peaks(analog_data.loc[:, "trigger1"], height=ana_threshold)
+                    # 繪出 analog data 的起始時間
+                    plt.plot(analog_data.loc[:, "Frame"], analog_data.loc[:, "trigger1"], label='Signal')
+                    plt.plot(analog_data.loc[peaks, "Frame"], analog_data.loc[peaks, "trigger1"], 'ro', label='Peaks')
+                    plt.legend()
+                    plt.show()
+                    # 3. 找出 analog, motion 兩個時間最接近的 frame, 並定義 start index
+                    for ii, x in enumerate(motion_data.loc[:, "Frame"]):
+                        # 每個 frame 減去 peak value，以找到最接近列表的索引
+                        if abs(motion_data.loc[ii, "Frame"] - analog_data.loc[peaks, "Frame"].values) == \
+                            min(abs(motion_data.loc[:, "Frame"] - analog_data.loc[peaks, "Frame"].values)):
+                            # 定義 motion data 的起始索引
+                            motion_start_ind = ii
+                            print("Analog", analog_data.loc[peaks, "Frame"])
+                            print("Frame", ii)
+                            break
+                    # 1.2.2. ---------Fitts law data 處理-----------------------------
+                    # 計算開始與結束的索引位置
+                    # 判斷是否為 Fitts data 並且 Fitts end 有數值
+                    if "Fitts" in all_table['c3d'][i] and all_table['Fitts_end'][num]:
+                        print(all_table['c3d'][i])
+                        for ii, x in enumerate(motion_data.loc[:, "Frame"]):
+                            # 利用 staging file 判斷截止時間
+                            # 結束時間 = Fitts所花時間 + analog 開始時間
+                            Fitts_end_time = (all_table['Fitts_end'][i] / 1000 + motion_start_ind/int(motion_info["frame_rate"]))
+                            # 每個 frame 減去 end value，以找到最接近列表的索引
+                            if abs(motion_data.loc[ii, "Frame"] - Fitts_end_time) == \
+                                min(abs(motion_data.loc[:, "Frame"] - Fitts_end_time)):
+                                # print(all_table['Fitts_end'][i])
+                                # 定義 motion data 的結束索引
+                                motion_end_ind = ii
+                                print("end", ii)
+                                break
+                    # 1.2.3. ---------Blink 與 Spyder 資料處理-----------------------------
+                    # 計算開始與結束的索引位置
+                    elif "Blink" in all_table['c3d'][i] or "Spider" in all_table['c3d'][i]:
+                        print(0)
+                        # 開始索引從analog begin後加三秒
+                        task_start_ind = int(motion_start_ind + motion_info["frame_rate"]*5)
+                        # 開始索引從 motion start 加 58 秒 (多截斷一些數值，避免動作上的誤差)
+                        task_end_ind = int(motion_start_ind + motion_info["frame_rate"]*(3+55))
+                    # 1.2.4. ---------truncate motion data--------------------------------
+                    trun_motion = np_motion_data[:, task_start_ind:task_end_ind, :]
 
-#                     # 建立手肘內上髁的資料貯存位置
-#                     V_R_Elbow_Med = np.zeros(shape=(1, np.shape(trun_motion)[1], np.shape(trun_motion)[2]))
-#                     # 找出以下三個字串的索引值
-#                     target_strings = ["EC2 Wight:R.Elbow.Lat", "EC2 Wight:UA1"
-#                                       , "EC2 Wight:UA3", "EC2 Wight:R.Shoulder"]
-#                     indices = []
-#                     for target_str in target_strings:
-#                         try:
-#                             index = motion_info["LABELS"].index(target_str)
-#                             indices.append(index)
-#                         except ValueError:
-#                             indices.append(None)
-#                     # 回算手肘內上髁在 GCS 之位置
-#                     for frame in range(np.shape(trun_motion)[1]):
-#                         V_R_Elbow_Med[0, frame, :] = func.transformation_matrix(trun_motion[indices[0], frame, :], # EC2 Wight:R.Elbow.Lat
-#                                                                                 trun_motion[indices[1], frame, :], # EC2 Wight:UA1
-#                                                                                 trun_motion[indices[2], frame, :], # EC2 Wight:UA3
-#                                                                                 p1_all.iloc[5, :].values, np.array([0, 0, 0]),
-#                                                                                 rotation='LCStoGCS')
-#                     # 合併 motion data and virtual R.Elbow.Med data
-#                     new_trun_motion = np.concatenate((trun_motion, V_R_Elbow_Med), axis=0)
-#                     # motion_info 新增 R.Elbow.Med 的標籤
-#                     # motion_info, motion_data, analog_info, analog_data, np_motion_data = read_c3d(r"E:\Motion Analysis\U3 Research\S01\S01_1VS1_1.c3d")
-#                     motion_info['LABELS'].append("EC2 Wight:R.Elbow.Med")
-#                     # 去掉LABELS中關於Cortex Marker set 之資訊 -> 去掉 EC2 Wight:
-#                     for label in range(len(motion_info['LABELS'])):
-#                         motion_info['LABELS'][label] = motion_info['LABELS'][label].replace("EC2 Wight:", "")
-#                     # 去除掉 Virtual marker 的 LABELS 與 motion data
-#                     new_labels = []
-#                     np_labels = []
-#                     for key, item in enumerate(motion_info['LABELS']):
-#                         # print(key, item)
-#                         # 要去除的特定字符 : V_marker
-#                         if "V_" not in item:
-#                             new_labels.append(item)
-#                             np_labels.append(key) # add time and Frame
-#                     motion_info['LABELS'] = new_labels
-#                     # 重新定義 motion data
-#                     # new_motion_data = motion_data.iloc[:, new_ind]
-#                     new_np_motion_data = new_trun_motion[np_labels, :, :]
-#                     # 2023.08.11. 不再修正檔案為opensim可用之格式
-#                     # # 進opensim，所有marker以R.shoulder做平移
-#                     # dis_np_motion_data = np.empty(shape=np.shape(new_np_motion_data))
-#                     # for iii in range(np.shape(new_np_motion_data)[0]):
-#                     #     dis_np_motion_data[iii, :, :] = new_np_motion_data[iii, :, :] - (new_np_motion_data[indices[3], :, :]-np.array([57.73, -56.75, 15.2]))
-#                     # # 低通濾波 butterworth filter
-#                     bandpass_filtered = np.empty(shape=np.shape(new_np_motion_data))
-#                     bandpass_sos = signal.butter(2, 20/0.802,  btype='lowpass', fs=motion_info["frame_rate"], output='sos')
-#                     for iii in range(np.shape(new_np_motion_data)[0]):
-#                         for iiii in range(np.shape(new_np_motion_data)[2]):
-#                             bandpass_filtered[iii, :, iiii] = signal.sosfiltfilt(bandpass_sos,
-#                                                                                  new_np_motion_data[iii, :, iiii])
-#                     # 將副檔名從.c3d 改成 .trc
-#                     trc_name = all_table['c3d'][i].split('.')[0] + '.trc'
-#                     # 資料貯存路徑 + folder name
-#                     func.c3d_to_trc(str(motion_path + folder_name + "\\" + trc_name),
-#                                     trc_name, new_np_motion_data, motion_info)
-#                     # 清除不必要的空間
-#                     gc.collect()
+                    # 建立手肘內上髁的資料貯存位置
+                    V_R_Elbow_Med = np.zeros(shape=(1, np.shape(trun_motion)[1], np.shape(trun_motion)[2]))
+                    # 找出以下三個字串的索引值
+                    target_strings = ["EC2 Wight:R.Elbow.Lat", "EC2 Wight:UA1"
+                                      , "EC2 Wight:UA3", "EC2 Wight:R.Shoulder"]
+                    indices = []
+                    for target_str in target_strings:
+                        try:
+                            index = motion_info["LABELS"].index(target_str)
+                            indices.append(index)
+                        except ValueError:
+                            indices.append(None)
+                    # 回算手肘內上髁在 GCS 之位置
+                    for frame in range(np.shape(trun_motion)[1]):
+                        V_R_Elbow_Med[0, frame, :] = func.transformation_matrix(trun_motion[indices[0], frame, :], # EC2 Wight:R.Elbow.Lat
+                                                                                trun_motion[indices[1], frame, :], # EC2 Wight:UA1
+                                                                                trun_motion[indices[2], frame, :], # EC2 Wight:UA3
+                                                                                p1_all.iloc[5, :].values, np.array([0, 0, 0]),
+                                                                                rotation='LCStoGCS')
+                    # 合併 motion data and virtual R.Elbow.Med data
+                    new_trun_motion = np.concatenate((trun_motion, V_R_Elbow_Med), axis=0)
+                    # motion_info 新增 R.Elbow.Med 的標籤
+                    # motion_info, motion_data, analog_info, analog_data, np_motion_data = read_c3d(r"E:\Motion Analysis\U3 Research\S01\S01_1VS1_1.c3d")
+                    motion_info['LABELS'].append("EC2 Wight:R.Elbow.Med")
+                    # 去掉LABELS中關於Cortex Marker set 之資訊 -> 去掉 EC2 Wight:
+                    for label in range(len(motion_info['LABELS'])):
+                        motion_info['LABELS'][label] = motion_info['LABELS'][label].replace("EC2 Wight:", "")
+                    # 去除掉 Virtual marker 的 LABELS 與 motion data
+                    new_labels = []
+                    np_labels = []
+                    for key, item in enumerate(motion_info['LABELS']):
+                        # print(key, item)
+                        # 要去除的特定字符 : V_marker
+                        if "V_" not in item:
+                            new_labels.append(item)
+                            np_labels.append(key) # add time and Frame
+                    motion_info['LABELS'] = new_labels
+                    # 重新定義 motion data
+                    # new_motion_data = motion_data.iloc[:, new_ind]
+                    new_np_motion_data = new_trun_motion[np_labels, :, :]
+                    # 2023.08.11. 不再修正檔案為opensim可用之格式
+                    # # 進opensim，所有marker以R.shoulder做平移
+                    # dis_np_motion_data = np.empty(shape=np.shape(new_np_motion_data))
+                    # for iii in range(np.shape(new_np_motion_data)[0]):
+                    #     dis_np_motion_data[iii, :, :] = new_np_motion_data[iii, :, :] - (new_np_motion_data[indices[3], :, :]-np.array([57.73, -56.75, 15.2]))
+                    # # 低通濾波 butterworth filter
+                    bandpass_filtered = np.empty(shape=np.shape(new_np_motion_data))
+                    bandpass_sos = signal.butter(2, 20/0.802,  btype='lowpass', fs=motion_info["frame_rate"], output='sos')
+                    for iii in range(np.shape(new_np_motion_data)[0]):
+                        for iiii in range(np.shape(new_np_motion_data)[2]):
+                            bandpass_filtered[iii, :, iiii] = signal.sosfiltfilt(bandpass_sos,
+                                                                                  new_np_motion_data[iii, :, iiii])
+                    # 將副檔名從.c3d 改成 .trc
+                    trc_name = all_table['c3d'][i].split('.')[0] + '.trc'
+                    # 資料貯存路徑 + folder name
+                    func.c3d_to_trc(str(motion_path + folder_name + "\\" + trc_name),
+                                    trc_name, new_np_motion_data, motion_info)
+                    # 清除不必要的空間
+                    gc.collect()
                   
 # %% 計算 spider
 
