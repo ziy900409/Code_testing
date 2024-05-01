@@ -299,12 +299,13 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
 # %% 找力版時間
 
 # 定義資料儲存位置
-data_table = pd.DataFrame({}, columns = ['filename', 'order', '左腳離地時間', '左腳最大值',
-                                         '左腳最大值時間', '右腳離地時間', '右腳最大值',
-                                         '右腳最大值時間', '啟動時間', '啟動左腳力量',
-                                         'Left_RFD', '右腳發力時間_g', '右腳發力值_g',
-                                         'Right_RFD_g', '右腳發力時間_r', '右腳發力值_r',
-                                         'Right_RFD_r']
+data_table = pd.DataFrame({}, columns = ['filename', 'order', '左腳離地時間', '左腳最大值時間',
+                                         '左腳最大值', '左腳啟動時間', '左腳啟動力量',
+                                         'Left_RFD', '',
+                                         '右腳離地時間', '右腳最大值時間', '右腳最大值', 
+                                          '右腳發力時間_g', '右腳發力時間_r', '右腳發力值_g', '右腳發力值_r',
+                                         'Right_RFD_g', 'Right_RFD_r', 'Right_DRFD_g', 'Right_DRFD_r',
+                                         'onset time']
 
                           )
 emg_data_table = pd.DataFrame({}, columns = ['task','trial', 'time', 'L RECTUS FEMORIS: EMG 1', 'L VASTUS LATERALIS: EMG 2',
@@ -657,33 +658,33 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         data_table = pd.concat([data_table, pd.DataFrame({'filename' : StagingFile_Exist.loc[file_name, '.anc'],
                                                           'order' : StagingFile_Exist.loc[file_name, 'order'],
                                                           '左腳離地時間': [leftLeg_off + ana_time_start],
-                                                          '左腳最大值': [combin_left[left_max_time]],
                                                           '左腳最大值時間': [left_max_time],
-                                                          '右腳離地時間': [rightLeg_off + right_time],
-                                                          '右腳最大值': [combin_right[right_time]],
-                                                          '右腳最大值時間':[right_time],
-                                                          '啟動時間': [time_start],
-                                                          '啟動左腳力量': [combin_right[time_start]],
-                                                          'Left_RFD': [(combin_left[left_max_time] - combin_right[time_start])/ \
+                                                          '左腳最大值': [combin_left[left_max_time]],
+                                                          '左腳啟動時間': [time_start],
+                                                          '左腳啟動力量': [combin_left[time_start]],
+                                                          'Left_RFD': [(combin_left[left_max_time] - combin_left[time_start])/ \
                                                                        ((left_max_time - time_start)/2500)],
                                                         'Left_DRFD': [(combin_left[int(time_start+2500*0.1)] - combin_right[time_start])/ \
                                                                      ((2500*0.1)/2500)],
+                                                          '右腳離地時間': [rightLeg_off + right_time],
+                                                          '右腳最大值': [combin_right[right_time]],
+                                                          '右腳最大值時間':[right_time],
                                                         '右腳發力時間_g':[first_right_max_idx],
+                                                        '右腳發力時間_r':[slope_idx],
                                                         '右腳發力值_g':[combin_right[first_right_max_idx]],
+                                                        '右腳發力值_r':[combin_right[slope_idx]],
                                                         'Right_RFD_g':[(combin_right[right_time] - combin_right[first_right_max_idx])/ \
                                                                      ((right_time - first_right_max_idx)/2500)],
+                                                        'Right_RFD_r':[(combin_right[right_time] - combin_right[slope_idx])/ \
+                                                                        ((right_time - slope_idx)/2500)],
                                                         'Right_DRFD_g':[(combin_right[int(first_right_max_idx+2500*0.1)] - combin_right[first_right_max_idx])/ \
                                                                      ((2500*0.1)/2500)],
-                                                        '右腳發力時間_r':[slope_idx],
-                                                        '右腳發力值_r':[combin_right[slope_idx]],
-                                                        'Right_RFD_r':[(combin_right[right_time] - combin_right[slope_idx])/ \
-                                                                       ((right_time - slope_idx)/2500)],
                                                         'Right_DRFD_r':[(combin_right[int(slope_idx+2500*0.1)] - combin_right[slope_idx])/ \
                                                                        ((2500*0.1)/2500)],
                                                         'onset time': [onset]
                                                           }, index=[0])],
                                ignore_index=True)
-    
+            
 # 將資料輸出成 EXCEL TABLE
 data_table.to_excel(computer_path + "motion_statistic_" + formatted_date + ".xlsx")
 emg_data_table.to_excel(computer_path + "emg_data_statistic_" + formatted_date + ".xlsx")
