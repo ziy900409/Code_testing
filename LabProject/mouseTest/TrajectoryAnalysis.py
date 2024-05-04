@@ -32,6 +32,32 @@ import json
 # %%
 raw_data = pd.read_csv(r"D:\BenQ_Project\FittsDragDropTest\mouse_data.csv")
 
+# 設定儲存格式
+raw_data_format = {
+                  "info": {
+                      "participants":[],
+                      "condition": [],
+                      "sessions": [],
+                      "blocks": []
+                      },
+                  "task":{
+                      "Sequence":[],
+                      "A": [],
+                      "W": [],
+                      "Trial": [],
+                      "from_x": [],
+                      "from_y": [],
+                      "to_x": [],
+                      "to_y": []
+                      },
+                  "{t_x_y}":{
+                      "t":[],
+                      "x": [],
+                      "y": []
+                      }
+                  }
+                
+
 # %%
 """
 purpose: 找出所有 trail by trail 的順序及路徑
@@ -84,7 +110,35 @@ begin_mousedown = raw_data[raw_data['Event'] == 'MOUSEBUTTONDOWN']
 # MOUSEBUTTONDOWN = MOUSEBUTTONUP_SUCC + MOUSEBUTTONUP_FAIL
 
 
+# %% 新增資料
 
+# 更新info部分
+raw_data_format["info"]["participants"].append(new_data["participant"])
+raw_data_format["info"]["condition"].append(new_data["condition"])
+raw_data_format["info"]["sessions"].append(new_data["session"])
+raw_data_format["info"]["blocks"].append(new_data["block"])
+
+# 更新task部分
+raw_data_format["task"]["Sequence"].append(new_data["Sequence"])
+raw_data_format["task"]["A"].append(new_data["A"])
+raw_data_format["task"]["W"].append(new_data["W"])
+raw_data_format["task"]["Trial"].append(new_data["Trial"])
+raw_data_format["task"]["from_x"].append(new_data["from_x"])
+raw_data_format["task"]["from_y"].append(new_data["from_y"])
+raw_data_format["task"]["to_x"].append(new_data["to_x"])
+raw_data_format["task"]["to_y"].append(new_data["to_y"])
+
+# 更新t_x_y部分
+for key in ["t", "x", "y"]:
+    raw_data_format["{t_x_y}"][key].append([])  # 新增一個空列表
+
+# 設定新資料的索引
+index = len(raw_data_format["info"]["participants"]) - 1  # 新資料的索引是列表的長度減1
+
+# 添加新資料到t_x_y中
+raw_data_format["{t_x_y}"]["t"][index].extend(new_data["t_x_y"]["t"])
+raw_data_format["{t_x_y}"]["x"][index].extend(new_data["t_x_y"]["x"])
+raw_data_format["{t_x_y}"]["y"][index].extend(new_data["t_x_y"]["y"])
 
 
 
