@@ -37,7 +37,6 @@ raw_data_format = {
                   "info": {
                       "participants":[],
                       "condition": [],
-                      "sessions": [],
                       "blocks": []
                       },
                   "task":{
@@ -89,14 +88,7 @@ duplicate_info['Block']
 duplicate_info['Sequence']
 # 每一次拖曳的軌跡
 duplicate_info['Trial']
-# 不同難度與每次拖曳軌跡的排列組合
-all_combinations = []
-# 外部循環迭代surrounding_circle_radius
-for seq_info in duplicate_info['Sequence']:
-    # 內部循環迭代target_amplitudes
-    for trial_info in duplicate_info['Trial']:
-        # 將此組合添加到所有組合列表中
-        all_combinations.append({"Sequence": seq_info, "Trial": trial_info})
+
      
 # to_x - centre x coordinate of target
 # to_y - centre y coordinate of target
@@ -113,20 +105,40 @@ begin_mousedown = raw_data[raw_data['Event'] == 'MOUSEBUTTONDOWN']
 # %% 新增資料
 
 # 更新info部分
-raw_data_format["info"]["participants"].append(new_data["participant"])
-raw_data_format["info"]["condition"].append(new_data["condition"])
-raw_data_format["info"]["sessions"].append(new_data["session"])
-raw_data_format["info"]["blocks"].append(new_data["block"])
+raw_data_format["info"]["participants"].append(raw_data["Participant"])
+raw_data_format["info"]["condition"].append(raw_data["Condition"])
+raw_data_format["info"]["blocks"].append(raw_data["Block"])
 
 # 更新task部分
-raw_data_format["task"]["Sequence"].append(new_data["Sequence"])
-raw_data_format["task"]["A"].append(new_data["A"])
-raw_data_format["task"]["W"].append(new_data["W"])
-raw_data_format["task"]["Trial"].append(new_data["Trial"])
-raw_data_format["task"]["from_x"].append(new_data["from_x"])
-raw_data_format["task"]["from_y"].append(new_data["from_y"])
-raw_data_format["task"]["to_x"].append(new_data["to_x"])
-raw_data_format["task"]["to_y"].append(new_data["to_y"])
+raw_data_format["task"]["Sequence"].append(raw_data["Sequence"])
+raw_data_format["task"]["A"].append(raw_data["Amplitudes"])
+raw_data_format["task"]["W"].append(raw_data["Width"])
+raw_data_format["task"]["Trial"].append(raw_data["Trial"])
+raw_data_format["task"]["from_x"].append(raw_data["from_x"])
+raw_data_format["task"]["from_y"].append(raw_data["from_y"])
+raw_data_format["task"]["to_x"].append(raw_data["to_x"])
+raw_data_format["task"]["to_y"].append(raw_data["to_y"])
+
+# 1. 先找出有多少種難度組合
+# 不同難度與每次拖曳軌跡的排列組合
+all_combinations = []
+# 外部循環迭代surrounding_circle_radius
+for seq_info in duplicate_info['Amplitudes']:
+    # 內部循環迭代target_amplitudes
+    for trial_info in duplicate_info['Width']:
+        # 將此組合添加到所有組合列表中
+        all_combinations.append({"Amplitudes": seq_info, "Width": trial_info})
+# 所有難度組合的數量應該要跟 Sequence 一樣
+print(len(all_combinations) == raw_data["Sequence"].max())
+# 2. 找出所有 from_x, from_y, to_x, to_y
+# 2.1. to_x, to_y
+target_pos = raw_data[raw_data["Event"] == "EdgeCirclePos"]
+# 2.2. from_x, from_y
+from_pos = raw_data[raw_data["Event"] == "MOUSEBUTTONDOWN"]
+# 找出有多少個 trial 應該等於 13
+
+# 輸入資料數量應該是 3 (x, y, t) * sequence * Trial
+
 
 # 更新t_x_y部分
 for key in ["t", "x", "y"]:
@@ -136,9 +148,9 @@ for key in ["t", "x", "y"]:
 index = len(raw_data_format["info"]["participants"]) - 1  # 新資料的索引是列表的長度減1
 
 # 添加新資料到t_x_y中
-raw_data_format["{t_x_y}"]["t"][index].extend(new_data["t_x_y"]["t"])
-raw_data_format["{t_x_y}"]["x"][index].extend(new_data["t_x_y"]["x"])
-raw_data_format["{t_x_y}"]["y"][index].extend(new_data["t_x_y"]["y"])
+raw_data_format["{t_x_y}"]["t"][index].extend(raw_data["t_x_y"]["t"])
+raw_data_format["{t_x_y}"]["x"][index].extend(raw_data["t_x_y"]["x"])
+raw_data_format["{t_x_y}"]["y"][index].extend(raw_data["t_x_y"]["y"])
 
 
 

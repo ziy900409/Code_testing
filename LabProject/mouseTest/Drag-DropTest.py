@@ -70,12 +70,42 @@ import math
 import csv
 import numpy as np
 # %%
-def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y):
+def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, circle_radius):
+    """
+    计算中心圆与边界圆之间的边界点坐标.
+
+    Parameters
+    ----------
+    circle_x : float
+        中心圆的 x 坐标.
+    circle_y : float
+        中心圆的 y 坐标.
+    edge_cir_x : float
+        边界圆的 x 坐标.
+    edge_cir_y : float
+        边界圆的 y 坐标.
+    circle_radius : float
+        中心圆的半径.
+
+    Returns
+    -------
+    edge_point : list
+        边界点的坐标 [x, y].
+
+    """
+    # 计算距离
+    distance = np.sqrt((circle_x - edge_cir_x) ** 2 + (circle_y - edge_cir_y) ** 2)
     sin_angle = abs(circle_y - edge_cir_y) \
                     / np.sqrt((circle_x - edge_cir_x)**2 + (circle_y - edge_cir_y)**2)
     cos_angle = abs(circle_x - edge_cir_x) \
                     / np.sqrt((circle_x - edge_cir_x)**2 + (circle_y - edge_cir_y)**2)
-                # 第一象限
+    default_edge_point = [circle_x, circle_y]
+    # 确保距离不为零，避免除以零错误
+    if distance == 0:
+        # 在这里添加处理方式，例如返回一个默认角度值或者设置一个很小的距离值
+        return default_edge_point
+    # 根据中心圆与边界圆的位置关系计算边界点的位置
+    # 第一象限
     if circle_x - edge_cir_x > 0 and circle_y - edge_cir_y > 0:
         edge_point = [(circle_x + circle_radius*cos_angle),
                     (circle_y + circle_radius*sin_angle)]
@@ -148,7 +178,7 @@ num_surrounding_circles = 14
 # 設定多個不同難度的測試
 tests = [
     {"surrounding_circle_radius": 40, 'target_amplitudes': 400}
-    #, {"surrounding_circle_radius": 20, 'target_amplitudes': 250}
+    , {"surrounding_circle_radius": 20, 'target_amplitudes': 250}
 ]
 
 # 保存所有可能的組合
@@ -281,7 +311,8 @@ while True:
             # 定義指定周圍圓的圓心
             edge_cir_x = surrounding_circles[completed_positions+1][0]
             edge_cir_y = surrounding_circles[completed_positions+1][1]
-            edge_point = edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y)
+            edge_point = edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, 
+                                        surrounding_circle_radius*0.6)
             # 計算周圍圓與中心圓的最遠位置的距離
             distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
             # 距離必須小於周圍圓的半徑
@@ -309,7 +340,8 @@ while True:
                     # 定義指定周圍圓的圓心
                     edge_cir_x = surrounding_circles[completed_positions+1][0]
                     edge_cir_y = surrounding_circles[completed_positions+1][1]
-                    edge_point = edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y)
+                    edge_point = edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y,
+                                                surrounding_circle_radius*0.6)
                     # 計算周圍圓與中心圓的最遠位置的距離
                     distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
                     if distance <= surrounding_circle_radius:
