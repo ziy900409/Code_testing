@@ -177,8 +177,8 @@ next_sample_time = pygame.time.get_ticks() + sampling_interval
 num_surrounding_circles = 14
 # 設定多個不同難度的測試
 tests = [
-    {"surrounding_circle_radius": 40, 'target_amplitudes': 400}
-    , {"surrounding_circle_radius": 20, 'target_amplitudes': 250}
+    {"surrounding_circle_radius": 40, 'target_amplitudes': 200}
+    , {"surrounding_circle_radius": 20, 'target_amplitudes': 100}
 ]
 
 # 保存所有可能的組合
@@ -202,8 +202,8 @@ pygame.init()
 
 # 设置窗口大小和标题
 infoObject = pygame.display.Info()
-WINDOW_WIDTH = infoObject.current_w-100
-WINDOW_HEIGHT = infoObject.current_h-100
+WINDOW_WIDTH = infoObject.current_w*0.85
+WINDOW_HEIGHT = infoObject.current_h*0.85
 window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption('Drag and Drop to Finish Test')
 
