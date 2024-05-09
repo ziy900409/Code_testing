@@ -28,8 +28,8 @@ floor_columns = ["前_2F","前_1F","前_B","右前_2F","右前_1F","右前_B","�
                   "左_2F","左_1F","左_B","左前_2F","左前_1F","左前_B"]
 headset_name = ["耳罩式耳機A", "耳罩式耳機B", "耳罩式耳機C", "耳罩式耳機D",
                 "入耳式耳機1", "入耳式耳機2"]
-data_path = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\S01_答案.xlsx"
-subject_answer_folder = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\subject_answer"
+# data_path = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\S01_答案.xlsx"
+subject_answer_folder = r"C:\Users\h7058\Downloads\drive-download-20240509T133859Z-001\\"
 
 # %%
 def Read_File(file_path, file_type, subfolder=None):
@@ -76,7 +76,7 @@ def Read_File(file_path, file_type, subfolder=None):
         
     return csv_file_list
 # %% read data
-answer_sheet = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案_0506.xlsx")
+answer_sheet = pd.read_excel(r"C:\Users\h7058\Downloads\答案_0506 (1).xlsx")
 
 # read data path
 all_data_path = Read_File(subject_answer_folder,
@@ -96,10 +96,16 @@ number_answer = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
 floor_answer = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                       len(subject_info + floor_columns))),
                              columns=[subject_info + floor_columns])
-
 # 方向對
 sam_direction_answer = pd.DataFrame({},
                                     columns=[subject_info + ["測試順序"] + direct_columns])
+# 方向對，去掉 NAN vs NAN
+direction_answer_noO = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
+                                              len(subject_info + direct_columns))),
+                                    columns=[subject_info + direct_columns])
+direction_answer_noX = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
+                                              len(subject_info + direct_columns))),
+                                    columns=[subject_info + direct_columns])
 # 0. 方向對 簡化版
 # 依照欄位編號、方向對答案
 # 再加上受試者編號以及耳機
@@ -143,6 +149,10 @@ for subject in range(len(all_data_path)):
         print(columns_number)
         direction_answer.loc[columns_number, "受試者"] = data_sheet["受試者"][0]
         direction_answer.loc[columns_number, "耳機"] = headset_name[headset]
+        direction_answer_noO.loc[columns_number, "受試者"] = data_sheet["受試者"][0]
+        direction_answer_noO.loc[columns_number, "耳機"] = headset_name[headset]
+        direction_answer_noX.loc[columns_number, "受試者"] = data_sheet["受試者"][0]
+        direction_answer_noX.loc[columns_number, "耳機"] = headset_name[headset]
         for row in range(len(data_sheet)):
             for i in range(len(answer_sheet)):
                 # 對欄位
@@ -153,10 +163,16 @@ for subject in range(len(all_data_path)):
                         if pd.isna(data_sheet.loc[row, direct]) != pd.isna(answer_sheet.loc[i, direct]):
                             direction_answer.loc[columns_number, direct] = direction_answer.loc[columns_number, direct].values + 1
                             print(direct)
-                        # if pd.isna(data_sheet.loc[row, direct]) == False and \
-                        #     pd.isna(answer_sheet.loc[i, direct]) == False:
-                        #     direction_answer.loc[columns_number, direct] = direction_answer.loc[columns_number, direct].values + \
-                        #         data_sheet.loc[row, direct] / answer_sheet.loc[i, direct_columns].fillna(0).sum()
+                        # 計算正確的欄位數，並除以出現方位數
+                        if pd.isna(answer_sheet.loc[i, direct]) == False and\
+                            pd.isna(data_sheet.loc[row, direct]) != pd.isna(answer_sheet.loc[i, direct]):
+                            direction_answer_noO.loc[columns_number, direct] = direction_answer_noO.loc[columns_number, direct].values + 1
+                                # 1/ (len(answer_sheet.loc[i, direct_columns]) - pd.isna(answer_sheet.loc[i, direct_columns]).sum())
+                        if pd.isna(answer_sheet.loc[i, direct]) == True and\
+                            pd.isna(data_sheet.loc[row, direct]) == False:
+                            direction_answer_noX.loc[columns_number, direct] = direction_answer_noX.loc[columns_number, direct].values + 1
+                            
+                        
                         
 # 2. 人數對：
 for subject in range(len(all_data_path)):
