@@ -28,10 +28,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import XiaoThesisMotionFunction as mot
 import XiaoThesisGeneralFunction as gen
+from detecta import detect_onset
 
 # %% parameter setting 
 staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v1_input.xlsx"
-c3d_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\R01\SH1_1OK.c3d"
+c3d_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\R01\SH1_3OK.c3d"
 
 # %%
 # read staging file
@@ -53,6 +54,13 @@ R_Elbow_Lat_x = motion_data.loc[start_index:, ["Frame", "R.Epi.Lat_z"]].reset_in
 bow_middle = motion_data.loc[start_index:, ["Frame", "Middle_z"]].reset_index(drop=True)
 # 抓分期時間
 # 找L.Wrist.Rad Z, T10 Z, L.Acromion Z, R.Elbow Lat X
+
+# 0. 抓 trigger onset
+# analog channel: C63
+triggrt_on = detect_onset(analog_data["C63"]*-1,
+                          np.mean(analog_data["C63"][:100]*-1)*0.8,
+                          n_above=0, n_below=0, show=True)
+
 # 1. E1: 當L.Wrist.Rad Z軸高度超過T10 Z軸高度 擷取此段資料。
 # 布林判斷L_Wrist_Rad_z["L.Wrist.Rad_z"] > T10_z["T10_z"] 的第一個 TRUE 位置
 E1_idx = (L_Wrist_Rad_z["L.Wrist.Rad_z"] > T10_z["T10_z"]).idxmax()
@@ -60,15 +68,22 @@ E1_idx = (L_Wrist_Rad_z["L.Wrist.Rad_z"] > T10_z["T10_z"]).idxmax()
 # 2. E2: 舉弓頂點時間:根據全段資料，以L.Wrist.Rad Z軸判定，回傳位置峰值
 #    數值與對應時間點，即時運算角度後取角度峰直數值與對應時間點
 E2_idx = L_Wrist_Rad_z["L.Wrist.Rad_z"].idxmax()
+
 # 3. E3: 當L.Wrist.Rad Z軸高度等於L. Acromion Z進行標記
 # 找兩者相減的最小值
 E3_idx = abs(L_Wrist_Rad_z["L.Wrist.Rad_z"] - L_Acromion_z["L.Acromion_z"]).idxmin()
-# 4. E4: 放箭時間:根據資料末端2000點判定，即時運算移動平均, R. Elbow Lat
-#       X軸超出前1秒數據3個標準差，判定為放箭
+# 4. E4: 放箭時間:根據資料末端2000點判定，即時運算移動平均, R. Elbow Lat X軸
+#       超出前1秒數據3個標準差，判定為放箭
+
+
+
 # 5. E5: 擷取直到弓身低於T10 Z軸高度，停止擷取。
 # find bow_middle < T10_z and time begin from E2
 E5_idx = (bow_middle.loc[E2_idx:, "Middle_z"] < T10_z.loc[E2_idx:, "T10_z"]).idxmax()
-# 抓 trigger onset
+# 6. 舉弓角度計算
+# T10, L_Wrist_Rad, L_Wrist_Rad 在 T10 平面的投影點
+T10 = motion_data.loc[start_index:, ["Frame","T10_x", "T10_y", "T10_z"]]
+L_Wrist_Rad = motion_data.loc[start_index:, ["Frame", "L.Wrist.Rad_z"]]
 
 
 
