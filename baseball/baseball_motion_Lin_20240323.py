@@ -12,6 +12,7 @@ import sys
 sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
+import spm1d
 
 # data path setting
 motion_folder_path = r"E:\Hsin\NTSU_lab\Baseball\衛宣博論運動學\\"
@@ -856,20 +857,114 @@ for i in range(np.shape(staging_file)[0]):
 
 
 # %% 輸出成EXCEL
-save_file_name = r"E:\Hsin\NTSU_lab\Baseball\motion_statistic_data_20240325.xlsx"
+# save_file_name = r"E:\Hsin\NTSU_lab\Baseball\motion_statistic_data_20240325.xlsx"
 
 
-with pd.ExcelWriter(save_file_name) as Writer:
-    save_finger_data.to_excel(Writer, sheet_name="finger", index=False)
-    save_elbow_data.to_excel(Writer, sheet_name="elbow", index=False)
-    save_shoulder_data.to_excel(Writer, sheet_name="shoulder", index=False)
-
-
+# with pd.ExcelWriter(save_file_name) as Writer:
+#     save_finger_data.to_excel(Writer, sheet_name="finger", index=False)
+#     save_elbow_data.to_excel(Writer, sheet_name="elbow", index=False)
+#     save_shoulder_data.to_excel(Writer, sheet_name="shoulder", index=False)
 
 
 
 
 
+# %% 繪圖用
+staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
+                             sheet_name='T1_memo2')
+staging_file = staging_file.dropna(axis=0, thresh=14)
+
+
+pos_cloname = ["食指遠端指關節角度", "食指近端指關節角度", "食指掌指關節角度",
+                "中指遠端指關節角度", "中指近端指關節角度", "中指掌指關節角度"]
+vel_colname = ["食指遠端指關節角速度", "食指近端指關節角速度", "食指掌指關節角速度",
+               "中指遠端指關節角速度", "中指近端指關節角速度", "中指掌指關節角速度"]
+subject_name = ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10",
+                "S11", "S12", "S13", "S14", "S15", "S16", "S17", "S18", "S19", "S20"]
+fast_group = ["S07", "S10", "S11", "S12", "S14", "S15", "S16", "S17", "S19", "S20"]
+slow_group = ["S01", "S02", "S03", "S04", "S05", "S06", "S08", "S09", "S13", "S18"]
+# %%
+# create data
+finger_distal_angle = pd.DataFrame(np.zeros([202, 20]), 
+                                   columns = subject_name)
+finger_proximal_angle = pd.DataFrame(np.zeros([202, 20]), 
+                                     columns = subject_name)
+finger_plam_angle = pd.DataFrame(np.zeros([202, 20]), 
+                                 columns = subject_name)
+med_distal_angle = pd.DataFrame(np.zeros([202, 20]), 
+                                columns = subject_name)
+med_proximal_angle = pd.DataFrame(np.zeros([202, 20]), 
+                                  columns = subject_name)
+med_plam_angle = pd.DataFrame(np.zeros([202, 20]), 
+                              columns = subject_name)
+finger_distal_vel = pd.DataFrame(np.zeros([202, 20]), 
+                                 columns = subject_name)
+finger_proximal_vel = pd.DataFrame(np.zeros([202, 20]), 
+                                   columns = subject_name)
+finger_plam_vel = pd.DataFrame(np.zeros([202, 20]), 
+                               columns = subject_name)
+med_distal_vel = pd.DataFrame(np.zeros([202, 20]), 
+                              columns = subject_name)
+med_proximal_vel = pd.DataFrame(np.zeros([202, 20]), 
+                                columns = subject_name)
+med_plam_vel = pd.DataFrame(np.zeros([202, 20]), 
+                            columns = subject_name)
+
+
+
+
+for subject in range(len(staging_file["Subject"])):
+    print(staging_file["Subject"][subject])
+    finger_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure.xlsx",
+                                sheet_name = staging_file["Subject"][subject])
+    # define time
+    # footContact = staging_file.loc[subject, "foot contact"]
+    SER = staging_file.loc[subject, "shoulder external rotation"]
+    # 找到符合條件的索引位置
+    SER_idx = finger_data.index[finger_data["Frame#"] == SER][0]
+    # 1. stage2
+    angle_data = finger_data.loc[:SER_idx, pos_cloname]
+    vel_data = finger_data.loc[1:SER_idx, vel_colname]
+    # 內插成 100 data point
+    Y = spm1d.util.interp(angle_data.values.T, Q=101)
+    Z = spm1d.util.interp(vel_data.values.T, Q=101)
+    # 儲存食指角度
+    finger_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[0, :]
+    finger_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[1, :]
+    finger_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[2, :]
+    med_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[3, :]
+    med_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[4, :]
+    med_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[5, :]
+    # 儲存中指角度
+    finger_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[0, :]
+    finger_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[1, :]
+    finger_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[2, :]
+    med_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[3, :]
+    med_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[4, :]
+    med_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[5, :]
+    # 2. stage3
+    angle_data = finger_data.loc[SER_idx+1:, pos_cloname]
+    vel_data = finger_data.loc[SER_idx+1:, vel_colname].dropna(axis=0)
+    # 內插手指角速度
+    Y = spm1d.util.interp(angle_data.values.T, Q=101)
+    Z = spm1d.util.interp(vel_data.values.T, Q=101)
+    # 儲存食指角度
+    finger_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[0, :]
+    finger_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[1, :]
+    finger_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[2, :]
+    med_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[3, :]
+    med_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[4, :]
+    med_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[5, :]
+    # 儲存中指角度
+    finger_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[0, :]
+    finger_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[1, :]
+    finger_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[2, :]
+    med_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[3, :]
+    med_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[4, :]
+    med_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[5, :]
+    
+    
+    
 
 
 
