@@ -8,6 +8,7 @@ Created on Sat Mar 23 14:14:21 2024
 import pandas as pd
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 import sys
 sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
@@ -912,7 +913,7 @@ med_plam_vel = pd.DataFrame(np.zeros([202, 20]),
 
 
 
-
+ 
 for subject in range(len(staging_file["Subject"])):
     print(staging_file["Subject"][subject])
     finger_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure.xlsx",
@@ -949,23 +950,112 @@ for subject in range(len(staging_file["Subject"])):
     Y = spm1d.util.interp(angle_data.values.T, Q=101)
     Z = spm1d.util.interp(vel_data.values.T, Q=101)
     # 儲存食指角度
-    finger_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[0, :]
-    finger_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[1, :]
-    finger_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[2, :]
-    med_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[3, :]
-    med_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[4, :]
-    med_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[5, :]
+    finger_distal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[0, :]
+    finger_proximal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[1, :]
+    finger_plam_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[2, :]
+    med_distal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[3, :]
+    med_proximal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[4, :]
+    med_plam_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[5, :]
     # 儲存中指角度
-    finger_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[0, :]
-    finger_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[1, :]
-    finger_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[2, :]
-    med_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[3, :]
-    med_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[4, :]
-    med_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[5, :]
+    finger_distal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[0, :]
+    finger_proximal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[1, :]
+    finger_plam_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[2, :]
+    med_distal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[3, :]
+    med_proximal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[4, :]
+    med_plam_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[5, :]
     
     
-    
+# %%
+# coluns name
+finger_columns = ["食指遠端指關節角度", "食指近端指關節角度", "食指掌指關節角度",
+                  "食指遠端指關節角速度", "食指近端指關節角速度", "食指掌指關節角速度"]
+med_columns = ["中指遠端指關節角度", "中指近端指關節角度", "中指掌指關節角度",
+               "中指遠端指關節角速度", "中指近端指關節角速度", "中指掌指關節角速度"]
 
+# create multi-dimension matrix
+fast_dict = np.zeros((6, # muscle name without time
+                      202, # time length
+                      10)) # subject number
+
+
+fast_dict[0, :, :] = finger_distal_angle.loc[:, fast_group]
+fast_dict[0, :, :] = finger_proximal_angle.loc[:, fast_group]
+fast_dict[0, :, :] = finger_plam_angle.loc[:, fast_group]
+fast_dict[0, :, :] = finger_distal_vel.loc[:, fast_group]
+fast_dict[0, :, :] = finger_proximal_vel.loc[:, fast_group]
+fast_dict[0, :, :] = finger_plam_vel.loc[:, fast_group]
+
+
+slow_dict = np.zeros((6, # muscle name without time
+                      202, # time length
+                      10)) # subject number
+slow_dict[0, :, :] = finger_distal_angle.loc[:, slow_group]
+slow_dict[0, :, :] = finger_proximal_angle.loc[:, slow_group]
+slow_dict[0, :, :] = finger_plam_angle.loc[:, slow_group]
+slow_dict[0, :, :] = finger_distal_vel.loc[:, slow_group]
+slow_dict[0, :, :] = finger_proximal_vel.loc[:, slow_group]
+slow_dict[0, :, :] = finger_plam_vel.loc[:, slow_group]
+
+
+
+# 設定圖片大小
+# 畫第一條線
+# save = savepath + "\\mean_std_" + filename + ".jpg"
+# n = int(math.ceil((np.shape(type2_dict)[0]) /2))
+
+# 設置圖片大小
+# plt.figure(figsize=(2*n+1,10))
+# 設定繪圖格式與字體
+# plt.style.use('seaborn-white')
+# 顯示輸入中文
+plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
+plt.rcParams['axes.unicode_minus'] = False
+palette = plt.get_cmap('Set1')
+fig, axs = plt.subplots(2, 3, figsize = (10,12), sharex='col')
+for i in range(np.shape(fast_dict)[0]):
+    # 確定繪圖順序與位置
+    x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
+    color = palette(0) # 設定顏色
+    iters = list(np.linspace(-release[0], release[1], 
+                             len(type1_dict[0, :, 0])))
+    # 設定計算資料
+    avg1 = np.mean(type1_dict[i, :, :], axis=1) # 計算平均
+    std1 = np.std(type1_dict[i, :, :], axis=1) # 計算標準差
+    r1 = list(map(lambda x: x[0]-x[1], zip(avg1, std1))) # 畫一個標準差以內的線
+    r2 = list(map(lambda x: x[0]+x[1], zip(avg1, std1)))
+    axs[x, y].plot(iters, avg1, color=color, label='before', linewidth=3)
+    axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2)
+    # 找所有數值的最大值，方便畫括弧用
+    yy = max(r2)
+    # 畫第二條線
+    color = palette(1) # 設定顏色
+    avg2 = np.mean(type2_dict[i, :, :], axis=1) # 計畫平均
+    std2 = np.std(type2_dict[i, :, :], axis=1) # 計算標準差
+    r1 = list(map(lambda x: x[0]-x[1], zip(avg2, std2))) # 畫一個標準差以內的線
+    r2 = list(map(lambda x: x[0]+x[1], zip(avg2, std2)))
+    # 找所有數值的最大值，方便畫括弧用
+    yy = max([yy, max(r2)])
+    axs[x, y].plot(iters, avg2, color=color, label='after', linewidth=3) # 畫平均線
+    axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2) # 塗滿一個正負標準差以內的區塊
+    # 圖片的格式設定
+    axs[x, y].set_title(example_data.columns[i+1], fontsize=12)
+    axs[x, y].legend(loc="lower left") # 圖例位置
+    axs[x, y].grid(True, linestyle='-.')
+    # 畫放箭時間
+    axs[x, y].set_xlim(-(release[0]), release[1])
+    axs[x, y].axvline(x=0, color = 'darkslategray', linewidth=1, linestyle = '--')
+
+    
+plt.suptitle(str("mean std cloud: " + filename), fontsize=16)
+plt.tight_layout()
+fig.add_subplot(111, frameon=False)
+# hide tick and tick label of the big axes
+plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+plt.grid(False)
+plt.xlabel("time (second)", fontsize = 14)
+plt.ylabel("muscle activation (%)", fontsize = 14)
+plt.savefig(save, dpi=200, bbox_inches = "tight")
+plt.show()    
 
 
 
