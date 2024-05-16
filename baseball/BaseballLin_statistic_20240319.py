@@ -20,7 +20,7 @@ data_sheet = ["Stage2", "Stage3"]
 
 # %% 1. read staging file
 staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
-                             sheet_name='memo2') # 改變要找stage2 or stage3
+                             sheet_name='T2_memo3') # 改變要找stage2 or stage3
 staging_file = staging_file.dropna(axis=0, thresh=14)
 folder_file_list = os.listdir(folder_path)
 all_file_list = []
@@ -49,7 +49,7 @@ for file_name in staging_file["EMG_File"]:
 2. 內插成101個點
 '''
 
-muscle_data = np.zeros([len(ture_file_path), 202, 6])
+muscle_data = np.zeros([len(ture_file_path), 150, 6])
 
 for file in range(len(ture_file_path)):
     for sheet in data_sheet:
@@ -60,21 +60,24 @@ for file in range(len(ture_file_path)):
             x = emg_data.iloc[:, 0] # time
             y = emg_data.iloc[:, i+1]
             f = interp1d(x, y, kind='cubic')
-            x_new = np.linspace(emg_data.iloc[0, 0], emg_data.iloc[-1, 0], 101)
-            y_new = f(x_new)
+            
             if sheet == "Stage2":
-                muscle_data[file, :101, i] = y_new
+                x_new = np.linspace(emg_data.iloc[0, 0], emg_data.iloc[-1, 0], 100)
+                y_new = f(x_new)
+                muscle_data[file, :100, i] = y_new
             elif sheet == "Stage3":
-                muscle_data[file, 101:, i] = y_new
+                x_new = np.linspace(emg_data.iloc[0, 0], emg_data.iloc[-1, 0], 50)
+                y_new = f(x_new)
+                muscle_data[file, 100:, i] = y_new
 
-arr_muscle_data = np.zeros([6, 202, len(ture_file_path)])
+arr_muscle_data = np.zeros([6, 150, len(ture_file_path)])
 for i in range(np.shape(arr_muscle_data)[0]):
     for ii in range(np.shape(arr_muscle_data)[2]):
         arr_muscle_data[i, :, ii] = muscle_data[ii, :, i]
 
 # 修改儲存檔名
 # save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx"
-save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx"
+save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240516.xlsx"
 
 with pd.ExcelWriter(save_file_name) as Writer:
     pd.DataFrame(arr_muscle_data[0, :, :]).to_excel(Writer, sheet_name="muscle1", index=False)
@@ -114,15 +117,15 @@ plt.rcParams.update(parameters)
 
 # 讀資料
 # data = arr_muscle_data
-excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx")
+excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240516.xlsx")
 
 # 获取所有分页（sheet）的名称
 sheet_names = excel_file.sheet_names
-t1_data = np.zeros([6, 202, len(ture_file_path)])
+t1_data = np.zeros([6, 150, len(ture_file_path)])
 
 
 for name in range(len(sheet_names)):
-  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx",
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240516.xlsx",
                                       sheet_name = sheet_names[name])
 data = t1_data
 columns_name = ['Briceps Brachii','Triceps Brachii', 'Extensor Carpi Radialis',
@@ -161,7 +164,7 @@ for i in range(np.shape(data)[0]):
     axs[x, y].legend(loc="upper left") # 圖例位置
     axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
-    # axs[x, y].set_xlim(-(release[0]), release[1])
+    axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
 plt.suptitle(str("mean std cloud: "), fontsize=16)
 plt.tight_layout()
@@ -169,7 +172,7 @@ fig.add_subplot(111, frameon=False)
 # hide tick and tick label of the big axes
 plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
 plt.grid(False)
-plt.xlabel("time (second)", fontsize = 14)
+plt.xlabel("time", fontsize = 14)
 plt.ylabel("muscle activation (%)", fontsize = 14)
 # plt.savefig(save, dpi=200, bbox_inches = "tight")
 plt.show()
