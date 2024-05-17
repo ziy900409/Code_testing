@@ -887,29 +887,29 @@ fast_group = ["S07", "S10", "S11", "S12", "S14", "S15", "S16", "S17", "S19", "S2
 slow_group = ["S01", "S02", "S03", "S04", "S05", "S06", "S08", "S09", "S13", "S18"]
 # %%
 # create data
-finger_distal_angle = pd.DataFrame(np.zeros([202, 20]), 
+finger_distal_angle = pd.DataFrame(np.zeros([150, 20]), 
                                    columns = subject_name)
-finger_proximal_angle = pd.DataFrame(np.zeros([202, 20]), 
+finger_proximal_angle = pd.DataFrame(np.zeros([150, 20]), 
                                      columns = subject_name)
-finger_plam_angle = pd.DataFrame(np.zeros([202, 20]), 
+finger_plam_angle = pd.DataFrame(np.zeros([150, 20]), 
                                  columns = subject_name)
-med_distal_angle = pd.DataFrame(np.zeros([202, 20]), 
+med_distal_angle = pd.DataFrame(np.zeros([150, 20]), 
                                 columns = subject_name)
-med_proximal_angle = pd.DataFrame(np.zeros([202, 20]), 
+med_proximal_angle = pd.DataFrame(np.zeros([150, 20]), 
                                   columns = subject_name)
-med_plam_angle = pd.DataFrame(np.zeros([202, 20]), 
+med_plam_angle = pd.DataFrame(np.zeros([150, 20]), 
                               columns = subject_name)
-finger_distal_vel = pd.DataFrame(np.zeros([202, 20]), 
+finger_distal_vel = pd.DataFrame(np.zeros([150, 20]), 
                                  columns = subject_name)
-finger_proximal_vel = pd.DataFrame(np.zeros([202, 20]), 
+finger_proximal_vel = pd.DataFrame(np.zeros([150, 20]), 
                                    columns = subject_name)
-finger_plam_vel = pd.DataFrame(np.zeros([202, 20]), 
+finger_plam_vel = pd.DataFrame(np.zeros([150, 20]), 
                                columns = subject_name)
-med_distal_vel = pd.DataFrame(np.zeros([202, 20]), 
+med_distal_vel = pd.DataFrame(np.zeros([150, 20]), 
                               columns = subject_name)
-med_proximal_vel = pd.DataFrame(np.zeros([202, 20]), 
+med_proximal_vel = pd.DataFrame(np.zeros([150, 20]), 
                                 columns = subject_name)
-med_plam_vel = pd.DataFrame(np.zeros([202, 20]), 
+med_plam_vel = pd.DataFrame(np.zeros([150, 20]), 
                             columns = subject_name)
 
 
@@ -928,96 +928,95 @@ for subject in range(len(staging_file["Subject"])):
     angle_data = finger_data.loc[:SER_idx, pos_cloname]
     vel_data = finger_data.loc[1:SER_idx, vel_colname]
     # 內插成 100 data point
-    Y = spm1d.util.interp(angle_data.values.T, Q=101)
-    Z = spm1d.util.interp(vel_data.values.T, Q=101)
+    Y = spm1d.util.interp(angle_data.values.T, Q=100)
+    Z = spm1d.util.interp(vel_data.values.T, Q=100)
     # 儲存食指角度
-    finger_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[0, :]
-    finger_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[1, :]
-    finger_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[2, :]
-    med_distal_angle.loc[:100, staging_file["Subject"][subject]] = Y[3, :]
-    med_proximal_angle.loc[:100, staging_file["Subject"][subject]] = Y[4, :]
-    med_plam_angle.loc[:100, staging_file["Subject"][subject]] = Y[5, :]
+    finger_distal_angle.loc[:99, staging_file["Subject"][subject]] = Y[0, :]
+    finger_proximal_angle.loc[:99, staging_file["Subject"][subject]] = Y[1, :]
+    finger_plam_angle.loc[:99, staging_file["Subject"][subject]] = Y[2, :]
+    med_distal_angle.loc[:99, staging_file["Subject"][subject]] = Y[3, :]
+    med_proximal_angle.loc[:99, staging_file["Subject"][subject]] = Y[4, :]
+    med_plam_angle.loc[:99, staging_file["Subject"][subject]] = Y[5, :]
     # 儲存中指角度
-    finger_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[0, :]
-    finger_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[1, :]
-    finger_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[2, :]
-    med_distal_vel.loc[:100, staging_file["Subject"][subject]] = Z[3, :]
-    med_proximal_vel.loc[:100, staging_file["Subject"][subject]] = Z[4, :]
-    med_plam_vel.loc[:100, staging_file["Subject"][subject]] = Z[5, :]
+    finger_distal_vel.loc[:99, staging_file["Subject"][subject]] = Z[0, :]
+    finger_proximal_vel.loc[:99, staging_file["Subject"][subject]] = Z[1, :]
+    finger_plam_vel.loc[:99, staging_file["Subject"][subject]] = Z[2, :]
+    med_distal_vel.loc[:99, staging_file["Subject"][subject]] = Z[3, :]
+    med_proximal_vel.loc[:99, staging_file["Subject"][subject]] = Z[4, :]
+    med_plam_vel.loc[:99, staging_file["Subject"][subject]] = Z[5, :]
     # 2. stage3
     angle_data = finger_data.loc[SER_idx+1:, pos_cloname]
     vel_data = finger_data.loc[SER_idx+1:, vel_colname].dropna(axis=0)
     # 內插手指角速度
-    Y = spm1d.util.interp(angle_data.values.T, Q=101)
-    Z = spm1d.util.interp(vel_data.values.T, Q=101)
+    Y = spm1d.util.interp(angle_data.values.T, Q=50)
+    Z = spm1d.util.interp(vel_data.values.T, Q=50)
     # 儲存食指角度
-    finger_distal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[0, :]
-    finger_proximal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[1, :]
-    finger_plam_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[2, :]
-    med_distal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[3, :]
-    med_proximal_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[4, :]
-    med_plam_angle.loc[100+1:, staging_file["Subject"][subject]] = Y[5, :]
+    finger_distal_angle.loc[100:, staging_file["Subject"][subject]] = Y[0, :]
+    finger_proximal_angle.loc[100:, staging_file["Subject"][subject]] = Y[1, :]
+    finger_plam_angle.loc[100:, staging_file["Subject"][subject]] = Y[2, :]
+    med_distal_angle.loc[100:, staging_file["Subject"][subject]] = Y[3, :]
+    med_proximal_angle.loc[100:, staging_file["Subject"][subject]] = Y[4, :]
+    med_plam_angle.loc[100:, staging_file["Subject"][subject]] = Y[5, :]
     # 儲存中指角度
-    finger_distal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[0, :]
-    finger_proximal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[1, :]
-    finger_plam_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[2, :]
-    med_distal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[3, :]
-    med_proximal_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[4, :]
-    med_plam_vel.loc[100+1:, staging_file["Subject"][subject]] = Z[5, :]
+    finger_distal_vel.loc[100:, staging_file["Subject"][subject]] = Z[0, :]
+    finger_proximal_vel.loc[100:, staging_file["Subject"][subject]] = Z[1, :]
+    finger_plam_vel.loc[100:, staging_file["Subject"][subject]] = Z[2, :]
+    med_distal_vel.loc[100:, staging_file["Subject"][subject]] = Z[3, :]
+    med_proximal_vel.loc[100:, staging_file["Subject"][subject]] = Z[4, :]
+    med_plam_vel.loc[100:, staging_file["Subject"][subject]] = Z[5, :]
     
     
 # %%
 # coluns name
 finger_columns = ["食指掌指關節角度","食指近端指關節角度", "食指遠端指關節角度",
-                  "食指掌指關節角速度", "食指遠端指關節角速度", "食指近端指關節角速度"]
-med_columns = ["中指遠端指關節角度", "中指遠端指關節角速度",
-               "中指近端指關節角度", "中指近端指關節角速度",
-               "中指掌指關節角度", "中指掌指關節角速度"]
+                  "中指掌指關節角度", "中指近端指關節角度", "中指遠端指關節角度"]
+med_columns = ["食指掌指關節角速度", "食指遠端指關節角速度", "食指近端指關節角速度",
+               "中指掌指關節角速度", "中指近端指關節角速度","中指遠端指關節角速度"]
 # create multi-dimension matrix
-# 食指關節角度
+# 關節角度
 # 快轉組
 fast_dict = np.zeros((6, # muscle name without time
-                      202, # time length
+                      150, # time length
                       10)) # subject number
 
-fast_dict[0, :, :] = finger_distal_angle.loc[:, fast_group]
-fast_dict[1, :, :] = finger_distal_vel.loc[:, fast_group]
-fast_dict[2, :, :] = finger_proximal_angle.loc[:, fast_group]
-fast_dict[3, :, :] = finger_proximal_vel.loc[:, fast_group]
-fast_dict[4, :, :] = finger_plam_angle.loc[:, fast_group]
-fast_dict[5, :, :] = finger_plam_vel.loc[:, fast_group]
+fast_dict[0, :, :] = finger_plam_angle.loc[:, fast_group]
+fast_dict[1, :, :] = finger_proximal_angle.loc[:, fast_group]
+fast_dict[2, :, :] = finger_distal_angle.loc[:, fast_group]
+fast_dict[3, :, :] = med_plam_angle.loc[:, fast_group]
+fast_dict[4, :, :] = med_proximal_angle.loc[:, fast_group]
+fast_dict[5, :, :] = med_distal_angle.loc[:, fast_group]
 # 慢轉組
 slow_dict = np.zeros((6, # muscle name without time
-                      202, # time length
+                      150, # time length
                       10)) # subject number
-slow_dict[0, :, :] = finger_distal_angle.loc[:, slow_group]
-slow_dict[1, :, :] = finger_distal_vel.loc[:, slow_group]
-slow_dict[2, :, :] = finger_proximal_angle.loc[:, slow_group]
-slow_dict[3, :, :] = finger_proximal_vel.loc[:, slow_group]
-slow_dict[4, :, :] = finger_plam_angle.loc[:, slow_group]
-slow_dict[5, :, :] = finger_plam_vel.loc[:, slow_group]
-# 中指關節角度
+slow_dict[0, :, :] = finger_plam_angle.loc[:, slow_group]
+slow_dict[1, :, :] = finger_proximal_angle.loc[:, slow_group]
+slow_dict[2, :, :] = finger_distal_angle.loc[:, slow_group]
+slow_dict[3, :, :] = med_plam_angle.loc[:, slow_group]
+slow_dict[4, :, :] = med_proximal_angle.loc[:, slow_group]
+slow_dict[5, :, :] = med_distal_angle.loc[:, slow_group]
+# 角度度
 # 快轉組
 med_fast_dict = np.zeros((6, # muscle name without time
-                      202, # time length
+                      150, # time length
                       10)) # subject number
 
-med_fast_dict[0, :, :] = med_distal_angle.loc[:, fast_group]
-med_fast_dict[1, :, :] = med_distal_vel.loc[:, fast_group]
-med_fast_dict[2, :, :] = med_proximal_angle.loc[:, fast_group]
-med_fast_dict[3, :, :] = med_proximal_vel.loc[:, fast_group]
-med_fast_dict[4, :, :] = med_plam_angle.loc[:, fast_group]
-med_fast_dict[5, :, :] = med_plam_vel.loc[:, fast_group]
+med_fast_dict[0, :, :] = finger_plam_vel.loc[:, fast_group]
+med_fast_dict[1, :, :] = finger_proximal_vel.loc[:, fast_group]
+med_fast_dict[2, :, :] = finger_distal_vel.loc[:, fast_group]
+med_fast_dict[3, :, :] = med_plam_vel.loc[:, fast_group]
+med_fast_dict[4, :, :] = med_proximal_vel.loc[:, fast_group]
+med_fast_dict[5, :, :] = med_distal_vel.loc[:, fast_group]
 # 慢轉組
 med_slow_dict = np.zeros((6, # muscle name without time
-                      202, # time length
+                      150, # time length
                       10)) # subject number
-med_slow_dict[0, :, :] = med_distal_angle.loc[:, slow_group]
-med_slow_dict[1, :, :] = med_distal_vel.loc[:, slow_group]
-med_slow_dict[2, :, :] = med_proximal_angle.loc[:, slow_group]
-med_slow_dict[3, :, :] = med_proximal_vel.loc[:, slow_group]
-med_slow_dict[4, :, :] = med_plam_angle.loc[:, slow_group]
-med_slow_dict[5, :, :] = med_plam_vel.loc[:, slow_group]
+med_slow_dict[0, :, :] = finger_plam_vel.loc[:, slow_group]
+med_slow_dict[1, :, :] = finger_proximal_vel.loc[:, slow_group]
+med_slow_dict[2, :, :] = finger_distal_vel.loc[:, slow_group]
+med_slow_dict[3, :, :] = med_plam_vel.loc[:, slow_group]
+med_slow_dict[4, :, :] = med_proximal_vel.loc[:, slow_group]
+med_slow_dict[5, :, :] = med_distal_vel.loc[:, slow_group]
 
 
 
@@ -1035,14 +1034,14 @@ plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
 plt.rcParams['axes.unicode_minus'] = False
 palette = plt.get_cmap('Set1')
 # %% 食指關節角度圖
-fig, axs = plt.subplots(3, 2, figsize = (16,10), sharex='col')
+fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
     i_idx = y
     print(x, y)
     color = palette(0) # 設定顏色
-    iters = list(np.linspace(0, 202, 
+    iters = list(np.linspace(0, 150, 
                              len(fast_dict[0, :, 0])))
     # 設定計算資料
     avg1 = np.mean(fast_dict[i, :, :], axis=1) # 計算平均
@@ -1068,34 +1067,35 @@ for i in range(np.shape(fast_dict)[0]):
     axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
-    axs[x, y].set_xlim(0, 202)
-    axs[x, y].axvline(x=102, color = 'darkslategray', linewidth=1, linestyle = '--')
+    axs[x, y].set_xlim(0, 150)
+    axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列
-    if y == 0 and x == 0:
-        axs[x, y].set_ylabel('deg', fontsize=14)
-    elif y == 0 and x == 1:
-        axs[x, y].set_ylabel('deg/s', fontsize=14)
+    # if y == 0 and x == 0:
+    #     axs[x, y].set_ylabel('deg', fontsize=14)
+    # elif y == 0 and x == 1:
+    #     axs[x, y].set_ylabel('deg/s', fontsize=14)
     
-plt.suptitle(str("食指關節角度時序圖"), fontsize=18)
+plt.suptitle(str("手指關節角度時序圖"), fontsize=20)
 plt.tight_layout()
 fig.add_subplot(111, frameon=False)
 # hide tick and tick label of the big axes
 plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
 plt.grid(False)
-plt.xlabel("time (%)", fontsize = 14)
+plt.xlabel("time (%)", labelpad=8, fontsize = 16)
+plt.ylabel("deg", labelpad=8, fontsize = 16)
 
 # plt.savefig(save, dpi=200, bbox_inches = "tight")
 plt.show()    
 
 # %% 中指關節角度圖
-fig, axs = plt.subplots(3, 2, figsize = (16,10), sharex='col')
+fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
     i_idx = y
     print(x, y)
     color = palette(0) # 設定顏色
-    iters = list(np.linspace(0, 202, 
+    iters = list(np.linspace(0, 150, 
                              len(fast_dict[0, :, 0])))
     # 設定計算資料
     avg1 = np.mean(med_fast_dict[i, :, :], axis=1) # 計算平均
@@ -1121,24 +1121,86 @@ for i in range(np.shape(fast_dict)[0]):
     axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
-    axs[x, y].set_xlim(0, 202)
-    axs[x, y].axvline(x=102, color = 'darkslategray', linewidth=1, linestyle = '--')
+    axs[x, y].set_xlim(0, 150)
+    axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列
-    if y == 0 and x == 0:
-        axs[x, y].set_ylabel('deg', fontsize=14)
-    elif y == 0 and x == 1:
-        axs[x, y].set_ylabel('deg/s', fontsize=14)
+    # if y == 0 and x == 0:
+    #     axs[x, y].set_ylabel('deg', fontsize=14)
+    # elif y == 0 and x == 1:
+    #     axs[x, y].set_ylabel('deg/s', fontsize=14)
     
-plt.suptitle(str("中指關節角度時序圖"), fontsize=18)
+plt.suptitle(str("手指關節角速度時序圖"), fontsize=18)
 plt.tight_layout()
 fig.add_subplot(111, frameon=False)
 # hide tick and tick label of the big axes
 plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
 plt.grid(False)
-plt.xlabel("time (%)", fontsize = 14)
+plt.xlabel("time (%)", labelpad=8, fontsize = 14)
+plt.ylabel("deg/s", labelpad=8, fontsize = 14)
 
 # plt.savefig(save, dpi=200, bbox_inches = "tight")
 plt.show()    
+
+# %% 指關節角速度比較圖
+fast_dict
+med_columns = ["食指掌指關節角速度", "食指遠端指關節角速度", "食指近端指關節角速度",
+               "中指掌指關節角速度", "中指近端指關節角速度","中指遠端指關節角速度"]
+finger_columns = ["食指掌指關節角度","食指近端指關節角度", "食指遠端指關節角度",
+                  "中指掌指關節角度", "中指近端指關節角度", "中指遠端指關節角度"]
+# Note that even in the OO-style, we use `.pyplot.figure` to create the Figure.
+fig, ax = plt.subplots(figsize=(6, 4), layout='constrained')
+ax.plot(np.mean(fast_dict[0, :, :], axis=1),
+        color='r', linestyle='--', label='食指掌指關節角度')  
+ax.plot(np.mean(fast_dict[1, :, :], axis=1),
+        color='r', linestyle='dotted', label='食指遠端指關節角度')
+ax.plot(np.mean(fast_dict[2, :, :], axis=1),
+        color='r', linestyle='solid', label='食指近端指關節角度')
+ax.plot(np.mean(fast_dict[3, :, :], axis=1),
+        color='b', linestyle='--', label='中指掌指關節角度')
+ax.plot(np.mean(fast_dict[4, :, :], axis=1),
+        color='b', linestyle='dotted', label='中指近端指關節角度')
+ax.plot(np.mean(fast_dict[5, :, :], axis=1),
+        color='b', linestyle='solid', label='中指遠端指關節角度')
+ax.axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
+
+
+# ax.plot(x, x**3, label='cubic')  
+plt.xlabel('deg')  # Add an x-label to the Axes.
+plt.ylabel('time')  # Add a y-label to the Axes.
+ax.set_title("指關節角度比較圖")  # Add a title to the Axes.
+plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.6), ncol=2)  # Add a legend.
+
+# %%
+fig, ax = plt.subplots(figsize=(6, 4), layout='constrained')
+ax.plot(np.mean(med_fast_dict[0, :, :], axis=1),
+        color='r', linestyle='--', label='食指掌指關節角速度')  
+ax.plot(np.mean(med_fast_dict[1, :, :], axis=1),
+        color='r', linestyle='dotted', label='食指遠端指關節角速度')
+ax.plot(np.mean(med_fast_dict[2, :, :], axis=1),
+        color='r', linestyle='solid', label='食指近端指關節角速度')
+ax.plot(np.mean(med_fast_dict[3, :, :], axis=1),
+        color='b', linestyle='--', label='中指掌指關節角速度')
+ax.plot(np.mean(med_fast_dict[4, :, :], axis=1),
+        color='b', linestyle='dotted', label='中指近端指關節角速度')
+ax.plot(np.mean(med_fast_dict[5, :, :], axis=1),
+        color='b', linestyle='solid', label='中指遠端指關節角速度')
+ax.axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
+
+
+# ax.plot(x, x**3, label='cubic')  
+plt.xlabel('deg/s')  # Add an x-label to the Axes.
+plt.ylabel('time')  # Add a y-label to the Axes.
+ax.set_title("指關節角速度比較圖")  # Add a title to the Axes.
+plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.6), ncol=2)  # Add a legend.
+
+
+
+
+
+
+
+
+
 
 
 
