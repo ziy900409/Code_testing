@@ -20,7 +20,7 @@ data_sheet = ["Stage2", "Stage3"]
 
 # %% 1. read staging file
 staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
-                             sheet_name='T2_memo3') # 改變要找stage2 or stage3
+                             sheet_name='T1_memo2') # 改變要找stage2 or stage3
 staging_file = staging_file.dropna(axis=0, thresh=14)
 folder_file_list = os.listdir(folder_path)
 all_file_list = []
@@ -77,15 +77,15 @@ for i in range(np.shape(arr_muscle_data)[0]):
 
 # 修改儲存檔名
 # save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx"
-save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240516.xlsx"
+save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240519.xlsx"
 
 with pd.ExcelWriter(save_file_name) as Writer:
-    pd.DataFrame(arr_muscle_data[0, :, :]).to_excel(Writer, sheet_name="muscle1", index=False)
-    pd.DataFrame(arr_muscle_data[1, :, :]).to_excel(Writer, sheet_name="muscle2", index=False)
-    pd.DataFrame(arr_muscle_data[2, :, :]).to_excel(Writer, sheet_name="muscle3", index=False)
-    pd.DataFrame(arr_muscle_data[3, :, :]).to_excel(Writer, sheet_name="muscle4", index=False)
-    pd.DataFrame(arr_muscle_data[4, :, :]).to_excel(Writer, sheet_name="muscle5", index=False)
-    pd.DataFrame(arr_muscle_data[5, :, :]).to_excel(Writer, sheet_name="muscle6", index=False)
+    pd.DataFrame(arr_muscle_data[0, :, :]).to_excel(Writer, sheet_name="biceps", index=False)
+    pd.DataFrame(arr_muscle_data[1, :, :]).to_excel(Writer, sheet_name="triceps", index=False)
+    pd.DataFrame(arr_muscle_data[2, :, :]).to_excel(Writer, sheet_name="ER", index=False)
+    pd.DataFrame(arr_muscle_data[3, :, :]).to_excel(Writer, sheet_name="EU", index=False)
+    pd.DataFrame(arr_muscle_data[4, :, :]).to_excel(Writer, sheet_name="FR", index=False)
+    pd.DataFrame(arr_muscle_data[5, :, :]).to_excel(Writer, sheet_name="FU", index=False)
 
 # %% T1 快轉 VS 慢轉
 import pandas as pd
@@ -356,6 +356,7 @@ for i in range(np.shape(data)[0]):
     plt.suptitle(str(columns_name[i]), fontsize=16)
     plt.tight_layout()
 
+# %%
 
 
 
