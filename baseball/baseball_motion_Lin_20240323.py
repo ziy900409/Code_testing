@@ -883,7 +883,7 @@ staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_2
                              sheet_name='T1_memo2')
 staging_file = staging_file.dropna(axis=0, thresh=14)
 staging_file_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
-                             sheet_name='T2_memo3')
+                             sheet_name='T2_motion')
 staging_file_T2 = staging_file_T2.dropna(axis=0, thresh=14)
 
 
@@ -955,8 +955,8 @@ for subject in range(len(staging_file["Subject"])):
     print(staging_file["Subject"][subject])
     finger_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure.xlsx",
                                 sheet_name = staging_file["Subject"][subject])
-    finger_data_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure_T2.xlsx",
-                                sheet_name = staging_file["Subject"][subject])
+    # finger_data_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure_T2.xlsx",
+    #                             sheet_name = staging_file["Subject"][subject])
     # define time
     # footContact = staging_file.loc[subject, "foot contact"]
     SER = staging_file.loc[subject, "shoulder external rotation"]
@@ -1006,12 +1006,13 @@ for subject in range(len(staging_file["Subject"])):
 # ------------------------for T2-------------------------------------------
 for subject in range(len(staging_file_T2["Subject"])):
     print(staging_file_T2["Subject"][subject])
-    finger_data_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\forearm_motion_figure_T2.xlsx",
-                                sheet_name = staging_file["Subject"][subject])
+    finger_data_T2 = pd.read_excel(r"E:/Hsin/NTSU_lab/Baseball/finger_motion_figure_T2.xlsx",
+                                sheet_name = staging_file_T2["Subject"][subject])
     # --------------------for T2------------------------------------
     SER = staging_file_T2.loc[subject, "shoulder external rotation"]
     # 找到符合條件的索引位置
-    SER_idx = staging_file_T2.index[finger_data_T2["Frame#"] == SER][0]
+    SER_idx = finger_data_T2.index[finger_data_T2["Frame#"] == SER][0]
+
     # -------------------------for T2---------------------------------
     # 1. stage2
     angle_data = finger_data_T2.loc[:SER_idx, pos_cloname]
