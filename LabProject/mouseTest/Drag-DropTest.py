@@ -2,11 +2,13 @@
 """
 待處理功能：
 
+1. 自動產生檔案
+    1.1. 是否可以自行輸入?
+    1.2. 輸出檔案自動產生
 3. 設定不同難度問題
     3.1. 不同難度應該隨機出現
-4. 應有判定方式確認任務是成功還是失敗
-    判斷是否為成功的 trail
-    例如： MOUSEBUTTONDOWN = MOUSEBUTTONUP_SUCC + MOUSEBUTTONUP_FAIL
+
+------------
 
 程式架構
 1. 產生圓圈： 
@@ -25,6 +27,8 @@
     4.2. 根據 Fitts's Law 的公式，計算操作的 ID（Index of Difficulty）和各項指標（如 MT、TP）。
 5. 顯示結果： 
     5.1. 將每次拖曳操作的結果（如操作時間、ID、TP 等）顯示在螢幕上，以便使用者查看。
+
+----------
 
 已解決
 1. 拖曳順序問題 
@@ -60,6 +64,10 @@
                event.pos, current_time))
 5. 獲得所有周圍圓的中心位置
     5.1. 利用 record edge 讓中心圓位置只被紀錄一次
+
+6. 應有判定方式確認任務是成功還是失敗
+   判斷是否為成功的 trail
+   例如： MOUSEBUTTONDOWN = MOUSEBUTTONUP_SUCC + MOUSEBUTTONUP_FAIL
 
 @author: Hsin.YH.Yang, written by May 02 2024
 """

@@ -75,16 +75,17 @@ staging_file_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\ZowieAllSeries
 # %% 分析疲勞
 tic = time.process_time()
 # 建立 slope data 要儲存之位置
-all_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse']+ muscle_name)
+all_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse', 'distance'])
 for i in range(len(rowdata_folder_list)):
-    print(0)
+    print(rowdata_folder_list[i])
     c3d_file_path = gen.Read_File(data_path + RawData_folder +  rowdata_folder_list[i],
                                ".c3d")
     all_file_path = c3d_file_path
     grid_shot_file_list = [file for file in all_file_path if 'GridShot' in file]
 
     for ii in range(len(grid_shot_file_list)):
-        # 處理檔名問題
+        print(grid_shot_file_list[ii])
+        # 0. 處理檔名問題------------------------------------------------------
         save_name, extension = os.path.splitext(grid_shot_file_list[ii].split('\\', -1)[-1])
         fig_svae_path = data_path + processingData_folder + rowdata_folder_list[i] + "\\" + \
             "FatigueAnalysis\\figure\\"
@@ -94,6 +95,7 @@ for i in range(len(rowdata_folder_list)):
         # 將檔名拆開
         filepath, tempfilename = os.path.split(grid_shot_file_list[ii])
         filename, extension = os.path.splitext(tempfilename)
+        # 1. 讀取資料與初步處理-------------------------------------------------
         # 讀取 c3d data
         motion_info, motion_data, analog_info, analog_data, np_motion_data = gen.read_c3d(grid_shot_file_list[ii])
         motion_data = motion_data.fillna(0)
@@ -103,6 +105,7 @@ for i in range(len(rowdata_folder_list)):
         onset_analog = detect_onset(analog_data.loc[:, 'trigger1'],
                                     np.std(analog_data.loc[:50, 'trigger1']),
                                     n_above=10, n_below=0, show=True)
+        oneset_idx = onset_analog[0, 0]
         # 設定 sampling rate
         sampling_time = 1/motion_info['frame_rate']
         # 前處理 motion data, 進行低通濾波
@@ -113,16 +116,46 @@ for i in range(len(rowdata_folder_list)):
         for i in range(np.shape(motion_data)[1]-1):
             filted_motion.iloc[:, i+1] = signal.sosfiltfilt(lowpass_sos,
                                                     motion_data.iloc[:, i+1].values)
+        # 2. 計算資料-----------------------------------------------------------
         # 計算中指掌指關節座標點與 mouse 的距離
+        # 平均 mouse M2, M3, M4 的距離, 相加除以3
+        mouse_mean = (filted_motion.loc[oneset_idx:, mouse_marker[0:3]].values + \
+                    filted_motion.loc[oneset_idx:, mouse_marker[3:6]].values + \
+                    filted_motion.loc[oneset_idx:, mouse_marker[6:9]].values)/3
+        # 計算 mouse_mean 與 R.M.Finger1 的距離
+        dis_mouse_MFinger = np.sqrt((mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_x'])**2 + \
+                                    (mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_y'])**2 + \
+                                    (mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_z'])**2)
+        min_dis = min(dis_mouse_MFinger)
+        max_dis = max(dis_mouse_MFinger)
         
+        # 3. 儲存資料-----------------------------------------------------------
+        # 將資料儲存至矩陣
+        add_data = pd.DataFrame({"file_name":filename,
+                                 "direction":vel_direc,
+                                 "max_value": first_max_values,
+                                 'Thumb angle': angle_thumb[first_max_idx],
+                                 'Ring angle': angle_ring[first_max_idx],
+                                 'Little finger angle': angle_little[first_max_idx],
+                                 'Wrist angle': angle_wrist[first_max_idx]},
+                                index=[0])
+        data_store = pd.concat([add_data, data_store], ignore_index=True)
         
-        
-        
-        
-        
-        
-        
-        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
         
         # 前處理EMG data
