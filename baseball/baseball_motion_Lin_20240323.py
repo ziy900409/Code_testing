@@ -11,14 +11,15 @@ import os
 import matplotlib.pyplot as plt
 import math
 import sys
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
-sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import spm1d
 
 # data path setting
 motion_folder_path = r"E:\Hsin\NTSU_lab\Baseball\衛宣博論運動學\\"
+# motion_folder_path = r"E:\Hsin\NTSU_lab\Baseball\衛宣博論運動學\\"
 # 設定繪圖格式與字體
 # plt.style.use('seaborn-white')
 # 顯示輸入中文
@@ -879,10 +880,12 @@ for i in range(np.shape(staging_file)[0]):
 
 
 # %% 繪圖用
-staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
-                             sheet_name='T1_memo2')
+# "D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx"
+# "E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx"
+staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+                             sheet_name='T1_motion')
 staging_file = staging_file.dropna(axis=0, thresh=14)
-staging_file_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
+staging_file_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
                              sheet_name='T2_motion')
 staging_file_T2 = staging_file_T2.dropna(axis=0, thresh=14)
 
@@ -953,7 +956,7 @@ med_plam_vel_T2 = pd.DataFrame(np.zeros([150, 20]),
  
 for subject in range(len(staging_file["Subject"])):
     print(staging_file["Subject"][subject])
-    finger_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure.xlsx",
+    finger_data = pd.read_excel(r"D:\BenQ_Project\python\Lin\finger_motion_figure_T1.xlsx",
                                 sheet_name = staging_file["Subject"][subject])
     # finger_data_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure_T2.xlsx",
     #                             sheet_name = staging_file["Subject"][subject])
@@ -1006,7 +1009,7 @@ for subject in range(len(staging_file["Subject"])):
 # ------------------------for T2-------------------------------------------
 for subject in range(len(staging_file_T2["Subject"])):
     print(staging_file_T2["Subject"][subject])
-    finger_data_T2 = pd.read_excel(r"E:/Hsin/NTSU_lab/Baseball/finger_motion_figure_T2.xlsx",
+    finger_data_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\finger_motion_figure_T2.xlsx",
                                 sheet_name = staging_file_T2["Subject"][subject])
     # --------------------for T2------------------------------------
     SER = staging_file_T2.loc[subject, "shoulder external rotation"]
@@ -1021,19 +1024,19 @@ for subject in range(len(staging_file_T2["Subject"])):
     Y = spm1d.util.interp(angle_data.values.T, Q=100)
     Z = spm1d.util.interp(vel_data.values.T, Q=100)
     # 儲存食指角度
-    finger_distal_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[0, :]
-    finger_proximal_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[1, :]
-    finger_plam_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[2, :]
-    med_distal_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[3, :]
-    med_proximal_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[4, :]
-    med_plam_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[5, :]
+    finger_distal_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[0, :]
+    finger_proximal_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[1, :]
+    finger_plam_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[2, :]
+    med_distal_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[3, :]
+    med_proximal_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[4, :]
+    med_plam_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[5, :]
     # 儲存中指角度
-    finger_distal_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[0, :]
-    finger_proximal_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[1, :]
-    finger_plam_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[2, :]
-    med_distal_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[3, :]
-    med_proximal_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[4, :]
-    med_plam_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[5, :]
+    finger_distal_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[0, :]
+    finger_proximal_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[1, :]
+    finger_plam_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[2, :]
+    med_distal_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[3, :]
+    med_proximal_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[4, :]
+    med_plam_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[5, :]
     # 2. stage3
     angle_data = finger_data_T2.loc[SER_idx+1:, pos_cloname]
     vel_data = finger_data_T2.loc[SER_idx+1:, vel_colname].dropna(axis=0)
@@ -1041,19 +1044,19 @@ for subject in range(len(staging_file_T2["Subject"])):
     Y = spm1d.util.interp(angle_data.values.T, Q=50)
     Z = spm1d.util.interp(vel_data.values.T, Q=50)
     # 儲存食指角度
-    finger_distal_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[0, :]
-    finger_proximal_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[1, :]
-    finger_plam_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[2, :]
-    med_distal_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[3, :]
-    med_proximal_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[4, :]
-    med_plam_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[5, :]
+    finger_distal_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[0, :]
+    finger_proximal_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[1, :]
+    finger_plam_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[2, :]
+    med_distal_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[3, :]
+    med_proximal_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[4, :]
+    med_plam_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[5, :]
     # 儲存中指角度
-    finger_distal_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[0, :]
-    finger_proximal_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[1, :]
-    finger_plam_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[2, :]
-    med_distal_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[3, :]
-    med_proximal_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[4, :]
-    med_plam_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[5, :]
+    finger_distal_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[0, :]
+    finger_proximal_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[1, :]
+    finger_plam_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[2, :]
+    med_distal_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[3, :]
+    med_proximal_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[4, :]
+    med_plam_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[5, :]
     
     
 # %%
@@ -1164,7 +1167,8 @@ n=3
 # plt.figure(figsize=(2*n+1,10))
 
 # %% 食指關節角度圖
-fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+# fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+fig, axs = plt.subplots(3, 2, figsize = (10,12))
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -1197,6 +1201,8 @@ for i in range(np.shape(fast_dict)[0]):
     axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列
@@ -1218,7 +1224,8 @@ plt.ylabel("deg", labelpad=8, fontsize = 16)
 plt.show()    
 
 # %% 手指關節角速度圖
-fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+# fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+fig, axs = plt.subplots(3, 2, figsize = (10,12))
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -1251,6 +1258,8 @@ for i in range(np.shape(fast_dict)[0]):
     axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列
@@ -1292,12 +1301,15 @@ ax.plot(np.mean(fast_dict[4, :, :], axis=1),
 ax.plot(np.mean(fast_dict[5, :, :], axis=1),
         color='b', linestyle='solid', label='中指遠端指關節角度')
 ax.axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
+x_major_locator = plt.MultipleLocator(25)
+ax.xaxis.set_major_locator(x_major_locator)
+ax.set_xlim(0, 150)
 
 
 # ax.plot(x, x**3, label='cubic')  
 plt.xlabel('time')  # Add an x-label to the Axes.
 plt.ylabel('deg')  # Add a y-label to the Axes.
-ax.set_title("指關節角度比較圖")  # Add a title to the Axes.
+ax.set_title("手指關節角度比較圖")  # Add a title to the Axes.
 plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.6), ncol=2)  # Add a legend.
 
 # %%
@@ -1324,7 +1336,8 @@ ax.set_title("指關節角速度比較圖")  # Add a title to the Axes.
 plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.6), ncol=2)  # Add a legend.
 
 # %% 手指關節角度 T1 VS T2
-fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+# fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+fig, axs = plt.subplots(3, 2, figsize = (10,12))
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -1357,6 +1370,8 @@ for i in range(np.shape(fast_dict)[0]):
     axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列
@@ -1372,13 +1387,14 @@ fig.add_subplot(111, frameon=False)
 plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
 plt.grid(False)
 plt.xlabel("time (%)", labelpad=8, fontsize = 16)
-plt.ylabel("deg", labelpad=8, fontsize = 16)
+plt.ylabel("deg", labelpad=12, fontsize = 16)
 
 # plt.savefig(save, dpi=200, bbox_inches = "tight")
 plt.show()    
 
 # %% 手指關節角速度比較  T1 VS T2
-fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+# fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')
+fig, axs = plt.subplots(3, 2, figsize = (10,12))
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -1411,6 +1427,8 @@ for i in range(np.shape(fast_dict)[0]):
     axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列
@@ -1426,7 +1444,7 @@ fig.add_subplot(111, frameon=False)
 plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
 plt.grid(False)
 plt.xlabel("time (%)", labelpad=8, fontsize = 14)
-plt.ylabel("deg/s", labelpad=8, fontsize = 14)
+plt.ylabel("deg/s", labelpad=16, fontsize = 14)
 
 # plt.savefig(save, dpi=200, bbox_inches = "tight")
 plt.show()    
@@ -1441,12 +1459,11 @@ plt.show()
 
 """
 
-staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
+staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
                              sheet_name='T1_memo2')
 staging_file = staging_file.dropna(axis=0, thresh=14)
-
-staging_file_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
-                             sheet_name='T2_memo3')
+staging_file_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+                             sheet_name='T2_motion')
 staging_file_T2 = staging_file_T2.dropna(axis=0, thresh=14)
 
 
@@ -1481,7 +1498,7 @@ wrist_vel_T2 = pd.DataFrame(np.zeros([150, 20]),
  
 for subject in range(len(staging_file["Subject"])):
     print(staging_file["Subject"][subject])
-    finger_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\forearm_motion_figure_T1.xlsx",
+    finger_data = pd.read_excel(r"D:\BenQ_Project\python\Lin\forearm_motion_figure_T1.xlsx",
                                 sheet_name = staging_file["Subject"][subject])
 
     
@@ -1518,12 +1535,13 @@ for subject in range(len(staging_file["Subject"])):
 # --------------------------for T2------------------------------------
 for subject in range(len(staging_file_T2["Subject"])):
     print(staging_file_T2["Subject"][subject])
-    finger_data_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\forearm_motion_figure_T2.xlsx",
-                                sheet_name = staging_file["Subject"][subject])
+    finger_data_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\forearm_motion_figure_T2.xlsx",
+                                   sheet_name = staging_file_T2["Subject"][subject])
     # --------------------for T2------------------------------------
     SER = staging_file_T2.loc[subject, "shoulder external rotation"]
     # 找到符合條件的索引位置
-    SER_idx = staging_file_T2.index[finger_data_T2["Frame#"] == SER][0]
+    SER_idx = finger_data_T2.index[finger_data_T2["Frame#"] == SER][0]
+    
     # 1. stage2
     angle_data = finger_data_T2.loc[:SER_idx, pos_cloname]
     vel_data = finger_data_T2.loc[1:SER_idx, vel_colname]
@@ -1531,11 +1549,11 @@ for subject in range(len(staging_file_T2["Subject"])):
     Y = spm1d.util.interp(angle_data.values.T, Q=100)
     Z = spm1d.util.interp(vel_data.values.T, Q=100)
     # 儲存手肘及手腕關節角度
-    elbow_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[0, :]
-    wrist_angle_T2.loc[:99, staging_file["Subject"][subject]] = Y[1, :]
+    elbow_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[0, :]
+    wrist_angle_T2.loc[:99, staging_file_T2["Subject"][subject]] = Y[1, :]
     # 儲存手肘及手腕關節角速度
-    elbow_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[0, :]
-    wrist_vel_T2.loc[:99, staging_file["Subject"][subject]] = Z[1, :]
+    elbow_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[0, :]
+    wrist_vel_T2.loc[:99, staging_file_T2["Subject"][subject]] = Z[1, :]
     # 2. stage3
     angle_data = finger_data_T2.loc[SER_idx+1:, pos_cloname]
     vel_data = finger_data_T2.loc[SER_idx+1:, vel_colname].dropna(axis=0)
@@ -1543,11 +1561,11 @@ for subject in range(len(staging_file_T2["Subject"])):
     Y = spm1d.util.interp(angle_data.values.T, Q=50)
     Z = spm1d.util.interp(vel_data.values.T, Q=50)
     # 儲存食指角度
-    elbow_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[0, :]
-    wrist_angle_T2.loc[100:, staging_file["Subject"][subject]] = Y[1, :]
+    elbow_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[0, :]
+    wrist_angle_T2.loc[100:, staging_file_T2["Subject"][subject]] = Y[1, :]
     # 儲存手肘及手腕關節角速度
-    elbow_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[0, :]
-    wrist_vel_T2.loc[100:, staging_file["Subject"][subject]] = Z[1, :]
+    elbow_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[0, :]
+    wrist_vel_T2.loc[100:, staging_file_T2["Subject"][subject]] = Z[1, :]
 
     
     
@@ -1581,8 +1599,8 @@ slow_dict[3, :, :] = wrist_vel.loc[:, slow_group]
 # compare T1 VS T2
 # T1
 med_fast_dict = np.zeros((4, # muscle name without time
-                      150, # time length
-                      20)) # subject number
+                          150, # time length
+                          20)) # subject number
 
 med_fast_dict[0, :, :] = elbow_angle.loc[:, :]
 med_fast_dict[1, :, :] = wrist_angle.loc[:, :]
@@ -1591,8 +1609,8 @@ med_fast_dict[3, :, :] = wrist_vel.loc[:, :]
 
 # T2
 med_slow_dict = np.zeros((4, # muscle name without time
-                      150, # time length
-                      20)) # subject number
+                          150, # time length
+                          20)) # subject number
 med_slow_dict[0, :, :] = elbow_angle_T2.loc[:, :]
 med_slow_dict[1, :, :] = wrist_angle_T2.loc[:, :]
 med_slow_dict[2, :, :] = elbow_vel_T2.loc[:, :]
@@ -1600,7 +1618,8 @@ med_slow_dict[3, :, :] = wrist_vel_T2.loc[:, :]
 
 # %% 繪製手肘與手腕關節角度及角速度
 n=2
-fig, axs = plt.subplots(2, 2, figsize = (8, 6), sharex='col')
+# fig, axs = plt.subplots(2, 2, figsize = (8, 6), sharex='col')
+fig, axs = plt.subplots(2, 2, figsize = (8, 6))
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -1633,6 +1652,8 @@ for i in range(np.shape(fast_dict)[0]):
     # axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列
@@ -1657,7 +1678,8 @@ plt.show()
 
 # %% 比較 T1 VS T2
 
-fig, axs = plt.subplots(2, 2, figsize = (8,6), sharex='col')
+# fig, axs = plt.subplots(2, 2, figsize = (8,6), sharex='col')
+fig, axs = plt.subplots(2, 2, figsize = (8, 6))
 for i in range(np.shape(fast_dict)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -1690,6 +1712,8 @@ for i in range(np.shape(fast_dict)[0]):
     # axs[x, y].legend(loc="lower left") # 圖例位置
     # axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     # 设置Y轴标题，只在最左边两列

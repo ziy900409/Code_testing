@@ -8,18 +8,20 @@ Created on Tue Mar 19 15:04:47 2024
 import pandas as pd
 import os
 import sys
-sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 # %% 0. parameter estting
-folder_path = r"E:\Hsin\NTSU_lab\Baseball\Processing_Data"
+# folder_path = r"E:\Hsin\NTSU_lab\Baseball\Processing_Data"
+folder_path = r"D:\BenQ_Project\python\Lin\Processing_Data"
 data_sheet = ["Stage2", "Stage3"]
 
 # %% 1. read staging file
-staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
+staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
                              sheet_name='T1_memo2') # 改變要找stage2 or stage3
 staging_file = staging_file.dropna(axis=0, thresh=14)
 folder_file_list = os.listdir(folder_path)
@@ -77,7 +79,8 @@ for i in range(np.shape(arr_muscle_data)[0]):
 
 # 修改儲存檔名
 # save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx"
-save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240519.xlsx"
+# save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240519.xlsx"
+save_file_name = r"D:\BenQ_Project\python\Lin\EMGdata_processing_T1_20240522.xlsx"
 
 with pd.ExcelWriter(save_file_name) as Writer:
     pd.DataFrame(arr_muscle_data[0, :, :]).to_excel(Writer, sheet_name="biceps", index=False)
