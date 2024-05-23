@@ -23,8 +23,8 @@ import time
 import numpy
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball\kao")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball\kao")
 import Kao_Function as func
 
 import math
@@ -39,8 +39,8 @@ import logging
 from datetime import datetime
 
 # data path
-computer_path = r"E:\Hsin\NTSU_lab\data\\"
-# computer_path = r"D:\BenQ_Project\python\Kao\\"
+# computer_path = r"E:\Hsin\NTSU_lab\data\\"
+computer_path = r"D:\BenQ_Project\python\Kao\\"
 data_path = computer_path + "EMG\\"
 rawData_folder = "raw_data"
 processingData_folder = "processing_data"
@@ -59,8 +59,8 @@ motion_fig_save = computer_path + "motion_processing\\force_figure\\"
 force_data_save = computer_path + "motion_processing\\force_data\\"
 emg_figure_save = computer_path + "motion_processing\\EMG\\"
 # 定義圖片儲存路徑
-folder_path = r"E:\Hsin\NTSU_lab\data\\"
-# folder_path = r"D:\BenQ_Project\python\Kao\\"
+# folder_path = r"E:\Hsin\NTSU_lab\data\\"
+folder_path = r"D:\BenQ_Project\python\Kao\\"
 # 获取当前日期和时间
 now = datetime.now()
 # 将日期转换为指定格式
@@ -194,36 +194,6 @@ for i in range(len(all_rawdata_folder_path)):
             + "\\data\\" + MVC_folder + '\\' + filename + end_name + ".xlsx"
         pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
     
-    
-    # 預處理shooting data
-    # for mac version replace "\\" by '/'
-    # Shooting_path = all_rawdata_folder_path[i] + "\\" + motion_folder
-    # Shooting_list = func.Read_File(Shooting_path, '.csv')
-    # for ii in range(len(Shooting_list)):
-    #     # 印出說明
-    #     x = PrettyTable()
-    #     x.field_names = ["平滑方法", "folder", "shooting_file"]
-    #     x.add_row([smoothing_method, all_rawdata_folder_path[i].split("\\")[-1],
-    #                Shooting_list[ii].split('\\')[-1]])
-    #     print(x)
-    #     # 讀取資料
-    #     data = pd.read_csv(Shooting_list[ii], encoding='UTF-8')
-    #     # EMG data 前處理
-    #     processing_data, bandpass_filtered_data = func.EMG_processing(data, smoothing="lowpass")
-    #     # 設定 EMG data 資料儲存路徑
-    #     # 將檔名拆開
-    #     filepath, tempfilename = os.path.split(Shooting_list[ii])
-    #     filename, extension = os.path.splitext(tempfilename)
-    #     # 畫 FFT analysis 的圖
-    #     func.Fourier_plot(data,
-    #                     (fig_save_path + "\\FFT\\motion"),
-    #                     filename)
-    #     # 畫 bandpass 後之資料圖
-    #     func.plot_plot(bandpass_filtered_data, str(fig_save_path + "\\processing\\bandpass\\" + motion_folder),
-    #                  filename, "Bandpass_")
-    #     # 畫前處理後之資料圖
-    #     func.plot_plot(processing_data, str(fig_save_path + "\\processing\\smoothing\\" + motion_folder),
-    #                  filename, str("_" + smoothing_method))
 toc = time.process_time()
 print("Total Time:",toc-tic)  
 gc.collect(generation=2)
@@ -503,11 +473,15 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         right_data_r = pd.DataFrame({'#Sample':right_lowpass.iloc[slope_idx:rightLeg_off + right_time, 0],
                                      'combine_right_g':combin_right[slope_idx:rightLeg_off + right_time]})
         # 將 force plate data 資料寫進 EXCEL
-        save_file_name = str(force_data_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.xlsx")
+        # if not os.path.exists(force_data_save):
+        #     os.makedirs(force_data_save)
+        save_file_name = os.path.join(force_data_save + StagingFile_Exist.loc[file_name, '.anc'] + "_PF.xlsx")
+        
         with pd.ExcelWriter(save_file_name) as Writer:
             left_data.to_excel(Writer, sheet_name="Stage1", index=False)
             right_data_g.to_excel(Writer, sheet_name="Stage2_g", index=False)
             right_data_r.to_excel(Writer, sheet_name="Stage2_r", index=False)
+        
         # ---------------處理 EMG data--------------------------------------
         # 2.1. read EMG data and pre-processing data
         '''
@@ -515,6 +489,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
         '''
         # 處理EMG data 必須要有 onset data
         if np.size(onset_analog) > 0:
+            # 1. EMG 前處理 ---------------------------------------------------
             EMG_data = pd.read_csv(read_emg)
             processing_data, bandpass_filtered_data = func.EMG_processing(read_emg, smoothing='lowpass')
             # 計算iMVC
@@ -545,50 +520,110 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
             right_start_g = int((first_right_max_idx - onset_analog[0, 0])/2500*2000)
             right_start_r = int((slope_idx - onset_analog[0, 0])/2500*2000)
             rightLeave = int((rightLeg_off + right_time - onset_analog[0, 0])/2500*2000)
-            # 計算積分面積
+            
+            # 2. EMG data 計算 -------------------------------------------------
+            # 2.1. 計算積分面積
             temp_stage1_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[motion_start:leftLeave, :], axis=0)],
-                                        columns=bandpass_iMVC.columns[:])
-            temp_stage2_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_g:rightLeave, :], axis=0)], # 右腳啟動綠色
-                                        columns=bandpass_iMVC.columns[:])
-            temp_stage3_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_r:rightLeave, :], axis=0)], #右腳啟動紅色
-                                        columns=bandpass_iMVC.columns[:])
+                                             columns=bandpass_iMVC.columns[:])
+            temp_stage2_g_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_g:rightLeave, :], axis=0)], # 右腳啟動綠色
+                                               columns=bandpass_iMVC.columns[:])
+            temp_stage2_r_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_r:rightLeave, :], axis=0)], #右腳啟動紅色
+                                               columns=bandpass_iMVC.columns[:])
+            # 2024.05.23 新增計算推蹬前期以及推蹬後期
+            stage1_mid = motion_start + int((leftLeave - motion_start)/2)
+            stage2_mid_g = right_start_g + int((rightLeave - right_start_g)/2)
+            # stage2_mid_r = right_start_r + int((rightLeave - right_start_r)/2)
+            # 計算積分面積
+            # stage 1
+            temp_stage1_first_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[motion_start:stage1_mid, :], axis=0)],
+                                                   columns=bandpass_iMVC.columns[:])
+            temp_stage1_second_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[stage1_mid:leftLeave, :], axis=0)],
+                                                   columns=bandpass_iMVC.columns[:])
+            # stage 2 green
+            temp_stage2_g_first_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_g:stage2_mid_g, :], axis=0)], # 右腳啟動綠色
+                                                     columns=bandpass_iMVC.columns[:])
+            temp_stage2_g_second_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[stage2_mid_g:rightLeave, :], axis=0)], # 右腳啟動綠色
+                                                      columns=bandpass_iMVC.columns[:])
+            # stage 2 red
+            # temp_stage2_r_first_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[right_start_r:stage2_mid_r, :], axis=0)], #右腳啟動紅色
+            #                                          columns=bandpass_iMVC.columns[:])
+            # temp_stage2_r_second_Atrap = pd.DataFrame([1/2000*trapz(bandpass_iMVC.iloc[stage2_mid_r:rightLeave, :], axis=0)], #右腳啟動紅色
+            #                                           columns=bandpass_iMVC.columns[:])
+            # 資料儲存, 插入 task 名稱以做區隔
             temp_stage1_Atrap.insert(0, 'task', 'stage1 intergated')
             temp_stage1_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
-            temp_stage2_Atrap.insert(0, 'task', 'stage2 intergated_g')
-            temp_stage2_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
-            temp_stage3_Atrap.insert(0, 'task', 'stage2 intergated_r')
-            temp_stage3_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
-            # 計算移動平均
+            temp_stage2_g_Atrap.insert(0, 'task', 'stage2 intergated_g')
+            temp_stage2_g_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            # temp_stage2_r_Atrap.insert(0, 'task', 'stage2 intergated_r')
+            # temp_stage2_r_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            # 新增計算
+            temp_stage1_first_Atrap.insert(0, 'task', 'stage1 intergated first half')
+            temp_stage1_first_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            temp_stage1_second_Atrap.insert(0, 'task', 'stage1 intergated second half')
+            temp_stage1_second_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            temp_stage2_g_first_Atrap.insert(0, 'task', 'stage2 intergated_g first half')
+            temp_stage2_g_first_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            temp_stage2_g_second_Atrap.insert(0, 'task', 'stage2 intergated_g second half')
+            temp_stage2_g_second_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            # temp_stage2_r_first_Atrap.insert(0, 'task', 'stage2 intergated_r first half')
+            # temp_stage2_r_first_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            # temp_stage2_r_second_Atrap.insert(0, 'task', 'stage2 intergated_r second half')
+            # temp_stage2_r_second_Atrap.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            # 2.2. 計算移動平均
             moving_process_iMVC = pd.DataFrame(np.empty(np.shape(processing_iMVC)), # 創建資料儲存位置
                                                columns = processing_iMVC.columns)
             moving_process_iMVC.iloc[:, 0] = processing_iMVC.iloc[:, 0] # 定義時間
             for i in range(np.shape(processing_iMVC)[1]-1):
                 moving_process_iMVC.iloc[:, i+1] = processing_iMVC.iloc[:, i+1].rolling(int(0.05*2000)).mean()
-            # 找到兩個stage的最大值
+            # 2.3. 找到兩個stage的最大值
             temp_stage1_max = pd.DataFrame([moving_process_iMVC.iloc[motion_start:leftLeave, :].max()],
                                            columns = moving_process_iMVC.columns)
             temp_stage2_max = pd.DataFrame([moving_process_iMVC.iloc[right_start_g:rightLeave, :].max()],
                                            columns = moving_process_iMVC.columns)
-            # 插入 task 名稱以做區隔
+            # 2024.05.23 新增計算推蹬前期以及推蹬後期
+            temp_stage1_first_max = pd.DataFrame([moving_process_iMVC.iloc[motion_start:stage1_mid, :].max()],
+                                                 columns = moving_process_iMVC.columns)
+            temp_stage1_second_max = pd.DataFrame([moving_process_iMVC.iloc[stage1_mid:leftLeave, :].max()],
+                                                  columns = moving_process_iMVC.columns)
+            temp_stage2_first_max = pd.DataFrame([moving_process_iMVC.iloc[right_start_g:stage2_mid_g, :].max()],
+                                                 columns = moving_process_iMVC.columns)
+            temp_stage2_second_max = pd.DataFrame([moving_process_iMVC.iloc[stage2_mid_g:rightLeave, :].max()],
+                                                  columns = moving_process_iMVC.columns)
+            # 資料儲存, 插入 task 名稱以做區隔
             temp_stage1_max.insert(0, 'task', 'stage1 max')
             temp_stage1_max.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
             temp_stage2_max.insert(0, 'task', 'stage2 max')
             temp_stage2_max.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
-            add_emg_statics = pd.concat([temp_stage1_Atrap, temp_stage2_Atrap,
-                                         temp_stage1_max, temp_stage2_max])
-            # 將資料寫進 EXCEL
+            # 新增資料
+            temp_stage1_first_max.insert(0, 'task', 'stage1 max first half')
+            temp_stage1_first_max.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            temp_stage1_second_max.insert(0, 'task', 'stage1 max second half')
+            temp_stage1_second_max.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            temp_stage2_first_max.insert(0, 'task', 'stage2 max first half')
+            temp_stage2_first_max.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            temp_stage2_second_max.insert(0, 'task', 'stage2 max second half')
+            temp_stage2_second_max.insert(1, 'trial', StagingFile_Exist.loc[file_name, 'EMG_Name'])
+            # 合併計算資料
+            add_emg_statics = pd.concat([temp_stage1_Atrap, temp_stage2_g_Atrap,
+                                         temp_stage1_first_Atrap, temp_stage1_second_Atrap,
+                                         temp_stage2_g_first_Atrap, temp_stage2_g_second_Atrap,
+                                         temp_stage1_max, temp_stage2_max,
+                                         temp_stage1_first_max, temp_stage1_second_max,
+                                         temp_stage2_first_max, temp_stage2_second_max])
+            # 3. 將資料寫進 EXCEL -----------------------------------------------
             save_file_name = os.path.dirname(read_emg.replace("raw_data", "processing_data").replace("motion", "data\\motion")) + \
                 "\\" + StagingFile_Exist.loc[file_name, 'EMG_Name'] + "_ed.xlsx"
             with pd.ExcelWriter(save_file_name) as Writer:
                 processing_iMVC.iloc[motion_start:leftLeave].to_excel(Writer, sheet_name="Stage1", index=False)
                 processing_iMVC.iloc[right_start_g:rightLeave].to_excel(Writer, sheet_name="Stage2_g", index=False)
                 processing_iMVC.iloc[right_start_r:rightLeave].to_excel(Writer, sheet_name="Stage2_r", index=False)
-    
+            
+            # 4. EMG 繪圖 --------------------------------------------------------
             # 設置資料儲存路徑 JPG
             filepath_fig = os.path.dirname(read_emg.replace("raw_data", "processing_data")\
                                            .replace("motion", r"figure\processing\smoothing\motion"))
             save_fig = filepath_fig + "\\" + StagingFile_Exist.loc[file_name, 'EMG_Name'] + "_Bandpass.jpg"
-            # EMG 繪圖
+            # 設定子圖數量
             n = int(math.ceil((np.shape(bandpass_filtered_data)[1] - 1) /2)) + 1
             fig, axs = plt.subplots(n, 2, figsize = ((2*n+1,10)), sharex=False)
             for i in range(np.shape(bandpass_filtered_data)[1]+1):
@@ -631,6 +666,22 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                     axs[xx, yy].axvline(leftLeave/2000, color='r', linestyle='--')
                     axs[xx, yy].axvline(right_start_g/2000, color='c', linestyle='--')
                     axs[xx, yy].axvline(rightLeave/2000, color='c', linestyle='--')
+                    temp_stage1_max = pd.DataFrame([moving_process_iMVC.iloc[motion_start:leftLeave, :].max()],
+                                                   columns = moving_process_iMVC.columns)
+                    temp_stage2_max = pd.DataFrame([moving_process_iMVC.iloc[right_start_g:rightLeave, :].max()],
+                                                   columns = moving_process_iMVC.columns)
+                    """
+                    2024.05.23 目前改到這裡
+                    """
+                    # 2024.05.23 新增計算推蹬前期以及推蹬後期
+                    temp_stage1_first_max = pd.DataFrame([moving_process_iMVC.iloc[motion_start:stage1_mid, :].max()],
+                                                         columns = moving_process_iMVC.columns)
+                    temp_stage1_second_max = pd.DataFrame([moving_process_iMVC.iloc[stage1_mid:leftLeave, :].max()],
+                                                          columns = moving_process_iMVC.columns)
+                    temp_stage2_first_max = pd.DataFrame([moving_process_iMVC.iloc[right_start_g:stage2_mid_g, :].max()],
+                                                         columns = moving_process_iMVC.columns)
+                    temp_stage2_second_max = pd.DataFrame([moving_process_iMVC.iloc[stage2_mid_g:rightLeave, :].max()],
+                                                          columns = moving_process_iMVC.columns)
                     # axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
             # 設定整張圖片之參數
             # plt.suptitle(StagingFile_Exist.loc[file_name, '.anc'] + "_Bandpass", fontsize = 16)
