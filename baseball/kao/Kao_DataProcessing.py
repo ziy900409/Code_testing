@@ -23,8 +23,8 @@ import time
 import numpy
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball\kao")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball\kao")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball\kao")
 import Kao_Function as func
 
 import math
@@ -39,8 +39,8 @@ import logging
 from datetime import datetime
 
 # data path
-# computer_path = r"E:\Hsin\NTSU_lab\data\\"
-computer_path = r"D:\BenQ_Project\python\Kao\\"
+computer_path = r"E:\Hsin\NTSU_lab\data\\"
+# computer_path = r"D:\BenQ_Project\python\Kao\\"
 data_path = computer_path + "EMG\\"
 rawData_folder = "raw_data"
 processingData_folder = "processing_data"
@@ -59,8 +59,8 @@ motion_fig_save = computer_path + "motion_processing\\force_figure\\"
 force_data_save = computer_path + "motion_processing\\force_data\\"
 emg_figure_save = computer_path + "motion_processing\\EMG\\"
 # 定義圖片儲存路徑
-# folder_path = r"E:\Hsin\NTSU_lab\data\\"
-folder_path = r"D:\BenQ_Project\python\Kao\\"
+folder_path = r"E:\Hsin\NTSU_lab\data\\"
+# folder_path = r"D:\BenQ_Project\python\Kao\\"
 # 获取当前日期和时间
 now = datetime.now()
 # 将日期转换为指定格式
@@ -283,7 +283,7 @@ emg_data_table = pd.DataFrame({}, columns = ['task','trial', 'time', 'L RECTUS F
                                              'L GASTROCNEMIUS MEDIAL HEAD: EMG 5', 'R RECTUS FEMORIS: EMG 6',
                                              'R VASTUS LATERALIS: EMG 7', 'R BICEPS FEMORIS: EMG 8',
                                              'R SEMITENDINOSUS: EMG 9', 'R GASTROCNEMIUS MEDIAL HEAD: EMG 10']
-                          )
+                              )
 
 for file_name in range(np.shape(StagingFile_Exist)[0]):
     # 1. 找出 anc, force, emg 的檔案路徑
@@ -631,6 +631,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                 # print(i-1*yy)
                 # print(xx ,yy)
                 if xx == 0 and yy == 0:
+                    # 繪製左腳力版圖
                     axs[xx, yy].plot(left_lowpass.iloc[time_start-2500:rightLeg_off + right_time+1250, 0],
                                      combin_left[time_start-2500:rightLeg_off + right_time+1250])
                     axs[xx, yy].axvline(time_TriggerOff*10, color='red', linestyle='--') # trigger off
@@ -666,23 +667,28 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                     axs[xx, yy].axvline(leftLeave/2000, color='r', linestyle='--')
                     axs[xx, yy].axvline(right_start_g/2000, color='c', linestyle='--')
                     axs[xx, yy].axvline(rightLeave/2000, color='c', linestyle='--')
-                    temp_stage1_max = pd.DataFrame([moving_process_iMVC.iloc[motion_start:leftLeave, :].max()],
-                                                   columns = moving_process_iMVC.columns)
-                    temp_stage2_max = pd.DataFrame([moving_process_iMVC.iloc[right_start_g:rightLeave, :].max()],
-                                                   columns = moving_process_iMVC.columns)
+                    axs[xx, yy].axvline(stage1_mid/2000, color='lightcoral', linestyle='--')
+                    axs[xx, yy].axvline(stage2_mid_g/2000, color='lightskyblue', linestyle='--')
+
                     """
                     2024.05.23 目前改到這裡
                     """
-                    # 2024.05.23 新增計算推蹬前期以及推蹬後期
-                    temp_stage1_first_max = pd.DataFrame([moving_process_iMVC.iloc[motion_start:stage1_mid, :].max()],
-                                                         columns = moving_process_iMVC.columns)
-                    temp_stage1_second_max = pd.DataFrame([moving_process_iMVC.iloc[stage1_mid:leftLeave, :].max()],
-                                                          columns = moving_process_iMVC.columns)
-                    temp_stage2_first_max = pd.DataFrame([moving_process_iMVC.iloc[right_start_g:stage2_mid_g, :].max()],
-                                                         columns = moving_process_iMVC.columns)
-                    temp_stage2_second_max = pd.DataFrame([moving_process_iMVC.iloc[stage2_mid_g:rightLeave, :].max()],
-                                                          columns = moving_process_iMVC.columns)
-                    # axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+                    # 2024.05.23 新增, 將每個階段找到的最大值圈起來
+                    if len(processing_iMVC) != 0:
+                        axs[xx, yy].plot(processing_iMVC.iloc[processing_iMVC.iloc[motion_start:stage1_mid, i-1*yy].idxmax(), 0],
+                                         processing_iMVC.iloc[motion_start:stage1_mid, i-1*yy].max(), # 右腳力版最大值
+                                         marker = 'o', ms = 10, mec='b', mfc='none')
+                        axs[xx, yy].plot(processing_iMVC.iloc[processing_iMVC.iloc[stage1_mid:leftLeave, i-1*yy].idxmax(), 0],
+                                         processing_iMVC.iloc[stage1_mid:leftLeave, i-1*yy].max(), # 右腳力版最大值
+                                         marker = 'o', ms = 10, mec='b', mfc='none')
+                        axs[xx, yy].plot(processing_iMVC.iloc[processing_iMVC.iloc[right_start_g:stage2_mid_g, i-1*yy].idxmax(), 0],
+                                         processing_iMVC.iloc[right_start_g:stage2_mid_g, i-1*yy].max(), # 右腳力版最大值
+                                         marker = 'o', ms = 10, mec='b', mfc='none')
+                        axs[xx, yy].plot(processing_iMVC.iloc[processing_iMVC.iloc[stage2_mid_g:rightLeave, i-1*yy].idxmax(), 0],
+                                         processing_iMVC.iloc[stage2_mid_g:rightLeave, i-1*yy].max(), # 右腳力版最大值
+                                         marker = 'o', ms = 10, mec='b', mfc='none')
+                        
+                    axs[xx, yy].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
             # 設定整張圖片之參數
             # plt.suptitle(StagingFile_Exist.loc[file_name, '.anc'] + "_Bandpass", fontsize = 16)
             plt.suptitle(StagingFile_Exist.loc[file_name, ".anc"] + '\n' 
