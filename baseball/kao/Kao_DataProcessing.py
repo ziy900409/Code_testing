@@ -674,7 +674,7 @@ for file_name in range(np.shape(StagingFile_Exist)[0]):
                     2024.05.23 目前改到這裡
                     """
                     # 2024.05.23 新增, 將每個階段找到的最大值圈起來
-                    if len(processing_iMVC) != 0:
+                    if len(processing_iMVC.iloc[motion_start:stage1_mid, i-1*yy]) != 0:
                         axs[xx, yy].plot(processing_iMVC.iloc[processing_iMVC.iloc[motion_start:stage1_mid, i-1*yy].idxmax(), 0],
                                          processing_iMVC.iloc[motion_start:stage1_mid, i-1*yy].max(), # 右腳力版最大值
                                          marker = 'o', ms = 10, mec='b', mfc='none')
