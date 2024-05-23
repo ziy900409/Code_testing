@@ -182,7 +182,7 @@ sampling_interval = 10  # 每10毫秒採樣一次
 next_sample_time = pygame.time.get_ticks() + sampling_interval
 # 設定不同難度
 # 定义周围圆的数量
-num_surrounding_circles = 14
+num_surrounding_circles = 16
 # 設定多個不同難度的測試
 tests = [
     {"surrounding_circle_radius": 40, 'target_amplitudes': 200}
