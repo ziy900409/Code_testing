@@ -3,11 +3,10 @@
 待處理功能：
 
 1. 自動產生檔案
-    1.1. 是否可以自行輸入?
+    1.1. 是否可以自行輸入? UI?
     1.2. 輸出檔案自動產生
-3. 設定不同難度問題
-    3.1. 不同難度應該隨機出現
 
+2. 所有難度的測試都應該要從滑鼠按下去"中心圓"才開始
 ------------
 
 程式架構
@@ -69,6 +68,9 @@
    判斷是否為成功的 trail
    例如： MOUSEBUTTONDOWN = MOUSEBUTTONUP_SUCC + MOUSEBUTTONUP_FAIL
 
+7. 設定不同難度問題
+    7.1. 不同難度應該隨機出現
+
 @author: Hsin.YH.Yang, written by May 02 2024
 """
 # %% import library
@@ -77,6 +79,7 @@ import sys
 import math
 import csv
 import numpy as np
+import random
 # %%
 def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, circle_radius):
     """
@@ -152,8 +155,6 @@ def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, circle_radius):
     return edge_point
 # %% 基礎參數設定及初始化
 # ------------基本受測資料------------------------
-Amplitudes = [400, 800]
-Widths = [40, 80]
 Participant = "S01"
 Condition = "S2"
 Block = "01"
@@ -185,8 +186,8 @@ next_sample_time = pygame.time.get_ticks() + sampling_interval
 num_surrounding_circles = 16
 # 設定多個不同難度的測試
 tests = [
-    {"surrounding_circle_radius": 40, 'target_amplitudes': 200}
-    , {"surrounding_circle_radius": 20, 'target_amplitudes': 100}
+    {"surrounding_circle_radius": 40, 'target_amplitudes': 200},
+    {"surrounding_circle_radius": 20, 'target_amplitudes': 150}
 ]
 
 # 保存所有可能的組合
@@ -199,7 +200,8 @@ for radius_info in tests:
         amplitude = amplitude_info['target_amplitudes']
         # 將此組合添加到所有組合列表中
         all_combinations.append({"surrounding_circle_radius": radius, "target_amplitudes": amplitude})
-     
+
+random.shuffle(all_combinations)
 # 當前測試索引
 current_test_index = 0
 # 選擇第一個測試
@@ -210,8 +212,8 @@ pygame.init()
 
 # 设置窗口大小和标题
 infoObject = pygame.display.Info()
-WINDOW_WIDTH = infoObject.current_w*0.85
-WINDOW_HEIGHT = infoObject.current_h*0.85
+WINDOW_WIDTH = infoObject.current_w
+WINDOW_HEIGHT = infoObject.current_h
 window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption('Drag and Drop to Finish Test')
 
@@ -383,7 +385,7 @@ while True:
             circle_y = all_combinations[current_test_index]['circle_y']
         else:
             # 將滑鼠軌跡和事件資料寫入 CSV 檔案
-            with open(r'D:\BenQ_Project\FittsDragDropTest\mouse_data.csv', mode='w', newline='') as file:
+            with open(r'D:\BenQ_Project\FittsDragDropTest\mouse_data_2.csv', mode='w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(['Participant', 'Condition', 'Block',
                                   'Sequence', 'Trial',
