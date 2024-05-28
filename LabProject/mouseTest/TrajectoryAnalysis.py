@@ -30,86 +30,17 @@ import pandas as pd
 import json
 import math
 from statsmodels.stats.diagnostic import lilliefors # 進行常態分佈檢定
+import sys
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest ")
+import Analysis_function_v1 as func
 
-# %%
+
+# %% 初始參數定義
 raw_data = pd.read_csv(r"D:\BenQ_Project\FittsDragDropTest\mouse_data.csv")
+select_cir_radius_ratio = 0.6
 
-# 設定儲存格式
-# %%
-def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, circle_radius):
-    """
-    计算中心圆与边界圆之间的边界点坐标.
+# %%設定儲存格式
 
-    Parameters
-    ----------
-    circle_x : float
-        中心圆的 x 坐标.
-    circle_y : float
-        中心圆的 y 坐标.
-    edge_cir_x : float
-        边界圆的 x 坐标.
-    edge_cir_y : float
-        边界圆的 y 坐标.
-    circle_radius : float
-        中心圆的半径.
-
-    Returns
-    -------
-    edge_point : list
-        边界点的坐标 [x, y].
-
-    """
-    # 计算距离
-    distance = np.sqrt((circle_x - edge_cir_x) ** 2 + (circle_y - edge_cir_y) ** 2)
-    sin_angle = abs(circle_y - edge_cir_y) \
-                    / np.sqrt((circle_x - edge_cir_x)**2 + (circle_y - edge_cir_y)**2)
-    cos_angle = abs(circle_x - edge_cir_x) \
-                    / np.sqrt((circle_x - edge_cir_x)**2 + (circle_y - edge_cir_y)**2)
-    default_edge_point = [circle_x, circle_y]
-    # 确保距离不为零，避免除以零错误
-    if distance == 0:
-        # 在这里添加处理方式，例如返回一个默认角度值或者设置一个很小的距离值
-        return default_edge_point
-    # 根据中心圆与边界圆的位置关系计算边界点的位置
-    # 第一象限
-    if circle_x - edge_cir_x > 0 and circle_y - edge_cir_y > 0:
-        edge_point = [(circle_x + circle_radius*cos_angle),
-                    (circle_y + circle_radius*sin_angle)]
-    # 第二象限
-    elif circle_x - edge_cir_x < 0 and circle_y - edge_cir_y > 0:
-        edge_point = [(circle_x - circle_radius*cos_angle),
-                    (circle_y + circle_radius*sin_angle)]
-    # 第三象限
-    elif circle_x - edge_cir_x < 0 and circle_y - edge_cir_y < 0:
-        edge_point = [(circle_x - circle_radius*cos_angle),
-                    (circle_y - circle_radius*sin_angle)]
-    # 第四象限
-    elif circle_x - edge_cir_x > 0 and circle_y - edge_cir_y < 0:
-        edge_point = [(circle_x + circle_radius*cos_angle),
-                    (circle_y - circle_radius*sin_angle)]
-    # 如果躺在X軸上
-    elif circle_y - edge_cir_y == 0:
-    # 在周圍圓的右側
-        if circle_x - edge_cir_x > 0:
-            edge_point = [(circle_x + circle_radius),
-                         (circle_y)]
-        # 在周圍圓的左側
-        elif circle_x - edge_cir_x < 0:
-                 edge_point = [(circle_x - circle_radius),
-                              (circle_y)]
-    # 如果躺在Y軸上
-    elif circle_x - edge_cir_x == 0:
-        # 在周圍圓的上方
-        if circle_y - edge_cir_y > 0:
-            edge_point = [(circle_x),
-                        (circle_y + circle_radius)]
-        # 在周圍圓的下方
-        elif circle_y - edge_cir_y < 0:
-             edge_point = [(circle_x),
-                             (circle_y - circle_radius)]
-    return edge_point
-
-# %%
 """
 purpose: 找出所有 trail by trail 的順序及路徑
 
@@ -127,33 +58,16 @@ for column in raw_data.columns:
         duplicate_counts = duplicated_values.value_counts().to_dict()
         duplicate_info[column] = duplicate_counts
 
-# print("每個欄位的重複值及其數量:")
-# print(duplicate_info)
-# duplicate_info['Event']
-
-# duplicate_info['Participant'].keys()
-
-# duplicate_info['Condition']
-
-# duplicate_info['Block']
-# # 不同難度
-# duplicate_info['Sequence']
-
-# duplicate_info['Trial']
-# duplicate_info["Amplitudes"]
-# duplicate_info["Width"]
-
-
 # 創建 sd1 表格包含 Amplitudes * Width * Trial, 格式為 pandas.DataFrame
 sd1_table = pd.DataFrame({},
-                         columns = ["Participant", "Condition", "Session", "Group", "Block",
+                         columns = ["Participant", "Condition", "Block",
                                     "Trial", "A", "W", "Ae", "dx", "PT(ms)", "ST(ms)", "MT(ms)",
                                     "Errors", "TRE", "TAC", "MDC", "ODC", "MV", "ME", "MO"]
                          )
 # 創建 sd2 表格包含 Amplitudes * Width
 sd2_table = pd.DataFrame({},
-                         columns = ["Participant", "Condition", "Session", "Group", "Block",
-                                    "Trial", "ID", "A", "W", "Ae", "We", "IDe(bits)", "PT(ms)",
+                         columns = ["Participant", "Condition", "Block",
+                                    "Trial", "A", "W", "Ae", "We", "IDe(bits)", "PT(ms)",
                                     "ST(ms)", "MT(ms)", "ER(%)", "TP(bps)", "TRE", "TAC", "MDC",
                                     "ODC", "MV", "ME", "MO"]
                          )
@@ -192,20 +106,6 @@ trial_info.remove(14)
 amplitude_info = sorted([int(key) for key in duplicate_info["Amplitudes"].keys()])
 width_info = sorted([int(key) for key in duplicate_info["Width"].keys()])
 
-
-# 更新 sd1, sd2 表格的基本資料
-for i in range(len(duplicate_info["Amplitudes"])):
-    for ii in range(len(duplicate_info["Width"])):
-        for iii in range(len(duplicate_info['Trial'])-1):
-            idx = i*len(trial_info)*len(width_info) + ii*len(trial_info) + iii 
-            print(i, ii, idx)
-            # 將任務條件輸入至表格
-            sd1_table.loc[idx, "Participant"] = list(duplicate_info['Participant'].keys())[0] # 受試者
-            sd1_table.loc[idx, "Condition"] = list(duplicate_info['Condition'].keys())[0] # 不同條件
-            sd1_table.loc[idx, "Block"] = list(duplicate_info['Block'].keys())[0] # 第幾次測試
-            sd1_table.loc[idx, "A"] = amplitude_info[i]
-            sd1_table.loc[idx, "W"] = width_info[ii]
-            sd1_table.loc[idx, "Trial"] = trial_info[iii]
 # %%
 # 找出每筆 trial, 數量為 Amplitudes * Width * Trial, 並依照 time 作排列
 for i in range(len(duplicate_info["Amplitudes"])):
@@ -280,136 +180,177 @@ for i in range(len(duplicate_info["Amplitudes"])):
             sd3_data_format["{t_x_y}"]["x"].append(raw_data["Pos_x"][matched_indices])
             sd3_data_format["{t_x_y}"]["y"].append(raw_data["Pos_y"][matched_indices])
 
-# %% 計算資料
-"""
-pygame.time.get_ticks() 單位為毫秒
-1. 先獲取計算 sd2 參數所需要的數值
-    1.1. https://www.yorku.ca/mack/FittsLawSoftware/doc/Throughput.html
-2. 計算參數: Ae, We, IDe(bits), PT(ms), ST(ms), MT(ms), ER(%),  Skewness, Kurtosis
-
-
-"""
-# Target Re-entry (TRE). 
-# If the pointer enters the target region, leaves, 
-# then re-enters the target region, then target re-entry (TRE ) occurs. 
-# If this behaviour is recorded twice in a sequence of ten trials, TRE is reported as 0.2 per trial
 
 # %% 計算 sd1 table 所需參數
-"""
-2024.05.24 改到這裡
-"""
+
 for i in range(len(sd3_data_format["task"]["Trial"])):
-    # 3. 計算 Movement Variability ----------------------------------------
-    # 3.1. Target Re-entry (TRE)
-    edge_cir_x = sd3_data_format["task"]["to_x"][i] + sd3_data_format["task"]["W"][i]
-    edge_cir_y = sd3_data_format["task"]["to_y"][i] + sd3_data_format["task"]["W"][i]
-    # 需要定義每個 trial 游標移動的位置
+    # 1. 基本數據定義 ---------------------------------------------------------
+    # 1.1. 目標圓心
+    edge_cir_x = sd3_data_format["task"]["to_x"][i] 
+    edge_cir_y = sd3_data_format["task"]["to_y"][i] 
+    # 1.2. 游標初始位置, 需要定義每個 trial 游標移動的位置
     pointer_pos = pd.DataFrame({"x": sd3_data_format["{t_x_y}"]["x"][i].values,
-                                "y" :sd3_data_format["{t_x_y}"]["y"][i].values})
-    distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
-    # 距離必須小於周圍圓的半徑
-    if distance <= surrounding_circle_radius:
-        print(0)
-
-
-# %% 計算 sd2 table 所需參數
-
-# 0. 定義表格: 欄位名稱 xFrom, yFrom, xTo, yTo, xSelect, ySelect, MT -----------
-sd2_calcu = pd.DataFrame({},
-                         columns=["A", "W", "Trial", "xFrom", "yFrom", "xTo", "yTo",
-                                  "xSelect", "ySelect", "MT",
-                                  "a", "b", "c", "dx", "Ae_indi",
-                                  "Errors"]
-                         )
-
-# 1. 先獲取計算 sd2 參數所需要的數值 --------------------------------------------
-# 將資料格式轉為 numpy int, float
-sd2_calcu.loc[:, "A"] = np.array(sd3_data_format["task"]["A"], dtype=int)
-sd2_calcu.loc[:, "W"] = np.array(sd3_data_format["task"]["W"], dtype=int)
-sd2_calcu.loc[:, "Trial"] = np.array(sd3_data_format["task"]["Trial"], dtype=int)
-sd2_calcu.loc[:, "xFrom"] = np.array(sd3_data_format["task"]["from_x"], dtype=int)
-sd2_calcu.loc[:, "yFrom"] = np.array(sd3_data_format["task"]["from_y"], dtype=int)
-sd2_calcu.loc[:, "xTo"] = np.array(sd3_data_format["task"]["to_x"], dtype=int)
-sd2_calcu.loc[:, "yTo"] = np.array(sd3_data_format["task"]["to_y"], dtype=int)
-sd2_calcu.loc[:, "xSelect"] = np.array(sd3_data_format["task"]["select_x"], dtype=int)
-sd2_calcu.loc[:, "ySelect"] = np.array(sd3_data_format["task"]["select_y"], dtype=int)
-sd2_calcu.loc[:, "MT"] = np.array(sd3_data_format["task"]["MT"], dtype=int)
-sd2_calcu.loc[:, "Errors"] = np.array(sd3_data_format["task"]["Errors"], dtype=str)
-# 計算 a, b, c, dx
-# double a = Math.hypot(x1 - x2, y1 - y2)
-# double b = Math.hypot(x - x2, y - y2)
-# double c = Math.hypot(x1 - x, y1 - y)
-# double dx = (c * c - b * b - a * a) / (2.0 * a)
-a, b, c, dx = [], [], [], []
-Ae_indi = []
-for i in range(len(sd2_calcu.loc[:, "xTo"])):
-    temp_a = math.hypot((sd2_calcu.loc[i, "xTo"] - sd2_calcu.loc[i, "xFrom"]),
-                        (sd2_calcu.loc[i, "yTo"] - sd2_calcu.loc[i, "yFrom"]))
-    temp_b = math.hypot((sd2_calcu.loc[i, "xSelect"] - sd2_calcu.loc[i, "xTo"]),
-                        (sd2_calcu.loc[i, "ySelect"] - sd2_calcu.loc[i, "yTo"]))
-    temp_c = math.hypot((sd2_calcu.loc[i, "xSelect"] - sd2_calcu.loc[i, "xFrom"]),
-                        (sd2_calcu.loc[i, "ySelect"] - sd2_calcu.loc[i, "yFrom"]))
+                                "y": sd3_data_format["{t_x_y}"]["y"][i].values,
+                                "t": sd3_data_format["{t_x_y}"]["t"][i].values})
+    
+    # 2. 數據計算 -------------------------------------------------------------
+    # 2.0. 判斷該次 trail 是否成功
+    if sd3_data_format["task"]["Errors"][i] == 'MOUSEBUTTONUP_SUCC':
+        trial_Errors = 0
+    else:
+        trial_Errors = 1
+    # 2.1. 初始參數: a, b, c, dx, Ae
+    temp_a = math.hypot((sd3_data_format["task"]["to_x"][i] - sd3_data_format["task"]["from_x"][i]),
+                        (sd3_data_format["task"]["to_y"][i] - sd3_data_format["task"]["from_y"][i]))
+    temp_b = math.hypot((sd3_data_format["task"]["select_x"][i] - sd3_data_format["task"]["to_x"][i]),
+                        (sd3_data_format["task"]["select_y"][i] - sd3_data_format["task"]["to_y"][i]))
+    temp_c = math.hypot((sd3_data_format["task"]["select_x"][i] - sd3_data_format["task"]["from_x"][i]),
+                        (sd3_data_format["task"]["select_y"][i] - sd3_data_format["task"]["from_y"][i]))
     temp_dx = (temp_c * temp_c - temp_b * temp_b - temp_a * temp_a) / (2.0 * temp_a)
-    if sd2_calcu.loc[i, "Trial"] == 1:
+    if sd3_data_format["task"]["Trial"][i] == 1:
         pre_temp_dx = 0
     temp_Ae = temp_a + temp_dx + pre_temp_dx
     pre_temp_dx = (temp_c * temp_c - temp_b * temp_b - temp_a * temp_a) / (2.0 * temp_a)
-    # 將計算得的資料儲存進 list
-    a.append(temp_a)
-    b.append(temp_b)
-    c.append(temp_c)
-    dx.append(temp_dx)
-    Ae_indi.append(temp_Ae)
     
-# 將資料儲存進 table
-sd2_calcu.loc[:, "a"] = a
-sd2_calcu.loc[:, "b"] = b
-sd2_calcu.loc[:, "c"] = c
-sd2_calcu.loc[:, "dx"] = dx
-sd2_calcu.loc[:, "Ae_indi"] = Ae_indi
-# %%
+    # 2.2. PT(ms), ST(ms), MT(ms)
+    # 2.2.1. PT - pointing time (ms): 
+    # 拖曳的圓圈進入邊緣圓圈後開始計算，但是必須扣除被拖曳的圓圈又離開目標圓圈的時間，
+    # 因此只計算最後一次進入目標圓圈的時間
+    # 方法：計算中心圓與邊界圓之間的邊界點座標，距離必須小於周圍圓的半徑
+    in_edge_cir = []
+    for pos in range(len(pointer_pos)):
+        edge_point = func.edge_calculate(pointer_pos.loc[pos, 'x'], pointer_pos.loc[pos, 'y'], # 拖曳圓圈的圓心位置
+                                    edge_cir_x, edge_cir_y, # 周圍圓圈的圓心位置
+                                    sd3_data_format["task"]["W"][i]*select_cir_radius_ratio) # 拖曳圓圈的半徑
+        distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
+        if distance <= sd3_data_format["task"]["W"][i]:
+            in_edge_cir.append(True)
+        else:
+            in_edge_cir.append(False)
+    # 找出第一個 Fasle 的位置
+    for first_False in range(len(in_edge_cir) - 1, -1, -1):
+        if not in_edge_cir[first_False]:
+            False_idx = first_False
+            break
+    PT = pointer_pos.loc[False_idx, 't'] - pointer_pos.loc[0, 't']
+    # 2.2.2. selection time (ms) - the time the button is down
+    ST = pointer_pos.loc[len(pointer_pos)-1, 't'] - pointer_pos.loc[False_idx, 't']
+    # 2.2.3. movement time (ms) - Note: MT = PT + ST
+    MT = pointer_pos.loc[len(pointer_pos)-1, 't'] - pointer_pos.loc[0, 't']
+    
+    # 3. 計算 Movement Variability --------------------------------------------
+    # 3.1. Target Re-entry (TRE)
+    # If the pointer enters the target region, leaves, 
+    # then re-enters the target region, then target re-entry (TRE ) occurs. 
+    TRE = func.find_true_indices_and_check_continuity(in_edge_cir)
+    # 3.2. Task Axis Crossing (TAC)
+    # 定義 from -> to 的連線
+    from_to_line = pd.DataFrame(np.zeros([len(pointer_pos), 2]),
+                                columns = ["x", "y"])
+    for idx in range(len(pointer_pos)):
+        slope = (sd3_data_format["task"]["to_y"][i] - sd3_data_format["task"]["from_y"][i]) / \
+            (len(pointer_pos) -1)
+            
+        from_to_line.loc[idx, "x"] = sd3_data_format["task"]["from_x"][i] + \
+            (idx)*((sd3_data_format["task"]["to_x"][i] - sd3_data_format["task"]["from_x"][i])/(len(pointer_pos)-1))
+  
+        from_to_line.loc[idx, "y"] = slope * (idx) + sd3_data_format["task"]["from_y"][i]
 
-# 2. 計算參數 -----------------------------------------------------------------
-# 一組難度只會計算一次
-# 計算 Ae, We, IDe(bits), PT(ms), ST(ms), MT(ms), ER(%),  Skewness, Kurtosis
+    # 找出數列中是有有數字跨過 from -> to 的連線，判定數據在連線位置的上下
+    TAC_list = []
+    for idx in range(len(pointer_pos)):
+        # 如果在連線位置的上方，給 1
+        if pointer_pos.loc[idx, "y"] >= from_to_line.loc[idx, "y"]:
+            TAC_list.append(1)
+        # 如果在連線位置的上方，給 -1
+        else:
+            TAC_list.append(-1)
+    TAC = func.count_sign_changes(TAC_list)
+    # 3.3. Movement Direction Change (MDC) and Orthogonal Direction Change (ODC)
+    # 判斷是否有方向改變，使用速度做判斷
+    vel_pointer = pointer_pos.loc[:len(pointer_pos)-2, ["x", "y"]].values - \
+        pointer_pos.loc[1:, ["x", "y"]].values
+    MDC_list = []
+    ODC_list = []
+    for idx in range(len(vel_pointer)):
+        # 利用是否跨過 X 軸做判斷
+        if vel_pointer[idx, 1] >= 0:
+            MDC_list.append(1)
+        else:
+            MDC_list.append(-1)
+        # 利用是否跨過 Y 軸做判斷
+        if vel_pointer[idx, 0] >= 0:
+            ODC_list.append(1)
+        else:
+            ODC_list.append(-1)
+    MDC = func.count_sign_changes(MDC_list)
+    ODC = func.count_sign_changes(ODC_list)
+    # 3.4. Movement Variability (MV): sqrt(sum(yi-y)**2/n-1)
+    # Assuming the task axis is y = 0
+    MV_vector = pointer_pos.loc[:, "y"].values - from_to_line.loc[:, "y"]
+    MV = np.sqrt(np.sum((MV_vector - np.mean(MV_vector))**2)/ \
+                 (len(pointer_pos.loc[:, "y"]) - 1))
+    # 3.5. Movement Error (ME): sum(abs(yi))/n
+    ME = np.sum(abs(MV_vector))/len(pointer_pos.loc[:, "y"])
+    # 3.6. Movement offset (MO) is the mean deviation of sample points from the task axis.
+    MO = np.mean(MV_vector)
+    
+    # 4. 將任務條件及計算資料輸入至表格 ----------------------------------------
+    
+    # trial info
+    sd1_table.loc[i, "Participant"] = sd3_data_format["info"]["participants"][i] # 受試者
+    sd1_table.loc[i, "Condition"] = sd3_data_format["info"]["condition"][i] # 不同條件
+    sd1_table.loc[i, "Block"] =  sd3_data_format["info"]["blocks"][i] # 第幾次測試
+    sd1_table.loc[i, "A"] = sd3_data_format["task"]["A"][i]
+    sd1_table.loc[i, "W"] = sd3_data_format["task"]["W"][i]
+    sd1_table.loc[i, "Trial"] = sd3_data_format["task"]["Trial"][i]
+    
+    # calculate data
+    sd1_table.loc[i, "Ae"] = temp_Ae
+    sd1_table.loc[i, "dx"] = pre_temp_dx
+    sd1_table.loc[i, "PT(ms)"] = PT
+    sd1_table.loc[i, "ST(ms)"] = ST
+    sd1_table.loc[i, "MT(ms)"] = MT
+    sd1_table.loc[i, "Errors"] = trial_Errors
+    
+    sd1_table.loc[i, "TRE"] = TRE
+    sd1_table.loc[i, "TAC"] = TAC
+    sd1_table.loc[i, "MDC"] = MDC
+    sd1_table.loc[i, "ODC"] = ODC
+    sd1_table.loc[i, "MV"] = MV
+    sd1_table.loc[i, "ME"] = ME
+    sd1_table.loc[i, "MO"] = MO
+    
+# %% 計算 sd2 table 所需參數, 使用 sd1 table 做計算
 
-# sd2 table 範本
-# 創建 sd2 表格包含 Amplitudes * Width
-sd2_table = pd.DataFrame({},
-                         columns = ["Participant", "Condition", "Session", "Group", "Block",
-                                    "Trial", "ID", "A", "W", "Ae", "We", "IDe(bits)", "PT(ms)",
-                                    "ST(ms)", "MT(ms)", "ER(%)", "TP(bps)", "TRE", "TAC", "MDC",
-                                    "ODC", "MV", "ME", "MO",
-                                    "Is_normal"]
-                         )
+# 0. 定義表格: 欄位名稱 xFrom, yFrom, xTo, yTo, xSelect, ySelect, MT -----------
 
-
-
-# 找出每個欄位的重複值及其數量
-for column in sd2_calcu.loc[:, ["A", "W"]]:
-    duplicated_values = sd2_calcu[column][sd2_calcu[column].duplicated()]
+for column in sd1_table.loc[:, ["A", "W"]]:
+    duplicated_values = sd1_table[column][sd1_table[column].duplicated()]
     if not duplicated_values.empty:
         duplicate_counts = duplicated_values.value_counts().to_dict()
         duplicate_info[column] = duplicate_counts
 # 定義 A, W 各自的值
-A_cond = duplicate_info["A"].keys()
-W_cond = duplicate_info["W"].keys()
+A_cond = list(duplicate_info["A"].keys())
+W_cond = list(duplicate_info["W"].keys())
 
-for a_indi in A_cond:
-    for w_indi in W_cond:
+for a_indi in range(len(A_cond)):
+    for w_indi in range(len(W_cond)):
+        i = a_indi*len(W_cond) + w_indi
+        print(i)
         condition = (
-            (sd2_calcu.loc[:, "A"] == a_indi) &
-            (sd2_calcu.loc[:, "W"] == w_indi)
-            )
-        matched_indices = sd2_calcu.index[condition].tolist()
-        sd2_calcu.loc[matched_indices, "Trial"]
+                    (sd1_table.loc[:, "A"] == A_cond[a_indi]) &
+                    (sd1_table.loc[:, "W"] == W_cond[w_indi])
+                    )
+        matched_indices = sd1_table.index[condition].tolist()
+        # sd1_table.loc[matched_indices, "Trial"]
 
         # 1. 計算數據基本定義 -------------------------------------------------
-        data = sd2_calcu.loc[matched_indices, "dx"].astype(float)
+        data = sd1_table.loc[matched_indices, "dx"].astype(float)
         n = len(data)
         # 2. 統計參數計算 -----------------------------------------------------
-        mean_x = np.mean(sd2_calcu.loc[matched_indices, "dx"])
-        std_x = np.std(sd2_calcu.loc[matched_indices, "dx"])
+        mean_x = np.mean(sd1_table.loc[matched_indices, "dx"])
+        std_x = np.std(sd1_table.loc[matched_indices, "dx"])
         # calculate kurtosis
         kurtosis = (n*(n+1) / ((n-1)*(n-2)*(n-3))) * np.sum(((data - mean_x) / std_x)**4) \
             - (3*(n-1)**2 / ((n-2)*(n-3)))
@@ -425,36 +366,54 @@ for a_indi in A_cond:
             is_normal = "False"
         # 計算 Ae, We, IDe(bits), MT, TP
         We = 4.133 * std_x # 計算 We = 4.133 × SDx
-        Ae = np.mean(sd2_calcu.loc[matched_indices, "Ae_indi"]) # 計算 Ae
+        Ae = np.mean(sd1_table.loc[matched_indices, "Ae"]) # 計算 Ae
         IDe = math.log2(Ae/We + 1) # IDe = log2(Ae / We + 1)
-        MT = np.mean(sd2_calcu.loc[matched_indices, "MT"])
-        TP = IDe / MT # thoughput
+        MT = np.mean(sd1_table.loc[matched_indices, "MT(ms)"])
+        TP = IDe / MT * 1000 # thoughput
+        # 計算 PT(ms), ST(ms) 的平均
+        PT = np.mean(sd1_table.loc[matched_indices, "PT(ms)"])
+        ST = np.mean(sd1_table.loc[matched_indices, "ST(ms)"])
         # 計算 Errors: 計算 MOUSEBUTTONUP_FAIL 的數量，並除以資料長度
-        Errors = sd2_calcu.loc[matched_indices, "Errors"].value_counts()["MOUSEBUTTONUP_FAIL"] / n
-
+        Errors = sd1_table.loc[matched_indices, "Errors"].value_counts()[1] / n * 100
+        # 計算 TRE, TAC, MDC, ODC, MV, ME, MO 的平均值
+        TRE = np.mean(sd1_table.loc[matched_indices, "TRE"])
+        TAC = np.mean(sd1_table.loc[matched_indices, "TAC"])
+        MDC = np.mean(sd1_table.loc[matched_indices, "MDC"])
+        ODC = np.mean(sd1_table.loc[matched_indices, "ODC"])
+        MV = np.mean(sd1_table.loc[matched_indices, "MV"])
+        ME = np.mean(sd1_table.loc[matched_indices, "ME"])
+        MO = np.mean(sd1_table.loc[matched_indices, "MO"])
         
+        # 4. 將任務條件及計算資料輸入至表格 ----------------------------------------
+        # trial info
+        sd2_table.loc[i, "Participant"] = sd1_table.loc[matched_indices[0], "Participant"] # 受試者
+        sd2_table.loc[i, "Condition"] = sd1_table.loc[matched_indices[0], "Condition"] # 不同條件
+        sd2_table.loc[i, "Block"] =  sd1_table.loc[matched_indices[0], "Block"] # 第幾次測試
+        sd2_table.loc[i, "A"] = sd1_table.loc[matched_indices[0], "A"]
+        sd2_table.loc[i, "W"] = sd1_table.loc[matched_indices[0], "W"]
+        sd2_table.loc[i, "Trial"] = sd1_table.loc[matched_indices[0], "Trial"]
+        
+        # calculate data
+        sd2_table.loc[i, "Ae"] = Ae
+        sd2_table.loc[i, "We"] = We
+        sd2_table.loc[i, "IDe(bits)"] = IDe     
+        sd2_table.loc[i, "PT(ms)"] = PT
+        sd2_table.loc[i, "ST(ms)"] = ST
+        sd2_table.loc[i, "MT(ms)"] = MT
+        sd2_table.loc[i, "ER(%)"] = Errors
+        sd2_table.loc[i, "TP(bps)"] = TP
+        
+        sd2_table.loc[i, "TRE"] = TRE
+        sd2_table.loc[i, "TAC"] = TAC
+        sd2_table.loc[i, "MDC"] = MDC
+        sd2_table.loc[i, "ODC"] = ODC
+        sd2_table.loc[i, "MV"] = MV
+        sd2_table.loc[i, "ME"] = ME
+        sd2_table.loc[i, "MO"] = MO
+
+# %% sd3 輸出 csv?
+
             
-            
-
-
-
-
-# values_A = sd3_data_format["task"]["A"]
-# values_W = sd3_data_format["task"]["W"]
-# indices = [index for index, (value_A, value_W) in enumerate(zip(values_A, values_W)) if value_A == 400 and value_W == 20]
-# print(indices)
-# sd3_data_format["task"]["A"] == 250
-# # 1. Throughput 
-# # mt: The movement times (ms) for each trial
-# mt = sd3_data_format["{t_x_y}"]["t"][0].values[-1] - sd3_data_format["{t_x_y}"]["t"][0].values[0]
-# amplitude = sd3_data_format["task"]["A"]
-# width = sd3_data_format["task"]["W"]
-# # mouse_from: The specified starting coordinates for each trial (center of the "from" target)
-# mouse_from = [sd3_data_format["task"]["from_x"][0], sd3_data_format["task"]["from_y"][0]]
-# # mouse_to: The specified ending coordinates for each trial (center of the "to" target)
-# moouse_to = [sd3_data_format["{t_x_y}"]["x"][0].values[-1], sd3_data_format["{t_x_y}"]["y"][0].values[-1]]
-# # mouse_select: The coordinates of selection where each trial was terminated
-# mouse_select = [sd3_data_format["task"]["to_x"][0], sd3_data_format["task"]["to_y"][0]]
 
      
 
