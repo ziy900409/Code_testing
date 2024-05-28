@@ -412,6 +412,28 @@ for a_indi in range(len(A_cond)):
         sd2_table.loc[i, "MO"] = MO
 
 # %% sd3 輸出 csv?
+import csv
+
+# 假設 A_cond 是一個字典，其中值是列表
+A_cond = sd3_data_format
+
+# 打開一個新的 CSV 文件進行寫入
+with open(r'D:\BenQ_Project\FittsDragDropTest\output.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    
+    # 找到最長的列表長度
+    max_length = max(len(values) for values in A_cond.values())
+    
+    # 寫入標題行
+    header = ['Key'] + [f'Value_{i}' for i in range(1, max_length + 1)]
+    writer.writerow(header)
+    
+    # 寫入每一行的字典條目
+    for key, values in A_cond.items():
+        row = [key] + values
+        # 填充空缺值
+        row.extend([''] * (max_length - len(values)))
+        writer.writerow(row)
 
             
 
