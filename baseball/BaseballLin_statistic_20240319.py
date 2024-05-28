@@ -8,21 +8,21 @@ Created on Tue Mar 19 15:04:47 2024
 import pandas as pd
 import os
 import sys
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 # %% 0. parameter estting
-# folder_path = r"E:\Hsin\NTSU_lab\Baseball\Processing_Data"
-folder_path = r"D:\BenQ_Project\python\Lin\Processing_Data"
+folder_path = r"E:\Hsin\NTSU_lab\Baseball\Processing_Data"
+# folder_path = r"D:\BenQ_Project\python\Lin\Processing_Data"
 data_sheet = ["Stage2", "Stage3"]
 
 # %% 1. read staging file
-staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
-                             sheet_name='T1_memo2') # 改變要找stage2 or stage3
+staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
+                             sheet_name='T2_memo3') # 改變要找stage2 or stage3
 staging_file = staging_file.dropna(axis=0, thresh=14)
 folder_file_list = os.listdir(folder_path)
 all_file_list = []
@@ -78,9 +78,9 @@ for i in range(np.shape(arr_muscle_data)[0]):
         arr_muscle_data[i, :, ii] = muscle_data[ii, :, i]
 
 # 修改儲存檔名
-# save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx"
-# save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240519.xlsx"
-save_file_name = r"D:\BenQ_Project\python\Lin\EMGdata_processing_T1_20240522.xlsx"
+save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240528.xlsx"
+# save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx"
+# save_file_name = r"D:\BenQ_Project\python\Lin\EMGdata_processing_T1_20240522.xlsx"
 
 with pd.ExcelWriter(save_file_name) as Writer:
     pd.DataFrame(arr_muscle_data[0, :, :]).to_excel(Writer, sheet_name="biceps", index=False)
@@ -120,7 +120,7 @@ plt.rcParams.update(parameters)
 
 # 讀資料
 # data = arr_muscle_data
-excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240516.xlsx")
+excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx")
 
 # 获取所有分页（sheet）的名称
 sheet_names = excel_file.sheet_names
@@ -128,13 +128,13 @@ t1_data = np.zeros([6, 150, len(ture_file_path)])
 
 
 for name in range(len(sheet_names)):
-  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240516.xlsx",
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx",
                                       sheet_name = sheet_names[name])
 data = t1_data
-columns_name = ['Briceps Brachii','Triceps Brachii', 'Extensor Carpi Radialis',
+columns_name = ['Biceps Brachii','Triceps Brachii', 'Extensor Carpi Radialis',
                 'Extensor Carpi Ulnaris', 'Flexor Carpi Radialis', 'Flexor Carpi Ulnaris']
 n = int(math.ceil((np.shape(data)[0]) /2))
-fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')
+fig, axs = plt.subplots(n, 2, figsize = (10,12))
 for i in range(np.shape(data)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -163,13 +163,16 @@ for i in range(np.shape(data)[0]):
     axs[x, y].plot(iters, avg2, color=color, label='慢轉組', linewidth=3) # 畫平均線
     axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2) # 塗滿一個正負標準差以內的區塊
     # 圖片的格式設定
-    axs[x, y].set_title(columns_name[i], fontsize=12)
+    axs[x, y].set_title(columns_name[i], fontsize=16)
     axs[x, y].legend(loc="upper left") # 圖例位置
     axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
-plt.suptitle(str("mean std cloud: "), fontsize=16)
+    axs[x, y].grid(False)
+plt.suptitle(str("mean std cloud: T1 快轉 VS 慢轉"), fontsize=20)
 plt.tight_layout()
 fig.add_subplot(111, frameon=False)
 # hide tick and tick label of the big axes
@@ -186,6 +189,10 @@ Y,mu       = dataset.get_data()
 t  = spm1d.stats.ttest(Y, mu)  #mu is 0 by default
 ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
 ti.plot()
+
+for name in range(len(sheet_names)):
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx",
+                                      sheet_name = sheet_names[name])
 
 for i in range(np.shape(data)[0]):
     data1 = pd.DataFrame(data[i, :, [5, 8, 9, 10, 12, 13, 14, 15, 17, 18]]) #設定資料欄位 快轉
@@ -207,6 +214,8 @@ for i in range(np.shape(data)[0]):
                             facecolor=(0.7,0.7,1),
                             edgecolor='b',
                             label='慢轉組')
+    plt.xlim(0, 150)  # 设置 x 轴范围
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(25))
     plt.legend(loc = "upper left")
 
     plt.subplot(2,1,2)
@@ -216,6 +225,10 @@ for i in range(np.shape(data)[0]):
     ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
     ti.plot()
     plt.suptitle(str(columns_name[i]), fontsize=16)
+    x_major_locator = plt.MultipleLocator(25)
+    # plt.xaxis.set_major_locator(x_major_locator)
+    plt.xlim(0, 150)  # 设置 x 轴范围
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(25))  # 设置 x 轴刻度间隔
     plt.tight_layout()
 
 
@@ -230,18 +243,18 @@ import math
 # read data
 # read sheet name
 # 读取 Excel 文件
-excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx")
+excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx")
 
 # 获取所有分页（sheet）的名称
 sheet_names = excel_file.sheet_names
 
-t1_data = np.zeros([6, 202, len(ture_file_path)])
-t2_data = np.zeros([6, 202, len(ture_file_path)])
+t1_data = np.zeros([6, 150, len(ture_file_path)])
+t2_data = np.zeros([6, 150, len(ture_file_path)])
 
 for name in range(len(sheet_names)):
-  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx",
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx",
                                       sheet_name = sheet_names[name])
-  t2_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx",
+  t2_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240528.xlsx",
                                       sheet_name = sheet_names[name])
 # 設定繪圖格式與字體
 plt.style.use('seaborn-white')
@@ -269,7 +282,7 @@ data = arr_muscle_data
 columns_name = ['Briceps Brachii','Triceps Brachii', 'Extensor Carpi Radialis',
                 'Extensor Carpi Ulnaris', 'Flexor Carpi Radialis', 'Flexor Carpi Ulnaris']
 n = int(math.ceil((np.shape(arr_muscle_data)[0]) /2))
-fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')
+fig, axs = plt.subplots(n, 2, figsize = (10,12))
 for i in range(np.shape(arr_muscle_data)[0]):
     # 確定繪圖順序與位置
     x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
@@ -298,13 +311,17 @@ for i in range(np.shape(arr_muscle_data)[0]):
     axs[x, y].plot(iters, avg2, color=color, label='T2', linewidth=3) # 畫平均線
     axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2) # 塗滿一個正負標準差以內的區塊
     # 圖片的格式設定
-    axs[x, y].set_title(columns_name[i], fontsize=12)
+    axs[x, y].set_title(columns_name[i], fontsize=16)
     axs[x, y].legend(loc="upper left") # 圖例位置
     axs[x, y].grid(True, linestyle='-.')
     # 畫放箭時間
     # axs[x, y].set_xlim(-(release[0]), release[1])
+    x_major_locator = plt.MultipleLocator(25)
+    axs[x, y].xaxis.set_major_locator(x_major_locator)
+    axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
-plt.suptitle(str("mean std cloud: "), fontsize=16)
+    axs[x, y].grid(False)
+plt.suptitle(str("mean std cloud: T1 vs T2"), fontsize=20)
 plt.tight_layout()
 fig.add_subplot(111, frameon=False)
 # hide tick and tick label of the big axes
@@ -317,13 +334,13 @@ plt.show()
 
 # %% spm T1 vs T2
 
-t1_data = np.zeros([6, 202, len(ture_file_path)])
-t2_data = np.zeros([6, 202, len(ture_file_path)])
+t1_data = np.zeros([6, 150, len(ture_file_path)])
+t2_data = np.zeros([6, 150, len(ture_file_path)])
 
 for name in range(len(sheet_names)):
-  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20230805.xlsx",
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx",
                                       sheet_name = sheet_names[name])
-  t2_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20230805.xlsx",
+  t2_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240528.xlsx",
                                       sheet_name = sheet_names[name])
   
 for i in range(np.shape(data)[0]):
@@ -348,6 +365,8 @@ for i in range(np.shape(data)[0]):
                             facecolor=(0.7,0.7,1),
                             edgecolor='b',
                             label='T2')
+    plt.xlim(0, 150)  # 设置 x 轴范围
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(25))  # 设置 x 轴刻度间隔
     plt.legend(loc = "upper left")
 
     plt.subplot(2,1,2)
@@ -357,6 +376,8 @@ for i in range(np.shape(data)[0]):
     ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
     ti.plot()
     plt.suptitle(str(columns_name[i]), fontsize=16)
+    plt.xlim(0, 150)  # 设置 x 轴范围
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(25))  # 设置 x 轴刻度间隔
     plt.tight_layout()
 
 # %%
