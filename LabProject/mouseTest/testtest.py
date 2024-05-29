@@ -1,122 +1,143 @@
-import pygame
-import sys
-import math
+# # 創建並排列各個 Label 和 Entry 小部件
+# tk.Label(root, text="使用者編號:").grid(row=0, column=0)
+# entry_user_id = tk.Entry(root)
+# entry_user_id.grid(row=0, column=1)
+# entry_user_id.insert(0, "S01")  # 設置預設文字
 
-# 初始化 Pygame
-pygame.init()
+# tk.Label(root, text="使用條件:").grid(row=1, column=0)
+# entry_condition = tk.Entry(root)
+# entry_condition.grid(row=1, column=1)
+# entry_condition.insert(0, "C01")  # 設置預設文字
 
-# 设置窗口大小
-WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 600
-window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption('Drag and Drop to Finish Test')
+# tk.Label(root, text="第幾次測試:").grid(row=2, column=0)
+# entry_test_number = tk.Entry(root)
+# entry_test_number.grid(row=2, column=1)
+# entry_test_number.insert(0, "1")  # 設置預設文字
 
-# 定义颜色
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-PURPLE = (128, 0, 128)  # 淡紫色
+# tk.Label(root, text="難度(寬):").grid(row=3, column=0)
+# entry_width_range = tk.Entry(root)
+# entry_width_range.grid(row=3, column=1)
+# entry_width_range.insert(0, "[20, 30]")  # 設置預設文字
 
-# 定义圆的初始位置和大小
-circle_radius = 20
-circle_x = WINDOW_WIDTH // 2
-circle_y = WINDOW_HEIGHT // 2
+# tk.Label(root, text="難度(距離):").grid(row=4, column=0)
+# entry_distance_range = tk.Entry(root)
+# entry_distance_range.grid(row=4, column=1)
+# entry_distance_range.insert(0, "[200, 400]")  # 設置預設文字
 
-# 定义周围圆的数量和半径
-num_surrounding_circles = 14
-surrounding_circle_radius = 30
 
-# 计算中心圆的对角线方向
-diagonal_angle = math.radians(45)
+# %%
+import tkinter as tk
+from tkinter import messagebox
 
-# 生成填入数字的列表
-number_list = [str(i+1) for i in range(num_surrounding_circles)]
+# 全局變量來存儲參數
+params = {}
 
-# 计算周围圆的位置
-angle_step = math.radians(360 / num_surrounding_circles)
-surrounding_circles = []
-for i in range(num_surrounding_circles):
-    if i % 2 == 0: 
-        angle_rad = int(i/2) * angle_step
-    else:
-        angle_rad = int(i/2) * angle_step + 3.14
-    x = circle_x + int(circle_radius * 10 * math.cos(angle_rad))
-    y = circle_y + int(circle_radius * 10 * math.sin(angle_rad))
-    surrounding_circles.append((x, y))
+def submit():
+    global params
+    user_id = entry_user_id.get()
+    condition = entry_condition.get()
+    test_number = entry_test_number.get()
+    width_range = entry_width_range.get()
+    distance_range = entry_distance_range.get()
 
-# 在循环外定义一个列表来跟踪每个外圆圈是否被碰到
-circle_touched = [False] * num_surrounding_circles
+    # 簡單的輸入檢查
+    if not user_id or not condition or not test_number or not width_range or not distance_range:
+        messagebox.showerror("輸入錯誤", "所有欄位都是必填的")
+        return
 
-# 记录已经拖拽到的位置数量
-completed_positions = 0
+    try:
+        width_range = eval(width_range)
+        distance_range = eval(distance_range)
+    except:
+        messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是有效的列表")
+        return
 
-# 标记是否有活动圆圈
-active_circle = False
+    if not (isinstance(width_range, list) and isinstance(distance_range, list) and
+            len(width_range) == 2 and len(distance_range) == 2):
+        messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是包含兩個數字的列表")
+        return
 
-# 游戏循环
-while True:
-    window.fill(WHITE)
+    # 保存輸入的值到全局變量
+    params = {
+        "user_id": user_id,
+        "condition": condition,
+        "test_number": test_number,
+        "width_range": width_range,
+        "distance_range": distance_range
+    }
 
-    # 绘制周围圆的外框，根据是否被碰到选择绘制的颜色
-    for i, (x, y) in enumerate(surrounding_circles):
-        if circle_touched[i]:
-            pygame.draw.circle(window, PURPLE, (x, y), surrounding_circle_radius)
-        else:
-            pygame.draw.circle(window, BLACK, (x, y), surrounding_circle_radius, width=2)
-        # 绘制数字到周围圆
-        font = pygame.font.Font(None, 24)
-        number_text = font.render(number_list[i], True, RED)
-        text_rect = number_text.get_rect(center=(x, y))
-        window.blit(number_text, text_rect)
+    # 在這裡，你可以將輸入的值傳遞給你的主要程式邏輯
+    print(f"User ID: {params['user_id']}")
+    print(f"Condition: {params['condition']}")
+    print(f"Test Number: {params['test_number']}")
+    print(f"Width Range: {params['width_range']}")
+    print(f"Distance Range: {params['distance_range']}")
+
+    # 清空輸入欄位
+    entry_user_id.delete(0, tk.END)
+    entry_condition.delete(0, tk.END)
+    entry_test_number.delete(0, tk.END)
+    entry_width_range.delete(0, tk.END)
+    entry_distance_range.delete(0, tk.END)
     
-    # 获取鼠标位置
-    mouse_x, mouse_y = pygame.mouse.get_pos()
-    # 在左下角绘制鼠标位置
-    mouse_position_text = font.render(f"Mouse Position: ({mouse_x}, {mouse_y})", True, RED)
-    window.blit(mouse_position_text, (10, WINDOW_HEIGHT - 30))  # 放在窗口左下角
+    # 關閉主窗口
+    root.destroy()
 
-    # 绘制中心圆
-    pygame.draw.circle(window, BLACK, (circle_x, circle_y), circle_radius)
+# 創建主窗口
+root = tk.Tk()
+root.title("參數輸入")
 
-    # 处理事件
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            # 检测鼠标是否与圆圈相交
-            distance = math.sqrt((circle_x - event.pos[0])**2 + (circle_y - event.pos[1])**2)
-            if distance <= circle_radius:
-                active_circle = True
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if active_circle:
-                active_circle = False
-                # 检测是否拖拽到了周围的圆圈位置
-                # 如果有拖曳到，就 completed_positions+1，并标记相应的外圆圈被碰到
-                for i, (x, y) in enumerate(surrounding_circles):
-                    distance = math.sqrt((x - circle_x)**2 + (y - circle_y)**2)
-                    if distance <= surrounding_circle_radius:
-                        completed_positions += 1
-                        circle_touched[i] = True
-                        break
-        elif event.type == pygame.MOUSEMOTION:
-            if active_circle:
-                # 检测是否拖拽到了周围的圆圈位置
-                # 如果有拖曳到，就标记相应的外圆圈被碰到
-                for i, (x, y) in enumerate(surrounding_circles):
-                    distance = math.sqrt((x - mouse_x)**2 + (y - mouse_y)**2)
-                    if distance <= surrounding_circle_radius:
-                        circle_touched[i] = True
-                    else:
-                        circle_touched[i] = False
+# 設置窗口大小
+window_width = 400
+window_height = 300
+root.geometry(f'{window_width}x{window_height}')
 
-    # 如果拖拽到了所有位置，结束游戏
-    if completed_positions == num_surrounding_circles:
-        pygame.quit()
-        sys.exit()
+# 使窗口居中
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+position_top = int(screen_height/2 - window_height/2)
+position_right = int(screen_width/2 - window_width/2)
+root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
 
-    # 如果有活动圆圈，根据鼠标位置更新圆圈位置
-    if active_circle:
-        circle_x, circle_y = pygame.mouse.get_pos()
+# 設置文字大小
+font_label = ('Helvetica', 14)
+font_entry = ('Helvetica', 14)
 
-    pygame.display.update()
+# 創建並排列各個 Label 和 Entry 小部件
+tk.Label(root, text="使用者編號:", font=font_label).grid(row=0, column=0, pady=5)
+entry_user_id = tk.Entry(root, font=font_entry)
+entry_user_id.grid(row=0, column=1, pady=5)
+entry_user_id.insert(0, "S01")  # 設置預設文字
+
+tk.Label(root, text="使用條件:", font=font_label).grid(row=1, column=0, pady=5)
+entry_condition = tk.Entry(root, font=font_entry)
+entry_condition.grid(row=1, column=1, pady=5)
+entry_condition.insert(0, "C01")  # 設置預設文字
+
+tk.Label(root, text="第幾次測試:", font=font_label).grid(row=2, column=0, pady=5)
+entry_test_number = tk.Entry(root, font=font_entry)
+entry_test_number.grid(row=2, column=1, pady=5)
+entry_test_number.insert(0, "1")  # 設置預設文字
+
+tk.Label(root, text="難度(寬):", font=font_label).grid(row=3, column=0, pady=5)
+entry_width_range = tk.Entry(root, font=font_entry)
+entry_width_range.grid(row=3, column=1, pady=5)
+entry_width_range.insert(0, "[20, 30]")  # 設置預設文字
+
+tk.Label(root, text="難度(距離):", font=font_label).grid(row=4, column=0, pady=5)
+entry_distance_range = tk.Entry(root, font=font_entry)
+entry_distance_range.grid(row=4, column=1, pady=5)
+entry_distance_range.insert(0, "[200, 400]")  # 設置預設文字
+
+# 創建並排列提交按鈕
+submit_button = tk.Button(root, text="提交", command=submit, font=font_label)
+submit_button.grid(row=5, columnspan=2, pady=20)
+
+# 開始主事件循環
+root.mainloop()
+
+# 假設你在這裡需要使用提交的參數，可以這樣調用
+print("已提交的參數：")
+print(params)
+
+

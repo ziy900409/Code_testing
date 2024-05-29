@@ -2,9 +2,9 @@
 """
 待處理功能：
 
-1. 自動產生檔案
-    1.1. 是否可以自行輸入? UI?
-    1.2. 輸出檔案自動產生
+1. 修改第幾次測試內容 從提交之後往後改
+2. 做一個暫存檔，儲存資料夾路徑跟受試者資訊
+3. 改成下拉式選單，或是不要英文字
 
 2. 所有難度的測試都應該要從滑鼠按下去"中心圓"才開始
 ------------
@@ -71,6 +71,10 @@
 7. 設定不同難度問題
     7.1. 不同難度應該隨機出現
 
+8. 自動產生檔案
+    8.1. 是否可以自行輸入? UI?
+    8.2 輸出檔案自動產生
+
 @author: Hsin.YH.Yang, written by May 02 2024
 """
 # %% import library
@@ -78,86 +82,202 @@ import pygame
 import sys
 import math
 import csv
-import numpy as np
+import os
+# import numpy as np
 import random
-# %%
-def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, circle_radius):
-    """
-    计算中心圆与边界圆之间的边界点坐标.
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest")
+import Analysis_function_v1 as func
+import tkinter as tk
+from tkinter import messagebox, filedialog
 
-    Parameters
-    ----------
-    circle_x : float
-        中心圆的 x 坐标.
-    circle_y : float
-        中心圆的 y 坐标.
-    edge_cir_x : float
-        边界圆的 x 坐标.
-    edge_cir_y : float
-        边界圆的 y 坐标.
-    circle_radius : float
-        中心圆的半径.
+# from tkinter import messagebox
+from datetime import datetime
+# %% 依照檔案中B01的數字來決定下一個數字
+# 判斷是否有暫存檔
+current_path = os.path.dirname(os.path.abspath(__file__))
 
-    Returns
-    -------
-    edge_point : list
-        边界点的坐标 [x, y].
+temp_params = {}
+if "DragDropTest_temp.txt" in os.listdir(current_path):
+    temp_txt_path = current_path + "\\" + "DragDropTest_temp.txt"
 
-    """
-    # 计算距离
-    distance = np.sqrt((circle_x - edge_cir_x) ** 2 + (circle_y - edge_cir_y) ** 2)
-    sin_angle = abs(circle_y - edge_cir_y) \
-                    / np.sqrt((circle_x - edge_cir_x)**2 + (circle_y - edge_cir_y)**2)
-    cos_angle = abs(circle_x - edge_cir_x) \
-                    / np.sqrt((circle_x - edge_cir_x)**2 + (circle_y - edge_cir_y)**2)
-    default_edge_point = [circle_x, circle_y]
-    # 确保距离不为零，避免除以零错误
-    if distance == 0:
-        # 在这里添加处理方式，例如返回一个默认角度值或者设置一个很小的距离值
-        return default_edge_point
-    # 根据中心圆与边界圆的位置关系计算边界点的位置
-    # 第一象限
-    if circle_x - edge_cir_x > 0 and circle_y - edge_cir_y > 0:
-        edge_point = [(circle_x + circle_radius*cos_angle),
-                    (circle_y + circle_radius*sin_angle)]
-    # 第二象限
-    elif circle_x - edge_cir_x < 0 and circle_y - edge_cir_y > 0:
-        edge_point = [(circle_x - circle_radius*cos_angle),
-                    (circle_y + circle_radius*sin_angle)]
-    # 第三象限
-    elif circle_x - edge_cir_x < 0 and circle_y - edge_cir_y < 0:
-        edge_point = [(circle_x - circle_radius*cos_angle),
-                    (circle_y - circle_radius*sin_angle)]
-    # 第四象限
-    elif circle_x - edge_cir_x > 0 and circle_y - edge_cir_y < 0:
-        edge_point = [(circle_x + circle_radius*cos_angle),
-                    (circle_y - circle_radius*sin_angle)]
-    # 如果躺在X軸上
-    elif circle_y - edge_cir_y == 0:
-    # 在周圍圓的右側
-        if circle_x - edge_cir_x > 0:
-            edge_point = [(circle_x + circle_radius),
-                         (circle_y)]
-        # 在周圍圓的左側
-        elif circle_x - edge_cir_x < 0:
-                 edge_point = [(circle_x - circle_radius),
-                              (circle_y)]
-    # 如果躺在Y軸上
-    elif circle_x - edge_cir_x == 0:
-        # 在周圍圓的上方
-        if circle_y - edge_cir_y > 0:
-            edge_point = [(circle_x),
-                        (circle_y + circle_radius)]
-        # 在周圍圓的下方
-        elif circle_y - edge_cir_y < 0:
-             edge_point = [(circle_x),
-                             (circle_y - circle_radius)]
-    return edge_point
+    with open(temp_txt_path, 'r') as file:
+        for line in file:
+            key, value = line.strip().split(': ', 1)
+            # 處理數值範圍
+            if key in ['width_range', 'distance_range']:
+                value = value.strip('[]').split(', ')
+                value = [int(v) for v in value]
+            # 處理其他項目
+            else:
+                try:
+                    value = int(value)
+                except ValueError:
+                    pass
+            temp_params[key] = value
+    
+judge_B01 = func.Read_File(temp_params["folder_path"],
+                            ".csv",
+                            subfolder=False)
+
+# # 找出檔案名稱中包含 DargDrapTask 的檔案路徑
+# Boi_file_list = []
+# for i in range(len(judge_B01)):
+#     if "DargDrapTask" in judge_B01[i]:
+#         Boi_file_list.append(judge_B01[i])
+
+# # 找出總共有幾種形式的 DargDrapTask-S01-C01
+# for i in range(len(Boi_file_list)):        
+#     filepath, tempfilename = os.path.split(Boi_file_list[i])
+#     filename, extension = os.path.splitext(tempfilename)
+    
+    
+
+# %% 設定 UI 介面來輸入受試者訊息
+
+# 全局變量來存儲參數
+params = {}
+
+def submit():
+    global params
+    user_id = entry_user_id.get()
+    condition = entry_condition.get()
+    test_number = entry_test_number.get()
+    width_range = entry_width_range.get()
+    distance_range = entry_distance_range.get()
+    folder_path = entry_folder_path.get()
+
+    # 簡單的輸入檢查
+    if not user_id or not condition or not test_number or not width_range or not distance_range:
+        messagebox.showerror("輸入錯誤", "所有欄位都是必填的")
+        return
+
+    try:
+        width_range = eval(width_range)
+        distance_range = eval(distance_range)
+    except:
+        messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是有效的列表")
+        return
+
+    if not (isinstance(width_range, list) and isinstance(distance_range, list) and
+            len(width_range) == 2 and len(distance_range) == 2):
+        messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是包含兩個數字的列表")
+        return
+
+    # 保存輸入的值到全局變量
+    params = {
+        "user_id": user_id,
+        "condition": condition,
+        "test_number": test_number,
+        "width_range": width_range,
+        "distance_range": distance_range,
+        "folder_path": folder_path
+    }
+
+    # 在這裡，你可以將輸入的值傳遞給你的主要程式邏輯
+    print(f"User ID: {params['user_id']}")
+    print(f"Condition: {params['condition']}")
+    print(f"Test Number: {params['test_number']}")
+    print(f"Width Range: {params['width_range']}")
+    print(f"Distance Range: {params['distance_range']}")
+    print(f"Folder Path: {params['folder_path']}")
+
+    # 清空輸入欄位
+    entry_user_id.delete(0, tk.END)
+    entry_condition.delete(0, tk.END)
+    entry_test_number.delete(0, tk.END)
+    entry_width_range.delete(0, tk.END)
+    entry_distance_range.delete(0, tk.END)
+    entry_folder_path.delete(0, tk.END)
+    
+    # 關閉主窗口
+    root.destroy()
+    
+def select_folder():
+    folder_selected = filedialog.askdirectory()
+    if folder_selected:
+        entry_folder_path.delete(0, tk.END)
+        entry_folder_path.insert(0, folder_selected)
+
+# 創建主窗口
+root = tk.Tk()
+root.title("參數輸入")
+
+# 設置窗口大小
+window_width = 480
+window_height = 320
+root.geometry(f'{window_width}x{window_height}')
+
+# 使窗口居中
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+position_top = int(screen_height/2 - window_height/2)
+position_right = int(screen_width/2 - window_width/2)
+root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
+
+# 設置文字大小
+font_label = ('Helvetica', 14)
+font_entry = ('Helvetica', 14)
+# 獲取當前程式所在的路徑
+
+
+# 創建並排列各個 Label 和 Entry 小部件
+tk.Label(root, text="使用者編號:", font=font_label).grid(row=0, column=0, pady=5)
+entry_user_id = tk.Entry(root, font=font_entry)
+entry_user_id.grid(row=0, column=1, pady=5)
+entry_user_id.insert(0, "S01")  # 設置預設文字
+
+tk.Label(root, text="使用條件:", font=font_label).grid(row=1, column=0, pady=5)
+entry_condition = tk.Entry(root, font=font_entry)
+entry_condition.grid(row=1, column=1, pady=5)
+entry_condition.insert(0, "C01")  # 設置預設文字
+
+tk.Label(root, text="第幾次測試:", font=font_label).grid(row=2, column=0, pady=5)
+entry_test_number = tk.Entry(root, font=font_entry)
+entry_test_number.grid(row=2, column=1, pady=5)
+entry_test_number.insert(0, "B01")  # 設置預設文字
+
+tk.Label(root, text="目標寬度:", font=font_label).grid(row=3, column=0, pady=5)
+entry_width_range = tk.Entry(root, font=font_entry)
+entry_width_range.grid(row=3, column=1, pady=5)
+entry_width_range.insert(0, "[20, 40]")  # 設置預設文字
+
+tk.Label(root, text="目標距離:", font=font_label).grid(row=4, column=0, pady=5)
+entry_distance_range = tk.Entry(root, font=font_entry)
+entry_distance_range.grid(row=4, column=1, pady=5)
+entry_distance_range.insert(0, "[200, 400]")  # 設置預設文字
+
+# 增加文件夾選擇
+tk.Label(root, text="資料夾路徑:", font=font_label).grid(row=5, column=0, pady=5)
+entry_folder_path = tk.Entry(root, font=font_entry)
+entry_folder_path.grid(row=5, column=1, pady=5)
+select_folder_button = tk.Button(root, text="選擇資料夾", command=select_folder, font=font_label)
+select_folder_button.grid(row=5, column=2, pady=5)
+entry_folder_path.insert(0, current_path)
+
+# 創建並排列提交按鈕
+submit_button = tk.Button(root, text="提交", command=submit, font=font_label)
+submit_button.grid(row=6, columnspan=3, pady=20)
+
+# 開始主事件循環
+root.mainloop()
+
+# %% 儲存一個 .txt 的暫存檔
+
+file_path = params['folder_path'] + "\\" + "DragDropTest_temp.txt"
+
+with open(file_path, 'w') as file:
+    for key, value in params.items():
+        file.write(f'{key}: {value}\n')
+
 # %% 基礎參數設定及初始化
 # ------------基本受測資料------------------------
-Participant = "S01"
-Condition = "S2"
-Block = "01"
+Participant = params["user_id"]
+Condition = params["condition"]
+Block = params["test_number"]
+file_name = params["user_id"] + "-" + params["condition"] + "-" + params["test_number"] \
+    + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
+# 設定輸出檔案儲存路徑
+data_save_path = r"D:\BenQ_Project\FittsDragDropTest\\DargDrapTask-" + file_name
 # -------------定义颜色--------------------------
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -165,7 +285,7 @@ RED = (255, 0, 0)
 CENTER_COLOR = (220, 190, 255)
 PURPLE = (220, 190, 255)  # 淡紫色
 # 定义圆的初始位置和大小
-circle_radius = 20
+# circle_radius = 20
 # 记录已经拖拽到的位置数量
 completed_positions = 0
 record_edge = 1
@@ -184,24 +304,16 @@ next_sample_time = pygame.time.get_ticks() + sampling_interval
 # 設定不同難度
 # 定义周围圆的数量
 num_surrounding_circles = 16
-# 設定多個不同難度的測試
-tests = [
-    {"surrounding_circle_radius": 40, 'target_amplitudes': 200},
-    {"surrounding_circle_radius": 20, 'target_amplitudes': 150}
-]
-
-# 保存所有可能的組合
+# 設定多個不同難度的測試, 保存所有可能的組合
 all_combinations = []
-# 外部循環迭代surrounding_circle_radius
-for radius_info in tests:
-    radius = radius_info['surrounding_circle_radius']
-    # 內部循環迭代target_amplitudes
-    for amplitude_info in tests:
-        amplitude = amplitude_info['target_amplitudes']
-        # 將此組合添加到所有組合列表中
-        all_combinations.append({"surrounding_circle_radius": radius, "target_amplitudes": amplitude})
-
+for i in params["width_range"]:
+    for ii in params["distance_range"]:
+        all_combinations.append({"surrounding_circle_radius": i,
+                                 'target_amplitudes': ii})
+# 隨機所有難度測試
 random.shuffle(all_combinations)
+# 定義中心圓的半徑，為最小周圍圓的0.6倍
+circle_radius = min(params["width_range"])*0.6
 # 當前測試索引
 current_test_index = 0
 # 選擇第一個測試
@@ -252,8 +364,8 @@ while True:
     # 獲取滑鼠位置
     mouse_pos = pygame.mouse.get_pos()
     # 在視窗上顯示文字信息
-    mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
-    window.blit(mouse_info, (20, 100))
+    # mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
+    # window.blit(mouse_info, (20, 100))
     # 計算出所有周圍圓圈的所在位置
     angle_step = math.radians(360 / num_surrounding_circles)
     surrounding_circles = []
@@ -290,9 +402,8 @@ while True:
                             pygame.time.get_ticks())) # time
     
     # 繪製中心圓
-    pygame.draw.circle(window, BLACK, (circle_x, circle_y), surrounding_circle_radius*0.6)
+    pygame.draw.circle(window, BLACK, (circle_x, circle_y), circle_radius)
 
-    # 設置採樣間隔（毫秒）
     # 處理事件
     for event in pygame.event.get():
         current_time = pygame.time.get_ticks()
@@ -301,7 +412,7 @@ while True:
             sys.exit()
         elif event.type == pygame.MOUSEBUTTONDOWN:
             # 檢測鼠標是否與中心圓相交
-            distance = math.sqrt((circle_x - event.pos[0]) ** 2 + (circle_y - event.pos[1]) ** 2)
+            distance = math.sqrt((circle_x  - event.pos[0]) ** 2 + (circle_y - event.pos[1]) ** 2)
             if distance <= circle_radius:
                 active_circle = True
                 mouse_click_events.append((Participant, Condition, Block, # 受試者, 條件, 第幾次測試
@@ -311,18 +422,19 @@ while True:
         elif event.type == pygame.MOUSEBUTTONUP:
             if active_circle:
                 active_circle = False
+            distance = math.sqrt((circle_x - event.pos[0]) ** 2 + (circle_y - event.pos[1]) ** 2)
+            # 如果按鍵釋放時，游標沒有碰到中心原，就不算事件的紀錄
+            if distance > circle_radius:
+                active_circle = False
+                break
             # 檢測是否拖拽到了周圍的圓圈位置
             # 如果拖拽到，就 completed_positions+1
             find = 0
-            """
-            1. 判斷中心圓座標與周圍圓座標的相對位置，切分為四象限，以定義直角三角形
-            2. 在中心圓周上找出離周圍圓圓心最遠的點，兩者相減必須小於周圍圓的半徑
-            """                
             # 定義指定周圍圓的圓心
             edge_cir_x = surrounding_circles[completed_positions+1][0]
             edge_cir_y = surrounding_circles[completed_positions+1][1]
-            edge_point = edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, 
-                                        surrounding_circle_radius*0.6)
+            edge_point = func.edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, 
+                                             circle_radius)
             # 計算周圍圓與中心圓的最遠位置的距離
             distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
             # 距離必須小於周圍圓的半徑
@@ -350,8 +462,8 @@ while True:
                     # 定義指定周圍圓的圓心
                     edge_cir_x = surrounding_circles[completed_positions+1][0]
                     edge_cir_y = surrounding_circles[completed_positions+1][1]
-                    edge_point = edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y,
-                                                surrounding_circle_radius*0.6)
+                    edge_point = func.edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y,
+                                                     circle_radius)
                     # 計算周圍圓與中心圓的最遠位置的距離
                     distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
                     if distance <= surrounding_circle_radius:
@@ -385,7 +497,7 @@ while True:
             circle_y = all_combinations[current_test_index]['circle_y']
         else:
             # 將滑鼠軌跡和事件資料寫入 CSV 檔案
-            with open(r'D:\BenQ_Project\FittsDragDropTest\mouse_data_2.csv', mode='w', newline='') as file:
+            with open(data_save_path, mode='w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(['Participant', 'Condition', 'Block',
                                   'Sequence', 'Trial',

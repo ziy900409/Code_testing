@@ -27,16 +27,17 @@ tracer file:
 
 import numpy as np
 import pandas as pd
-import json
+# import json
 import math
 from statsmodels.stats.diagnostic import lilliefors # 進行常態分佈檢定
 import sys
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest ")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest")
 import Analysis_function_v1 as func
+import jsonpickle # 將資料轉換成json格式
 
 
 # %% 初始參數定義
-raw_data = pd.read_csv(r"D:\BenQ_Project\FittsDragDropTest\mouse_data.csv")
+raw_data = pd.read_csv(r"D:\BenQ_Project\FittsDragDropTest\DargDrapTask-S01-C01-B01-05291059.csv")
 select_cir_radius_ratio = 0.6
 
 # %%設定儲存格式
@@ -102,11 +103,11 @@ sd3_data_format = {
 # 填入任務參數
 # 將info.keys轉成list的數值，並依照數值大小作排列
 trial_info = sorted([int(key) for key in duplicate_info['Trial'].keys()])
-trial_info.remove(14)
+trial_info.remove(16)
 amplitude_info = sorted([int(key) for key in duplicate_info["Amplitudes"].keys()])
 width_info = sorted([int(key) for key in duplicate_info["Width"].keys()])
 
-# %%
+# %% 處理 sd3 format
 # 找出每筆 trial, 數量為 Amplitudes * Width * Trial, 並依照 time 作排列
 for i in range(len(duplicate_info["Amplitudes"])):
     for ii in range(len(duplicate_info["Width"])):
@@ -179,7 +180,14 @@ for i in range(len(duplicate_info["Amplitudes"])):
             sd3_data_format["{t_x_y}"]["t"].append(raw_data["time"][matched_indices])
             sd3_data_format["{t_x_y}"]["x"].append(raw_data["Pos_x"][matched_indices])
             sd3_data_format["{t_x_y}"]["y"].append(raw_data["Pos_y"][matched_indices])
+# # 將Pandas Series轉換為可序列化的列表
+# func.convert_series_to_list(sd3_data_format)
+# # 將資料結構轉換為JSON字串
+# json_str = jsonpickle.encode(sd3_data_format)
 
+# # 將JSON字串寫入文件
+# with open(r'D:\BenQ_Project\FittsDragDropTest\sd3_data_format.json', 'w') as jsonfile:
+#     jsonfile.write(json_str)
 
 # %% 計算 sd1 table 所需參數
 
@@ -374,7 +382,11 @@ for a_indi in range(len(A_cond)):
         PT = np.mean(sd1_table.loc[matched_indices, "PT(ms)"])
         ST = np.mean(sd1_table.loc[matched_indices, "ST(ms)"])
         # 計算 Errors: 計算 MOUSEBUTTONUP_FAIL 的數量，並除以資料長度
-        Errors = sd1_table.loc[matched_indices, "Errors"].value_counts()[1] / n * 100
+        # 如果完全沒有失敗
+        if len(sd1_table.loc[matched_indices, "Errors"].value_counts()) == 1:
+            Errors =0
+        else:
+            Errors = sd1_table.loc[matched_indices, "Errors"].value_counts()[1] / n * 100
         # 計算 TRE, TAC, MDC, ODC, MV, ME, MO 的平均值
         TRE = np.mean(sd1_table.loc[matched_indices, "TRE"])
         TAC = np.mean(sd1_table.loc[matched_indices, "TAC"])
@@ -411,33 +423,41 @@ for a_indi in range(len(A_cond)):
         sd2_table.loc[i, "ME"] = ME
         sd2_table.loc[i, "MO"] = MO
 
-# %% sd3 輸出 csv?
-import csv
 
-# 假設 A_cond 是一個字典，其中值是列表
-A_cond = sd3_data_format
 
-# 打開一個新的 CSV 文件進行寫入
-with open(r'D:\BenQ_Project\FittsDragDropTest\output.csv', 'w', newline='') as csvfile:
-    writer = csv.writer(csvfile)
+
+# %%
+
+
+
+                
+
+
+with open(r'D:\BenQ_Project\FittsDragDropTest\sd3_data_format.json', 'r') as jsonfile:
+    json_str = jsonfile.read()
     
-    # 找到最長的列表長度
-    max_length = max(len(values) for values in A_cond.values())
-    
-    # 寫入標題行
-    header = ['Key'] + [f'Value_{i}' for i in range(1, max_length + 1)]
-    writer.writerow(header)
-    
-    # 寫入每一行的字典條目
-    for key, values in A_cond.items():
-        row = [key] + values
-        # 填充空缺值
-        row.extend([''] * (max_length - len(values)))
-        writer.writerow(row)
 
-            
+# 將JSON字串轉換為資料結構
+sd3_data_format_loaded = jsonpickle.decode(json_str)
 
-     
+# 將列表轉換回Pandas Series
+func.convert_list_to_series(sd3_data_format_loaded)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

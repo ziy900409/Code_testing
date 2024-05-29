@@ -6,10 +6,16 @@ Created on Tue May 28 13:52:35 2024
 """
 # %% import package
 import numpy as np
+import pandas as pd
+import os
+
 
 
 # %%define funciton
-
+"""
+1. 判斷中心圓座標與周圍圓座標的相對位置，切分為四象限，以定義直角三角形
+2. 在中心圓周上找出離周圍圓圓心最遠的點，兩者相減必須小於周圍圓的半徑
+"""       
 def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, circle_radius):
     """
     计算中心圆与边界圆之间的边界点坐标.
@@ -87,8 +93,7 @@ def edge_calculate(circle_x, circle_y, edge_cir_x, edge_cir_y, circle_radius):
              edge_point = [(circle_x),
                              (circle_y - circle_radius)]
     return edge_point
-# %% 
-# 找到所有 True 的索引，並且判斷索引值是否為連續整數
+# %% 找到所有 True 的索引，並且判斷索引值是否為連續整數
 def find_true_indices_and_check_continuity(bool_list):
     # 找到所有True的索引
     true_indices = [i for i, val in enumerate(bool_list) if val]
@@ -103,8 +108,7 @@ def find_true_indices_and_check_continuity(bool_list):
     
     return not is_continuous
 
-# %%
-# 判斷數列中是否同時包含正數與負數
+# %% 判斷數列中是否同時包含正數與負數
 def count_sign_changes(num_list):
     sign_changes = 0
     current_sign = None
@@ -123,3 +127,93 @@ def count_sign_changes(num_list):
         current_sign = new_sign
     
     return sign_changes
+
+# %%
+     
+def Read_File(file_path, file_type, subfolder=None):
+    '''
+    Parameters
+    ----------
+    x : str
+        給予欲讀取資料之路徑.
+    y : str
+        給定欲讀取資料之副檔名.
+    subfolder : boolean, optional
+        是否子資料夾一起讀取. The default is 'None'.
+
+    Returns
+    -------
+    csv_file_list : list
+        回給所有路徑下的資料絕對路徑.
+
+    '''
+    # if subfolder = True, the function will run with subfolder
+
+    csv_file_list = []
+    
+    if subfolder:
+        file_list_1 = []
+        for dirPath, dirNames, fileNames in os.walk(file_path):
+            # file_list = os.walk(folder_name)
+            file_list_1.append(dirPath)
+        # need to change here [1:]
+        for ii in file_list_1[1:]:
+            file_list = os.listdir(ii)
+            for iii in file_list:
+                if os.path.splitext(iii)[1] == file_type:
+                    # replace "\\" to '/', due to MAC version
+                    file_list_name = ii + '\\' + iii
+                    csv_file_list.append(file_list_name)
+    else:
+        folder_list = os.listdir(file_path)                
+        for i in folder_list:
+            if os.path.splitext(i)[1] == file_type:
+                # replace "\\" to '/', due to MAC version
+                file_list_name = file_path + "\\" + i
+                csv_file_list.append(file_list_name)                
+        
+    return csv_file_list
+
+# %% 將Pandas Series轉換為可序列化的列表
+def convert_series_to_list(sd3_data_format):
+    for key in sd3_data_format['{t_x_y}']:
+        for i, series in enumerate(sd3_data_format['{t_x_y}'][key]):
+            if isinstance(series, pd.Series):
+                sd3_data_format['{t_x_y}'][key][i] = series.tolist()
+    return sd3_data_format
+                
+# %% 將可序列化的列表轉換回Pandas Series
+def convert_list_to_series(sd3_data_format):
+    for key in sd3_data_format['{t_x_y}']:
+        for i, lst in enumerate(sd3_data_format['{t_x_y}'][key]):
+            if isinstance(lst, list):
+                sd3_data_format['{t_x_y}'][key][i] = pd.Series(lst)
+    return sd3_data_format
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

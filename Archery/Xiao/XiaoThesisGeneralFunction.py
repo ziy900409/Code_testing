@@ -16,6 +16,7 @@ X軸超出前1秒數據3個標準差，判定為放箭
 """
 # %%
 import os
+import numpy as np
 
 # %%
 
@@ -62,3 +63,28 @@ def Read_File(file_path, file_type, subfolder=None):
                 csv_file_list.append(file_list_name)                
         
     return csv_file_list
+
+# %%
+
+def euclidean_distance(point1, point2):
+    """
+    計算兩個三維點之間的歐幾里得距離
+    
+    參數：
+    point1, point2: 列表或元組，包含三個元素表示三維座標，例如 (x, y, z)
+    
+    返回值：
+    兩點之間的歐幾里得距離
+    """
+    point1 = np.array(point1)
+    point2 = np.array(point2)
+    distance = np.linalg.norm(point1 - point2)
+    return distance
+
+# %%
+def get_folder_paths(base_path, folder, subfolder, method):
+    folder_path = base_path + folder + subfolder + method
+    return [os.path.join(folder_path, f) for f in os.listdir(folder_path) if not f.startswith('.') and os.path.isdir(os.path.join(folder_path, f))]
+
+def append_paths(all_paths, category, base_path, folder, subfolder, method, folder_list):
+    all_paths[category].extend([os.path.join(base_path, folder, subfolder, method, f) for f in folder_list])

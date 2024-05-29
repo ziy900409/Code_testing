@@ -364,3 +364,26 @@ def plot_plot(data, savepath, filename, filter_type):
     plt.ylabel("Voltage (V)", fontsize = 14)
     plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

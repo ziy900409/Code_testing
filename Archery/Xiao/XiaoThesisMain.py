@@ -22,9 +22,12 @@ Created on Sun May  5 14:18:26 2024
     
 @author: Hsin.Yang 05.May.2024
 """
+import gc
+import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,13 +36,129 @@ import XiaoThesisGeneralFunction as gen
 from detecta import detect_onset
 
 # %% parameter setting 
-staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v1_input.xlsx"
-c3d_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\R01\SH1_1OK.c3d"
+# staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v1_input.xlsx"
+staging_path = r"D:\BenQ_Project\python\Archery\Archery_stage_v1_input.xlsx"
+# c3d_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\R01\SH1_1OK.c3d"
+c3d_path = r"D:\BenQ_Project\python\Archery\R01\SH1_1OK.c3d"
 
+
+
+folder_paramter = {"data_path": r"C:/Users/angel/Documents/NTSU/data/112_Plan2_YFMSArchery/",
+                   "method_subfolder": ["Method_1"], # , "Method_2"
+                   "subject_subfolder": ["test1", "test2"],
+                   "staging_file":[]}
+
+data_path = r"D:\BenQ_Project\python\Archery\\"
+
+# ------------------------------------------------------------------------
+# 設定資料夾
+"""
+Archery --- Raw_Data ---- c3d ---- file
+        -            -
+        -            -
+        -            ---- EMG ---- motion
+        -                     -
+        -                     -
+        -                     ---- MVC
+        -                     -
+        -                     -
+        -                     ---- SAVE
+        -                     -
+        -                     -
+        -                     ---- X
+        -
+        -
+        --- Processing_Data ---- c3d ---- data
+                            -        -
+                            -        -
+                            -        ---- figure
+                            -
+                            -
+                            ---- EMG
+
+"""
+# 第一層 ----------------------------------------------------------------------
+RawData_folder = "\\Raw_Data\\"
+processingData_folder = "\\Processing_Data\\"
+# 第二層 ----------------------------------------------------------------------
+# 動作資料夾名稱
+c3d_folder = "\\c3d\\"
+# EMG 資料夾
+emg_folder = "\\EMG\\"
+# 第三層 ----------------------------------------------------------------------
+
+fig_save = "\\figure"
+# 子資料夾名稱
+sub_folder = "\\\\"
+
+# MVC資料夾名稱
+MVC_folder = "MVC"
+# downsampling frequency
+down_freq = 1000
+# 抓放箭時候前後秒數
+# example : [秒數*採樣頻率, 秒數*採樣頻率]
+release = [5*down_freq, 1*down_freq]
+# 設定移動平均數與移動均方根之參數
+# 更改window length, 更改overlap length
+time_of_window = 0.1 # 窗格長度 (單位 second)
+overlap_len = 0.5 # 百分比 (%)
+# 預處理資料可修改檔名，並新增標籤，如：S2_MVC_Rep_1.16 -> S2_MVC_Rep_1.16_low
+end_name = "_ed"
+# 平滑處理方式 ex: lowpass, rms, moving
+smoothing_method = 'rms'
+# median frequency duration
+duration = 1 # unit : second
+processing_folder_path = data_path + processingData_folder
+
+# ---------------------找放箭時間用----------------------------
+# 設定最接近放箭位置之acc sensor的欄位編號，建議看完三軸資料再選最大的
+# 可設定數字或是欄位名稱：ex: R EXTENSOR GROUP: ACC.Y 1 or 5
+release_acc = 7
+# 設定放箭的振幅大小值
+release_peak = 1.0
+
+# %% 路徑設置
+
+all_rawdata_folder_path = {"motion": [], "EMG": []}
+all_processing_folder_path = {"motion": [], "EMG": []}
+
+for method in folder_paramter["method_subfolder"]:
+    emg_raw_folders = gen.get_folder_paths(data_path, emg_folder, RawData_folder, method)
+    motion_raw_folders = gen.get_folder_paths(data_path, c3d_folder, RawData_folder, method)
+    emg_processing_folders = gen.get_folder_paths(data_path, emg_folder, processingData_folder, method)
+    motion_processing_folders = gen.get_folder_paths(data_path, c3d_folder, processingData_folder, method)
+    
+    gen.append_paths(all_rawdata_folder_path, "EMG", data_path, emg_folder, RawData_folder, method, emg_raw_folders)
+    gen.append_paths(all_rawdata_folder_path, "motion", data_path, c3d_folder, RawData_folder, method, motion_raw_folders)
+    gen.append_paths(all_processing_folder_path, "EMG", data_path, emg_folder, processingData_folder, method, emg_processing_folders)
+    gen.append_paths(all_processing_folder_path, "motion", data_path, c3d_folder, processingData_folder, method, motion_processing_folders)
+    del emg_raw_folders, motion_raw_folders, emg_processing_folders, motion_processing_folders
+gc.collect(generation=2)
+    
 # %%
-# read staging file
-staging_file = pd.read_excel(staging_path,
-                             sheet_name="R01")
+"""
+1. 將分期檔與檔案對應
+2. 找分期時間
+3. 繪圖
+"""
+folder_list = ["R01"]
+
+for folder in folder_list:
+    # read staging file
+    staging_file = pd.read_excel(staging_path,
+                                 sheet_name=folder)
+    file_list = gen.Read_File(data_path + motion_folder + folder,
+                              ".c3d",
+                              subfolder=False)
+    for file in file_list:
+        for file_name in range(len(staging_file["Motion_filename"])):
+            filepath, tempfilename = os.path.split(file)
+            # filename, extension = os.path.splitext(tempfilename)
+            if tempfilename == staging_file["Motion_filename"][file_name]:
+                print(tempfilename)
+        
+    
+    
 # read .c3d
 motion_info, motion_data, analog_info, analog_data, np_motion_data = mot.read_c3d(c3d_path)
 
@@ -79,24 +198,11 @@ E3_idx = abs(L_Wrist_Rad_z["L.Wrist.Rad_z"] - L_Acromion_z["L.Acromion_z"]).idxm
 # 找安卡期 R.Finger 最貼近 C7 or Front.Head 的時間點 
 
 
-def euclidean_distance(point1, point2):
-    """
-    計算兩個三維點之間的歐幾里得距離
-    
-    參數：
-    point1, point2: 列表或元組，包含三個元素表示三維座標，例如 (x, y, z)
-    
-    返回值：
-    兩點之間的歐幾里得距離
-    """
-    point1 = np.array(point1)
-    point2 = np.array(point2)
-    distance = np.linalg.norm(point1 - point2)
-    return distance
+
 
 E3_idx = []
 for i in range(len(C7)):
-    E3_idx.append(euclidean_distance(C7.loc[i, ["C7_x", "C7_y", "C7_z"]],
+    E3_idx.append(gen.euclidean_distance(C7.loc[i, ["C7_x", "C7_y", "C7_z"]],
                                      R_Finger.loc[i, ["R.Finger_x", "R.Finger_y", "R.Finger_z"]]))
 np.array(E3_idx).argmin()
 # 4. E4: 放箭時間:根據資料末端2000點判定，即時運算移動平均, R. Elbow Lat X軸
