@@ -7,7 +7,7 @@ Created on Fri Mar 29 16:49:22 2024
 
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\4. code")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\allseries")
 import AllSeries_general_func_20240327 as gen
 import AllSeries_emg_func_20240327 as emg
 from detecta import detect_onset
@@ -324,9 +324,6 @@ file_name = "LiftingShot_data_" + formatted_date + ".xlsx"
 
 # %% statistic
 
-    
-    
-  
     
     
     

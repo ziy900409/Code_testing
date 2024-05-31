@@ -126,15 +126,16 @@ for i in range(len(rowdata_folder_list)):
         dis_mouse_MFinger = np.sqrt((mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_x'])**2 + \
                                     (mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_y'])**2 + \
                                     (mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_z'])**2)
-        min_dis = min(dis_mouse_MFinger)
-        max_dis = max(dis_mouse_MFinger)
+        min_dis = np.min(dis_mouse_MFinger)
+        max_dis = np.max(dis_mouse_MFinger)
+        std_dis = np.std(dis_mouse_MFinger)
         
         # 3. 儲存資料-----------------------------------------------------------
         # 將資料儲存至矩陣
         add_data = pd.DataFrame({"file_name":filename,
-                                 "direction":vel_direc,
-                                 "max_value": first_max_values,
-                                 'Thumb angle': angle_thumb[first_max_idx],
+                                 "min_dis":np.min(dis_mouse_MFinger),
+                                 "max_dis": first_max_values,
+                                 'std_dis': angle_thumb[first_max_idx],
                                  'Ring angle': angle_ring[first_max_idx],
                                  'Little finger angle': angle_little[first_max_idx],
                                  'Wrist angle': angle_wrist[first_max_idx]},
