@@ -21,8 +21,10 @@ import numpy as np
 from scipy import signal, interpolate
 import math
 import logging #print 警告用
+from pandas import DataFrame
 import matplotlib.pyplot as plt
 from scipy.fftpack import fft, fftfreq
+import XiaoThesisGeneralFunction as gen
 
 # %%
 # ---------------------前處理用--------------------------------
@@ -36,6 +38,12 @@ lowpass_freq = 6/0.802
 # 更改window length, 更改overlap length
 time_of_window = 0.1 # 窗格長度 (單位 second)
 overlap_len = 0.5 # 百分比 (%)
+# ---------------------找放箭時間用----------------------------
+# 設定最接近放箭位置之acc sensor的欄位編號，建議看完三軸資料再選最大的
+# 可設定數字或是欄位名稱：ex: R EXTENSOR GROUP: ACC.Y 1 or 5
+release_acc = 17
+# 設定放箭的振幅大小值
+release_peak = 1.5
 
 # %% EMG data processing
 def EMG_processing(raw_data_path, smoothing="lowpass"):
@@ -364,8 +372,73 @@ def plot_plot(data, savepath, filename, filter_type):
     plt.ylabel("Voltage (V)", fontsize = 14)
     plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
-    
-    
+# %%  to find the release timing
+
+def find_release_time(folder_path, save_path, save_fig=True):
+    # 讀所有.csv file
+    file_list = gen.Read_File(folder_path, '.csv')
+    release_timing_list = pd.DataFrame(columns = ["FileName", "Time Frame(降1000Hz)", "Time"])
+    # 繪圖用
+    n = int(math.ceil(len(file_list) /2))
+    plt.figure(figsize=(2*n,10))
+    fig, axs = plt.subplots(n, 2, figsize = (10,12))
+    for ii in range(len(file_list)):
+        if os.path.splitext(file_list[ii])[1] == ".csv":
+            filepath, tempfilename = os.path.split(file_list[ii])
+            data = pd.read_csv(file_list[ii])
+            # to find R EXTENSOR CARPI RADIALIS: ACC X data [43]
+            Extensor_ACC = data.iloc[:, release_acc]
+            # acc sampling rate
+            acc_freq = int(1/np.mean(np.array(data.iloc[2:11, (release_acc - 1)])
+                                     - np.array(data.iloc[1:10, (release_acc - 1)])))
+            # there should change with different subject
+            peaks, _ = signal.find_peaks(Extensor_ACC*-1, height = release_peak)
+            # 繪圖用，計算子圖編號
+            x, y = ii - n*math.floor(abs(ii)/n), math.floor(abs(ii)/n)
+            if peaks.any():
+                # Because ACC sampling frequency is 148Hz and EMG is 2000Hz
+                release_time = data.iloc[peaks[0], release_acc-1]
+                release_index = int((peaks[0]/acc_freq)*1000)
+                # 畫圖
+                axs[x, y].plot(data.iloc[:, release_acc-1], Extensor_ACC)
+                axs[x, y].set_title(tempfilename, fontsize = 12)
+                # 設定科學符號 : 小數點後幾位數
+                axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+                axs[x, y].plot(release_time,Extensor_ACC[peaks[0]], marker = "x", markersize=10)
+                axs[x, y].annotate(release_time, xy = (0, 0), fontsize = 16, color='b')
+            else:
+                release_index = "Nan"
+                release_time = "Nan"
+                axs[x, y].plot(data.iloc[:, release_acc-1], Extensor_ACC)
+                axs[x, y].set_title(tempfilename, fontsize = 12)
+                # 設定科學符號 : 小數點後幾位數
+                axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+                axs[x, y].annotate('Can not find', xy = (0, 0), fontsize = 16, color='r')
+            # to create DataFrame that easy to write data in a excel
+            # ii = ii.replace('.', '_')
+            release_time_number = pd.DataFrame([file_list[ii], release_index, release_time])
+            release_time_number = np.transpose(release_time_number)
+            release_time_number.columns = ["FileName", "Time Frame(降1000Hz)", "Time"]
+            release_timing_list = pd.concat([release_timing_list, release_time_number], ignore_index=True)
+
+    # 設定整張圖片之參數
+    plt.suptitle(str("release time: " + save_path.split('\\')[-1]), fontsize = 16)
+    plt.tight_layout()
+    fig.add_subplot(111, frameon=False)
+    # hide tick and tick label of the big axes
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+    plt.grid(False)
+    plt.xlabel("time (second)", fontsize = 14)
+    plt.ylabel("acc (g)", fontsize = 14)
+    plt.savefig(str(save_path + '\\' + save_path.split('\\')[-2] + "_" \
+                    + save_path.split('\\')[-1] + "_ReleaseTiming.jpg"),
+                dpi=100)
+    plt.show()
+    # writting data to a excel file
+    save_iMVC_name = save_path + '\\' + save_path.split('\\')[-2] + "_" \
+        + save_path.split('\\')[-1] + '_ReleaseTiming.xlsx' 
+    DataFrame(release_timing_list).to_excel(save_iMVC_name, sheet_name='Sheet1', index=False, header=True)
+    return release_index
     
     
     

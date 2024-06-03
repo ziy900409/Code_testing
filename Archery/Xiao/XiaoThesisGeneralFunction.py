@@ -81,10 +81,5 @@ def euclidean_distance(point1, point2):
     distance = np.linalg.norm(point1 - point2)
     return distance
 
-# %%
-def get_folder_paths(base_path, folder, subfolder, method):
-    folder_path = base_path + folder + subfolder + method
-    return [os.path.join(folder_path, f) for f in os.listdir(folder_path) if not f.startswith('.') and os.path.isdir(os.path.join(folder_path, f))]
 
-def append_paths(all_paths, category, base_path, folder, subfolder, method, folder_list):
-    all_paths[category].extend([os.path.join(base_path, folder, subfolder, method, f) for f in folder_list])
+    
