@@ -264,6 +264,8 @@ for subject in subject_list:
                                                           np.mean(-filted_motion.loc[end_index-750:end_index, "R.Epi.Lat_x"].values) + \
                                                               np.std(filted_motion.loc[end_index-750:end_index, "R.Epi.Lat_x"].values),
                                                           n_above=0, n_below=0, show=True)
+                                        
+                                    csv_data = pd.read_csv(emg_file)
                                     # 5. E5: 擷取直到弓身低於T10 Z軸高度，停止擷取。
                                     # find bow_middle < T10_z and time begin from E2
                                     E5_idx = (bow_middle.loc[E2_idx:, "Middle_z"] < T10_z.loc[E2_idx:, "T10_z"]).idxmax()
