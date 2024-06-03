@@ -9,16 +9,16 @@ import sys
 # 路徑改成你放自己code的資料夾
 sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\allseries")
 import AllSeries_general_func_20240327 as gen
-import AllSeries_emg_func_20240327 as emg
+# import AllSeries_emg_func_20240327 as emg
 from detecta import detect_onset
 from scipy import signal
 from datetime import datetime
-import math
+# import math
 
 import numpy as np
 import pandas as pd
 import os
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
  # %% parameter setting
 smoothing = 'lowpass'
 c = 0.802

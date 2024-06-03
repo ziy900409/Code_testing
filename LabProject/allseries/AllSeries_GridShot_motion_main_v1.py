@@ -15,10 +15,19 @@ import sys
 from scipy import signal
 # 路徑改成你放自己code的資料夾
 sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\allseries")
-import AllSeries_emg_func_20240327 as emg
+# import AllSeries_emg_func_20240327 as emg
 import AllSeries_general_func_20240327 as gen
-import gc
+# import gc
 from detecta import detect_onset
+from datetime import datetime
+# 获取当前日期和时间
+now = datetime.now()
+
+# 将日期转换为指定格式
+formatted_date = now.strftime("%Y-%m-%d")
+
+# 输出格式化后的日期
+print("当前日期：", formatted_date)
 # %% parameter setting
 # path setting
 data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\1. Motion Analysis\\"
@@ -75,7 +84,7 @@ staging_file_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\ZowieAllSeries
 # %% 分析疲勞
 tic = time.process_time()
 # 建立 slope data 要儲存之位置
-all_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse', 'distance'])
+all_dis_data = pd.DataFrame({}, columns = ['mouse'])
 for i in range(len(rowdata_folder_list)):
     print(rowdata_folder_list[i])
     c3d_file_path = gen.Read_File(data_path + RawData_folder +  rowdata_folder_list[i],
@@ -95,6 +104,8 @@ for i in range(len(rowdata_folder_list)):
         # 將檔名拆開
         filepath, tempfilename = os.path.split(grid_shot_file_list[ii])
         filename, extension = os.path.splitext(tempfilename)
+        # 定義受試者編號以及滑鼠名稱
+        trial_info = filename.split("_")
         # 1. 讀取資料與初步處理-------------------------------------------------
         # 讀取 c3d data
         motion_info, motion_data, analog_info, analog_data, np_motion_data = gen.read_c3d(grid_shot_file_list[ii])
@@ -113,9 +124,9 @@ for i in range(len(rowdata_folder_list)):
         filted_motion = pd.DataFrame(np.empty(np.shape(motion_data)),
                                      columns = motion_data.columns)
         filted_motion.iloc[:, 0] = motion_data.iloc[:, 0]
-        for i in range(np.shape(motion_data)[1]-1):
-            filted_motion.iloc[:, i+1] = signal.sosfiltfilt(lowpass_sos,
-                                                    motion_data.iloc[:, i+1].values)
+        for iii in range(np.shape(motion_data)[1]-1):
+            filted_motion.iloc[:, iii+1] = signal.sosfiltfilt(lowpass_sos,
+                                                              motion_data.iloc[:, iii+1].values)
         # 2. 計算資料-----------------------------------------------------------
         # 計算中指掌指關節座標點與 mouse 的距離
         # 平均 mouse M2, M3, M4 的距離, 相加除以3
@@ -126,58 +137,29 @@ for i in range(len(rowdata_folder_list)):
         dis_mouse_MFinger = np.sqrt((mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_x'])**2 + \
                                     (mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_y'])**2 + \
                                     (mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_z'])**2)
-        min_dis = np.min(dis_mouse_MFinger)
-        max_dis = np.max(dis_mouse_MFinger)
-        std_dis = np.std(dis_mouse_MFinger)
         
         # 3. 儲存資料-----------------------------------------------------------
         # 將資料儲存至矩陣
-        add_data = pd.DataFrame({"file_name":filename,
-                                 "min_dis":np.min(dis_mouse_MFinger),
-                                 "max_dis": first_max_values,
-                                 'std_dis': angle_thumb[first_max_idx],
-                                 'Ring angle': angle_ring[first_max_idx],
-                                 'Little finger angle': angle_little[first_max_idx],
-                                 'Wrist angle': angle_wrist[first_max_idx]},
+        add_data = pd.DataFrame({"file_name": filename,
+                                 "subject": trial_info[0],
+                                 "task": trial_info[1],
+                                 "mouse": trial_info[2],
+                                 "min_dis": np.min(dis_mouse_MFinger),
+                                 "max_dis": np.max(dis_mouse_MFinger),
+                                 'std_dis': np.std(dis_mouse_MFinger),
+                                 "mean_dis": np.mean(dis_mouse_MFinger)
+                                 },
                                 index=[0])
-        data_store = pd.concat([add_data, data_store], ignore_index=True)
+        all_dis_data = pd.concat([add_data, all_dis_data],
+                                 ignore_index=True)
         
+path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\\"
+file_name = "GridShot_distance_statistic_" + formatted_date + ".xlsx"
+all_dis_data.to_excel(path + file_name,
+                      sheet_name='Sheet1', index=False, header=True)
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-        
-        
-        # 前處理EMG data
-        processing_data, bandpass_filtered_data = emg.EMG_processing(grid_shot_file_list[ii], smoothing=smoothing)
-
-        # 畫 bandpass 後之資料圖
-        emg.plot_plot(bandpass_filtered_data, str(fig_svae_path),
-                      filename, "_Bandpass")
-        # 畫smoothing 後之資料圖
-        emg.plot_plot(processing_data, str(fig_svae_path),
-                      filename, str(smoothing + "_"))
-        # writting data in worksheet
-        file_name = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + MVC_folder + "\\data\\" + filename + end_name + ".xlsx"
-        pd.DataFrame(processing_data).to_excel(data_svae_path + save_name + "_lowpass.xlsx",
-                                               sheet_name='Sheet1', index=False, header=True)
-
-        
-
-        # 繪製傅立葉轉換圖，包含要不要做 notch filter
-        # emg.Fourier_plot(grid_shot_file_list[ii], fig_svae_path, save_name)
-        # emg.Fourier_plot(grid_shot_file_list[ii], fig_svae_path, save_name, notch=True)
-        # 將檔案儲存成.xlsx
-        # med_freq_data.to_excel(data_svae_path + save_name + "_MedFreq.xlsx")
-        print(data_svae_path + save_name + "_MedFreq.xlsx")
