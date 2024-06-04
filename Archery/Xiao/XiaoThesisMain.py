@@ -21,6 +21,7 @@ Created on Sun May  5 14:18:26 2024
 2. 同步EMG時間
     
 @author: Hsin.Yang 05.May.2024
+\
 """
 import gc
 import os
@@ -107,6 +108,12 @@ release_acc = 7
 # 設定放箭的振幅大小值
 release_peak = 1.0
 
+# 设定阈值和窗口大小
+threshold = 0.03
+window_size = 5
+                                    
+                                    
+
 # %% 路徑設置
 
 all_rawdata_folder_path = {"motion": [], "EMG": []}
@@ -160,7 +167,7 @@ gc.collect(generation=2)
 2. 找分期時間
 3. 繪圖
 """
-subject_list = ["R01", "R02"]
+subject_list = ["R02"]
 
 for subject in subject_list:
     for motion_folder in all_rawdata_folder_path["motion"]:
@@ -183,13 +190,15 @@ for subject in subject_list:
                         for emg_file in emg_list:
                             if staging_file["Motion_filename"][idx] in motion_file \
                                 and staging_file["EMG_filename"][idx] in emg_file:
-                                    # print(motion_file)
-                                    # print(emg_file)
+                                    print(motion_file)
+                                    print(emg_file)
                                     filepath, tempfilename = os.path.split(motion_file)
                                     # filename, extension = os.path.splitext(tempfilename)
                                     # read .c3d
                                     motion_info, motion_data, analog_info, analog_data, np_motion_data = mot.read_c3d(motion_file)
                                     # read .csv
+                                    Extensor_ACC = pd.read_csv(emg_file).iloc[:, [release_acc-1, release_acc]]
+                                    # preprocessing EMG data
                                     processing_data, bandpass_filtered = emg.EMG_processing(emg_file, smoothing=smoothing_method)
                                     # rename columns name
                                     rename_columns = motion_data.columns.str.replace("2023 Archery_Rev:", "")
@@ -212,75 +221,108 @@ for subject in subject_list:
                                         end_index = staging_file["End_index_frame"][idx]
                                     # 定義基本參數
                                     motion_sampling_rate = motion_info["frame_rate"]
-                                    emg_smaple_rate = int(1 / (bandpass_filtered.iloc[1, 0] - bandpass_filtered.iloc[0, 0]))
+                                    emg_sample_rate = 1 / (bandpass_filtered.iloc[1, 0] - bandpass_filtered.iloc[0, 0])
+                                    acc_sample_rate = 1 / (Extensor_ACC.iloc[1, 0] - Extensor_ACC.iloc[0, 0])
                                     # 定義所需要的 markerset, 時間都從 Start_index_frame 開始
-                                    L_Wrist_Rad_z = motion_data.loc[start_index:, ["Frame", "L.Wrist.Rad_z"]].reset_index(drop=True)
-                                    T10_z = motion_data.loc[start_index:, ["Frame", "T10_z"]].reset_index(drop=True)
-                                    L_Acromion_z = motion_data.loc[start_index:, ["Frame", "L.Acromion_z"]].reset_index(drop=True)
-                                    R_Elbow_Lat_x = motion_data.loc[start_index:, ["Frame", "R.Epi.Lat_x"]].reset_index(drop=True)
-                                    bow_middle = motion_data.loc[start_index:, ["Frame", "Middle_z"]].reset_index(drop=True)
-                                    C7 = motion_data.loc[start_index:, ["Frame", "C7_x", "C7_y", "C7_z"]].reset_index(drop=True)
-                                    R_Finger = motion_data.loc[start_index:, ["Frame", "R.Finger_x", "R.Finger_y", "R.Finger_z"]].reset_index(drop=True)
+                                    
+                                    C7 = filted_motion.loc[start_index:, ["Frame", "C7_x", "C7_y", "C7_z"]].reset_index(drop=True)
+                                    T10 = filted_motion.loc[start_index:, ["Frame", "T10_x", "T10_y", "T10_z"]].reset_index(drop=True)
+                                    L_Acromion = filted_motion.loc[start_index:, ["Frame", "L.Acromion_x", "L.Acromion_y", "L.Acromion_z"]].reset_index(drop=True)
+                                    L_Wrist_Rad = filted_motion.loc[start_index:, ["Frame", "L.Wrist.Rad_x", "L.Wrist.Rad_y", "L.Wrist.Rad_z"]].reset_index(drop=True)
+                                    R_Elbow_Lat = filted_motion.loc[start_index:, ["Frame", "R.Epi.Lat_x", "R.Epi.Lat_y", "R.Epi.Lat_z"]].reset_index(drop=True)
+                                    R_Wrist_Rad = filted_motion.loc[start_index:, ["Frame", "R.Wrist.Rad_x", "R.Wrist.Rad_y", "R.Wrist.Rad_z"]].reset_index(drop=True)
+                                    R_Finger = filted_motion.loc[start_index:, ["Frame", "R.Finger_x", "R.Finger_y", "R.Finger_z"]].reset_index(drop=True)
+                                    bow_middle = filted_motion.loc[start_index:, ["Frame", "Middle_x", "Middle_y", "Middle_z"]].reset_index(drop=True)
                                     # 抓分期時間
                                     # 找L.Wrist.Rad Z, T10 Z, L.Acromion Z, R.Elbow Lat X
                                     
-                                    # 0. 抓 trigger onset
+                                    # 0. 抓 trigger onset, release time ----------------------------------------------------------
                                     # analog channel: C63
                                     triggrt_on = detect_onset(analog_data["C63"]*-1,
                                                               np.mean(analog_data["C63"][:100]*-1)*0.8,
                                                               n_above=0, n_below=0, show=True)
+                                    # find time of arrow release
+                                    peaks, _ = signal.find_peaks(Extensor_ACC.iloc[:, 1]*-1, height = release_peak)
                                     # 0.1. 換算 EMG 時間
-                                    emg_start_index = int((start_index - (triggrt_on[0, 0]/analog_info["frame_rate"])) \
-                                        / motion_sampling_rate * emg_smaple_rate)
-                                    emg_end_index = int((end_index - (triggrt_on[0, 0]/analog_info["frame_rate"])) \
-                                        / motion_sampling_rate * emg_smaple_rate)
+                                    emg_start_index = round((start_index - (triggrt_on[0, 0]/analog_info["frame_rate"])) \
+                                        / motion_sampling_rate * emg_sample_rate)
+                                    emg_end_index = round((end_index - (triggrt_on[0, 0]/analog_info["frame_rate"])) \
+                                        / motion_sampling_rate * emg_sample_rate)
+                                    # 0.2. 換算 ACC to motion 時間
+                                    motion_release_frame = round(peaks[0] / acc_sample_rate * motion_sampling_rate + \
+                                                                 (triggrt_on[0, 0] / analog_info["frame_rate"] * motion_sampling_rate))
                                     
                                     # 1. E1: 當L.Wrist.Rad Z軸高度超過T10 Z軸高度 擷取此段資料。
                                     # 布林判斷L_Wrist_Rad_z["L.Wrist.Rad_z"] > T10_z["T10_z"] 的第一個 TRUE 位置
-                                    E1_idx = (L_Wrist_Rad_z["L.Wrist.Rad_z"] > T10_z["T10_z"]).idxmax() + start_index
+                                    E1_idx = (L_Wrist_Rad["L.Wrist.Rad_z"] > T10["T10_z"]).idxmax() + start_index
                                     
                                     # 2. E2: 舉弓頂點時間:根據全段資料，以L.Wrist.Rad Z軸判定，回傳位置峰值
                                     #    數值與對應時間點，即時運算角度後取角度峰直數值與對應時間點
-                                    E2_idx = L_Wrist_Rad_z["L.Wrist.Rad_z"].idxmax() + start_index
+                                    E2_idx = L_Wrist_Rad["L.Wrist.Rad_z"].idxmax() + start_index
                                     
-                                    # 3. E3: 當L.Wrist.Rad Z軸高度等於L. Acromion Z進行標記
+                                    # 3. E3-1, E3-2
+                                    # E3-1 : 引弓中段，寫在欄位 3-1_Draw_half_frame、3-1_Time[s]
+                                    E3_1_compare = (R_Wrist_Rad.loc[:, "R.Wrist.Rad_x"].values < T10.loc[:, "T10_x"].values)
+                                    E3_1_idx = [np.where(E3_1_compare)[0][0] if E3_1_compare.any() else None][0] + start_index
+                                    # E3-2 : 固定，寫在欄位 3-2_Anchor_frame、3-2_Time[s]
                                     # 找兩者相減的最小值
-                                    E3_idx_v1 = abs(L_Wrist_Rad_z["L.Wrist.Rad_z"] - L_Acromion_z["L.Acromion_z"]).idxmin() + start_index
-                                    # 找安卡期 R.Finger 最貼近 C7 or Front.Head 的時間點 
-                                    E3_cal = []
+                                    E3_idx_v1 = abs(L_Wrist_Rad["L.Wrist.Rad_z"] - L_Acromion["L.Acromion_z"]).idxmin() + start_index
+                                    # 找安卡期 R.Wrist.Rad 最貼近 C7 or Front.Head 的時間點
+                                    # 應該用變化量來計算，設定變化量的閾值
+                                    E3_2_cal = []
                                     for i in range(len(C7)):
-                                        E3_cal.append(gen.euclidean_distance(C7.loc[i, ["C7_x", "C7_y", "C7_z"]],
-                                                                             R_Finger.loc[i, ["R.Finger_x", "R.Finger_y", "R.Finger_z"]]))
-                                    E3_idx_v2 = np.array(E3_cal).argmin()
-                                    """
-                                    2024-06-03-23:46 改到這裡
-                                    需要改掉
-                                    1. 放箭時間:根據資料末端2000點判定，即時運算移動平均, R. Elbow Lat X軸
-                                    改成用放箭時間判斷
-                                    """
-                                    # 4. E4: 放箭時間:根據資料末端2000點判定，即時運算移動平均, R. Elbow Lat X軸
+                                        E3_2_cal.append(gen.euclidean_distance(C7.loc[i, ["C7_x", "C7_y", "C7_z"]],
+                                                                               R_Finger.loc[i, ["R.Finger_x", "R.Finger_y", "R.Finger_z"]]))
+                                    E3_2_diff = abs(np.array(E3_2_cal)[1:] - np.array(E3_2_cal)[:-1])
+
+                                    E3_2_idx = gen.find_index(E3_2_diff, threshold, window_size) + start_index
+                                    # 4. E4: 放箭時間:根據 Extensor_acc ，往前抓0.3~1.3秒, R. Elbow Lat X 軸
                                     #       超出前1秒數據3個標準差，判定為放箭
                                     E4_idx = detect_onset(-filted_motion.loc[start_index:end_index, "R.Epi.Lat_x"].values,
-                                                          np.mean(-filted_motion.loc[end_index-750:end_index, "R.Epi.Lat_x"].values) + \
-                                                              np.std(filted_motion.loc[end_index-750:end_index, "R.Epi.Lat_x"].values),
+                                                          np.mean(-filted_motion.loc[motion_release_frame-225:motion_release_frame-75,
+                                                                                     "R.Epi.Lat_x"].values)*0.98,
                                                           n_above=0, n_below=0, show=True)
-                                        
-                                    csv_data = pd.read_csv(emg_file)
-                                    # 5. E5: 擷取直到弓身低於T10 Z軸高度，停止擷取。
+                                    # 5. E5: 擷取直到弓身低於 T10 Z 軸高度，停止擷取。
                                     # find bow_middle < T10_z and time begin from E2
-                                    E5_idx = (bow_middle.loc[E2_idx:, "Middle_z"] < T10_z.loc[E2_idx:, "T10_z"]).idxmax()
+                                    E5_idx = (bow_middle.loc[E2_idx:, "Middle_z"].values < T10.loc[E2_idx:, "T10_z"].values).idxmax() 
                                     # 6. 舉弓角度計算
                                     # T10, L_Wrist_Rad, L_Wrist_Rad 在 T10 平面的投影點
                                     T10 = motion_data.loc[start_index:, ["Frame","T10_x", "T10_y", "T10_z"]]
                                     L_Wrist_Rad = motion_data.loc[start_index:, ["Frame", "L.Wrist.Rad_z"]]
                                     
                                     # 7. 繪圖
-                                    fig, axes = plt.subplots(4, 1, figsize=(8, 10))  
-                                    # 绘制第一个子图
-                                    axes[0].plot(filted_motion.loc[:, 'Frame'].values,
+                                    cmap = plt.get_cmap('Set2')
+                                    # 设置颜色
+                                    colors = [cmap(i) for i in np.linspace(0, 1, 6)]
+                                    fig, axes = plt.subplots(3, 1, figsize=(8, 10))
+                                    
+                                    # 繪製第一個子圖 X 軸: R.Wrist.Rad, R.Elbow.Lat, L.Acromin, L.Wrist.Rad, T10, Middle 
+                                    # 繪製 motion data
+                                    axes[0].plot(filted_motion.loc[:, 'Frame'].values, # R.Wrist.Rad
+                                                 filted_motion.loc[:, "R.Wrist.Rad_x"].values,
+                                                 color=colors[0], label = "R.Wrist.Rad")
+                                    axes[0].plot(filted_motion.loc[:, 'Frame'].values, # R.Epi.Lat
                                                  filted_motion.loc[:, "R.Epi.Lat_x"].values,
-                                                 color='blue')  # 假设 data1 是一个 Series 或 DataFrame
-                                    axes[0].axvline(E1_idx/motion_info['frame_rate'], color='r', linestyle='--') # trigger onset
+                                                 color=colors[1], label = "R.Epi.Lat")
+                                    axes[0].plot(filted_motion.loc[:, 'Frame'].values, # L.Acromion
+                                                 filted_motion.loc[:, "L.Acromion_x"].values,
+                                                 color=colors[2], label = "L.Acromion")
+                                    axes[0].plot(filted_motion.loc[:, 'Frame'].values, # L.Wrist.Rad
+                                                 filted_motion.loc[:, "L.Wrist.Rad_x"].values,
+                                                 color=colors[3], label = "L.Wrist.Rad")
+                                    axes[0].plot(filted_motion.loc[:, 'Frame'].values, # T10
+                                                 filted_motion.loc[:, "T10_x"].values,
+                                                 color=colors[4], label = "T10")
+                                    axes[0].plot(filted_motion.loc[:, 'Frame'].values, # Middle
+                                                 filted_motion.loc[:, "Middle_x"].values,
+                                                 color=colors[5], label = "Middle")
+                                    # 劃分期線
+                                    axes[0].axvline(filted_motion.loc[motion_release_frame, 'Frame'],
+                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
+                                    
+                                    
+                                    axes[0].plot(rightLeg_off + right_time, combin_right[rightLeg_off + right_time], # 右腳離地時間
+                                                 marker = 'o', ms = 10, mec='c', mfc='none')
                                     axes[0].axvline((E2_idx)/motion_info['frame_rate'], # R.I.Finger down
                                                     color='c', linestyle='--') 
                                     axes[0].axvline((E3_idx_v1)/motion_info['frame_rate'], # R.I.Finger up
@@ -291,7 +333,7 @@ for subject in subject_list:
                                                     color='c', linestyle='--')
                                     axes[0].set_xlim(0, analog_data['Frame'].iloc[-1])
                                     axes[0].set_title('R.I.Finger3_x')  # 设置子图标题
-                                    # 绘制第二个子图
+                                    # 繪製第一個子圖 Y 軸
                                     axes[1].plot(filted_motion.loc[:, 'Frame'].values,
                                                  filted_motion.loc[:, 'R.I.Finger3_y'].values,
                                                  color='blue')  # 假设 data2 是一个 Series 或 DataFrame
@@ -300,7 +342,7 @@ for subject in subject_list:
                                                     color='c', linestyle='--') 
                                     axes[1].set_xlim(0, analog_data['Frame'].iloc[-1])
                                     axes[1].set_title('R.I.Finger3_y')  # 设置子图标题
-                                    # 绘制第三个子图
+                                    # 繪製第一個子圖 Z 軸
                                     axes[2].plot(filted_motion.loc[:, 'Frame'].values,
                                                  filted_motion.loc[:, 'R.I.Finger3_z'].values,
                                                  color='blue')  # 假设 data2 是一个 Series 或 DataFrame
@@ -329,6 +371,42 @@ for subject in subject_list:
 
 
 # %% 資料前處理 : bandpass filter, absolute value, smoothing
+
+from matplotlib import colormaps
+import matplotlib as mpl
+list(colormaps['Paired'])
+colormaps['Paired']
+cmaps = {}
+
+gradient = np.linspace(0, 1, 256)
+gradient = np.vstack((gradient, gradient))
+
+
+def plot_color_gradients(category, cmap_list):
+    # Create figure and adjust figure height to number of colormaps
+    nrows = len(cmap_list)
+    figh = 0.35 + 0.15 + (nrows + (nrows - 1) * 0.1) * 0.22
+    fig, axs = plt.subplots(nrows=nrows + 1, figsize=(6.4, figh))
+    fig.subplots_adjust(top=1 - 0.35 / figh, bottom=0.15 / figh,
+                        left=0.2, right=0.99)
+    axs[0].set_title(f'{category} colormaps', fontsize=14)
+
+    for ax, name in zip(axs, cmap_list):
+        ax.imshow(gradient, aspect='auto', cmap=mpl.colormaps[name])
+        ax.text(-0.01, 0.5, name, va='center', ha='right', fontsize=10,
+                transform=ax.transAxes)
+
+    # Turn off *all* ticks & spines, not just the ones with colormaps.
+    for ax in axs:
+        ax.set_axis_off()
+
+    # Save colormap list for later.
+    cmaps[category] = cmap_list
+plot_color_gradients('Qualitative',
+                     ['Pastel1', 'Pastel2', 'Paired', 'Accent', 'Dark2',
+                      'Set1', 'Set2', 'Set3', 'tab10', 'tab20', 'tab20b',
+                      'tab20c'])
+# %%
 """
 3. 資料前處理: 
     3.1. 需至 function code 修改設定參數

@@ -81,5 +81,12 @@ def euclidean_distance(point1, point2):
     distance = np.linalg.norm(point1 - point2)
     return distance
 
+# %% 查找满足条件的索引值
+def find_index(data, threshold, window_size):
+    for i in range(len(data) - window_size + 1):
+        if np.all(data[i:i + window_size] < threshold):
+            return i
+    return None
+
 
     
