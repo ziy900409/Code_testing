@@ -42,31 +42,43 @@ c3d_notch_cutoff_5 = [349.5, 350.5]
 
 down_freq = 2000
 
-csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor carpi radialis',
-                     'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
-                     'Mini sensor 3: EMG 3': 'Triceps',
-                     'Quattro sensor 4: EMG.A 4': 'Extensor carpi ulnaris', 
-                     'Quattro sensor 4: EMG.B 4': '1st. dorsal interosseous', 
-                     'Quattro sensor 4: EMG.C 4': 'Abductor digiti quinti', 
-                     'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
-                     'Avanti sensor 5: EMG 5': 'Biceps'}
 
-c3d_recolumns_name = {'ExtRad.IM EMG1': 'Extensor carpi radialis',
+csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
+                     'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
+                     'Mini sensor 3: EMG 3': 'Triceps Brachii',
+                     'Quattro sensor 4: EMG.A 4': 'Extensor Carpi Ulnaris', 
+                     'Quattro sensor 4: EMG.B 4': '1st Dorsal Interosseous', 
+                     'Quattro sensor 4: EMG.C 4': 'Abductor Digiti Quinti', 
+                     'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
+                     'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
+
+c3d_recolumns_name = {'ExtRad.IM EMG1': 'Extensor Carpi Radialis',
                      'FleRad.IM EMG2': 'Flexor Carpi Radialis',
-                     'Triceps.IM EMG3': 'Triceps',
-                     'ExtUlnar.IM EMG4': 'Extensor carpi ulnaris', 
-                     'DorInter_1st.IM EMG5': '1st. dorsal interosseous', 
-                     'AbdDigMin.IM EMG6': 'Abductor digiti quinti', 
+                     'Triceps.IM EMG3': 'Triceps Brachii',
+                     'ExtUlnar.IM EMG4': 'Extensor Carpi Ulnaris', 
+                     'DorInter_1st.IM EMG5': '1st Dorsal Interosseous', 
+                     'AbdDigMin.IM EMG6': 'Abductor Digiti Quinti', 
                      'ExtInd.IM EMG7': 'Extensor Indicis',
-                     'Biceps.IM EMG8': 'Biceps'}
+                     'Biceps.IM EMG8': 'Biceps Brachii'}
 
 c3d_analog_cha = ['ExtRad.IM EMG1', 'FleRad.IM EMG2', 'Triceps.IM EMG3', 'ExtUlnar.IM EMG4',
                   'DorInter_1st.IM EMG5', 'AbdDigMin.IM EMG6',  'ExtInd.IM EMG7', 'Biceps.IM EMG8']
 
 c3d_analog_idx = [64, 72, 73, 74, 75, 76, 77, 78]
-muscle_name = ['Extensor carpi radialis', 'Flexor Carpi Radialis', 'Triceps',
-               'Extensor carpi ulnaris', '1st. dorsal interosseous', 
-               'Abductor digiti quinti', 'Extensor Indicis', 'Biceps']
+muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
+               'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
+               'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
+# to find the MVC max
+MVC_order = {"0": ['1st\xa0Dorsal Interosseous'],
+             "1": ['Abductor Digiti Quinti'],
+             "2": ['Extensor Indicis'],
+             "3": ['Extensor Carpi Ulnaris'],
+             "4": ['Flexor Carpi Radialis'],
+             "5": ['Extensor Carpi Radialis'],
+             "6": ['Biceps Brachii'],
+             "7": ['Triceps Brachii']}
+muscle_order = list(MVC_order.keys())
+
 
 # %% 中頻率分析
 def median_frquency(raw_data_path, duration, fig_svae_path, filename):
@@ -786,6 +798,47 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     find_max_all = pd.concat([find_max_all, MVC_max], axis=0, ignore_index=True)
     # writting data to EXCEl file
     find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-1] + '_all_MVC.xlsx'
+    pd.DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
+    
+# %%
+
+def Find_MVC_max_order(staging_file, MVC_folder, MVC_save_path):
+    # MVC_folder = r'D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\2. EMG\processing_data\S01\MVC\data'
+    # MVC_save_path = r'D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\2. EMG\processing_data\S01\MVC'
+    MVC_file_list = os.listdir(MVC_folder)
+    MVC_data = pd.read_excel(MVC_folder + '\\' + MVC_file_list[0], engine='openpyxl')
+    find_max_all = []
+    find_max_all = pd.DataFrame(find_max_all,
+                                columns = MVC_data.columns.insert(0, 'FileName'))
+    find_max_all.rename(columns=csv_recolumns_name, inplace=True)
+    # 找出 MVC 的檔名
+    target_cond = (staging_file["Mouse"] == "MVC")
+    target_indices = staging_file.index[target_cond].tolist()
+    for muscle_num in target_indices:
+        for i in MVC_file_list:
+            if staging_file["EMG_File"][muscle_num] in i:
+                print(staging_file["EMG_File"][muscle_num])
+                MVC_file_path = MVC_folder + '\\' + i
+                MVC_data = pd.read_excel(MVC_file_path)
+                if staging_file["Task"][muscle_num] == '1st Dorsal Interosseous':
+                    muscle = '1st\xa0Dorsal Interosseous'
+                else:
+                    muscle = staging_file["Task"][muscle_num]
+                find_max = MVC_data[muscle].max(axis=0)
+                # column_name = staging_file['Task'][muscle_num]
+                find_max = pd.DataFrame({'FileName': [i], 
+                                         muscle: [find_max]})
+                # find_max_all = find_max_all.append(find_max)
+                find_max_all = pd.concat([find_max_all, find_max], axis=0, ignore_index=True)
+    # find maximum value from each file
+    MVC_max = find_max_all.max(axis=0)
+    MVC_max[0] = 'Max value'
+    MVC_max = pd.DataFrame(MVC_max)
+    MVC_max = np.transpose(MVC_max)
+    # find_max_all = find_max_all.append(MVC_max)
+    find_max_all = pd.concat([find_max_all, MVC_max], axis=0, ignore_index=True)
+    # writting data to EXCEl file
+    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-3] + '_all_MVC.xlsx'
     pd.DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
 
 # %% 畫圖用
