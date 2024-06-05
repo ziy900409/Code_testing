@@ -9,8 +9,9 @@ import pandas as pd
 import numpy as np
 import time
 import os
+\
 import sys
-from scipy import signal
+from scipy import signal, interpolate 
 # 路徑改成你放自己code的資料夾
 sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\allseries")
 # import AllSeries_emg_func_20240327 as emg
@@ -254,19 +255,21 @@ for folder in range(len(rowdata_folder_list)):
                 
                 # 定義受試者編號以及滑鼠名稱
                 trial_info = filename.split("_")
-                
+                # 定義開始時間
+                recoil_begin = int(staging_file['Recoil_begin'][iii])
+                recoil_end = recoil_begin + 575
                 # 1.2. 讀取 c3d 以及 emg file -----------------------------------------
                 motion_info, motion_data, analog_info, analog_data, np_motion_data = gen.read_c3d(motion_list["motion"][ii])
-                
+                replace_columns = [item.replace('EC2 Wight:', '') for item in motion_data.columns]
                 # 處理欄位名稱問題
                 for mouse in all_mouse_name:
                     if trial_info[2] in mouse:
                         mouse_dict = generate_mouse_dict(new_name=mouse)
                 # 合併人體 marker set 以及滑鼠 marker set
-                c3d_recolumns_cortex.update(mouse_dict) 
-                # 更新 motion data's columns name
-                motion_data.rename(columns=c3d_recolumns_cortex, inplace=True)
                 
+                # 更新 motion data's columns name
+                motion_data.columns = replace_columns
+                motion_data.rename(columns=mouse_dict, inplace=True)
                 # 1.3. 定義基本參數, sampling rate -------------------------------------
                 motion_sampling_rate = 1/motion_info['frame_rate']
                 
@@ -277,12 +280,12 @@ for folder in range(len(rowdata_folder_list)):
                 motion_onset = int(pa_start_onset[0, 0]/10 + 240)
                 # 1.4. 基本資料處理, filting motion data
                 lowpass_sos = signal.butter(2, lowpass_cutoff,  btype='low', fs=motion_info['frame_rate'], output='sos')
-                filted_motion = pd.DataFrame(np.empty(np.shape(motion_data)),
+                filted_motion = pd.DataFrame(np.empty([575, np.shape(motion_data)[1]]),
                                              columns = motion_data.columns)
-                filted_motion.iloc[:, 0] = motion_data.iloc[:, 0]
+                filted_motion.iloc[:, 0] = motion_data.iloc[recoil_begin:recoil_end, 0]
                 for i in range(np.shape(motion_data)[1]-1):
                     filted_motion.iloc[:, i+1] = signal.sosfiltfilt(lowpass_sos,
-                                                                    motion_data.iloc[:, i+1].values)
+                                                                    motion_data.iloc[recoil_begin:recoil_end, i+1].values)
                 # 2. 資料處理 ----------------------------------------------------------
                 # 2.1. 找出食指按壓的時間點
                 """
@@ -292,8 +295,8 @@ for folder in range(len(rowdata_folder_list)):
                 3. 計算食指 x 軸負向的速度
                 4. 讀分期檔，開始時間再加 575 frame
                 """
-                recoil_begin = int(staging_file['Recoil_begin'][iii])
-                # motion  繪圖 -----------------------------------------------
+                
+                # %% motion  繪圖 -----------------------------------------------
                 # 创建一个包含四个子图的图形，并指定子图的布局
                 fig, axes = plt.subplots(4, 1, figsize=(8, 10))  
                 # 绘制第一个子图
@@ -341,7 +344,34 @@ for folder in range(len(rowdata_folder_list)):
                             dpi=100)
                 # 显示图形
                 plt.show()
-                #
+                # %% 繪製壓槍軌跡
+                """
+                mouse 2, 3, 4
+                是否可以處理 marker 旋轉問題 ?
+                """
+                fig, axes = plt.subplots(2, 1, figsize=(8, 10))  
+                # 绘制第一个子图
+                axes[0].plot(filted_motion.loc[:, 'M1_x'].values,
+                             filted_motion.loc[:, 'M1_y'].values,
+                             color='blue')  # 假设 data1 是一个 Series 或 DataFrame
+                axes[0].axvline(motion_onset/motion_info['frame_rate'], color='r', linestyle='--') # trigger onset
+                axes[0].axvline((recoil_begin)/motion_info['frame_rate'], # R.I.Finger down
+                                color='c', linestyle='--') 
+                axes[0].axvline((recoil_begin + 575)/motion_info['frame_rate'], # R.I.Finger up
+                                color='c', linestyle='--')
+                axes[0].set_xlim(0, analog_data['Frame'].iloc[-1])
+                axes[0].set_title('R.I.Finger3_x')  # 设置子图标题
+                # 绘制第二个子图
+                axes[1].plot(filted_motion.loc[:, 'Frame'].values,
+                             filted_motion.loc[:, 'R.I.Finger3_y'].values,
+                             color='blue')  # 假设 data2 是一个 Series 或 DataFrame
+                axes[1].axvline((recoil_begin)/motion_info['frame_rate'], color='r', linestyle='--') # trigger onset
+                axes[1].axvline((recoil_begin + 575)/motion_info['frame_rate'], # R.I.Finger down
+                                color='c', linestyle='--') 
+                axes[1].set_xlim(0, analog_data['Frame'].iloc[-1])
+                axes[1].set_title('R.I.Finger3_y')  # 设置子图标题
+                
+                # %
                 # 3. 處理 EMG --------------------------------------------------
                 processing_data, bandpass_filtered_data = emg.EMG_processing(motion_list["emg"][ii], smoothing=smoothing)
                 emg_smaple_rate = int(1 / (bandpass_filtered_data.iloc[1, 0] - bandpass_filtered_data.iloc[0, 0]))
@@ -372,7 +402,11 @@ for folder in range(len(rowdata_folder_list)):
                 # 畫smoothing 後之資料圖
                 emg.plot_plot(processing_data, str(emg_fig_save),
                               filename, str(smoothing + "_"))
-                emg.Fourier_plot(processing_data,
+                # 畫 FFT analysis 的圖
+                emg.Fourier_plot(motion_list["emg"][ii],
+                                (emg_fig_save),
+                                filename)
+                emg.Fourier_plot(motion_list["emg"][ii],
                                 (emg_fig_save),
                                 filename,
                                 notch=True)
@@ -393,6 +427,8 @@ for folder in range(len(rowdata_folder_list)):
 
                 axes[0].set_xlim(processing_iMVC['time'].iloc[emg_recoil_begin],
                                  processing_iMVC['time'].iloc[emg_recoil_end])
+                axes[0].set_xlabel('time', fontsize=14)
+                axes[0].set_ylabel('iMVC (%)', fontsize=14)
                 axes[0].set_title('1st. Dorsal Interosseous', fontsize=16)  # 设置子图标题
                 # 绘制第二个子图
                 axes[1].plot(processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'time'].values,
@@ -401,6 +437,8 @@ for folder in range(len(rowdata_folder_list)):
 
                 axes[1].set_xlim(processing_iMVC['time'].iloc[emg_recoil_begin],
                                  processing_iMVC['time'].iloc[emg_recoil_end])
+                axes[1].set_xlabel('time', fontsize=14)
+                axes[1].set_ylabel('iMVC (%)', fontsize=14)
                 axes[1].set_title('Abductor Digiti Quinti', fontsize=16)  # 设置子图标题
                 # 绘制第三个子图
                 axes[2].plot(processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'time'].values,
@@ -410,6 +448,8 @@ for folder in range(len(rowdata_folder_list)):
 
                 axes[2].set_xlim(processing_iMVC['time'].iloc[emg_recoil_begin],
                                  processing_iMVC['time'].iloc[emg_recoil_end])
+                axes[2].set_xlabel('time', fontsize=14)
+                axes[2].set_ylabel('Index', fontsize=14)
                 axes[2].set_title('肌肉共同收縮比值', fontsize=16)  # 设置子图标题
                 # 添加整体标题
                 fig.suptitle(filename)  # 设置整体标题
@@ -534,59 +574,67 @@ ZA_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appen
 ZA_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_ZA_2024-06-04.xlsx",
                           sheet_name="Abductor Digiti Quinti")
 
-
+# %%
 # 3.2. EMG 繪圖 ----------------------------------------------- 
 # 创建一个包含四个子图的图形，并指定子图的布局
+labels = ['Gpro', 'FK', 'U', 'S', 'ZA']
 fig, axes = plt.subplots(3, 1, figsize=(8, 10))  
 # 绘制第一个子图
 axes[0].plot(np.mean(Gpro_1st, axis=1),
-             color='r')  # 假设 data1 是一个 Series 或 DataFrame
+             color='r', label="Gpro")  # 假设 data1 是一个 Series 或 DataFrame
 axes[0].plot(np.mean(FK_1st, axis=1),
-             color='g') 
+             color='g', label="FK") 
 axes[0].plot(np.mean(U_1st, axis=1),
-             color='b') 
+             color='b', label="U") 
 axes[0].plot(np.mean(S_1st, axis=1),
-             color='c') 
+             color='c', label="S") 
 axes[0].plot(np.mean(ZA_1st, axis=1),
-             color='m') 
-
+             color='m', label="ZA") 
+axes[0].set_xlabel('time', fontsize=14)
+axes[0].set_ylabel('iMVC (%)', fontsize=14)
 axes[0].set_title('1st. Dorsal Interosseous', fontsize=16)  # 设置子图标题
 # 绘制第二个子图
 axes[1].plot(np.mean(Gpro_Abd, axis=1),
-             color='r')  # 假设 data1 是一个 Series 或 DataFrame
+             color='r', label="Gpro")  # 假设 data1 是一个 Series 或 DataFrame
 axes[1].plot(np.mean(FK_Abd, axis=1),
-             color='g') 
+             color='g', label="FK") 
 axes[1].plot(np.mean(U_Abd, axis=1),
-             color='b') 
+             color='b', label="U") 
 axes[1].plot(np.mean(S_Abd, axis=1),
-             color='c') 
+             color='c', label="S") 
 axes[1].plot(np.mean(ZA_Abd, axis=1),
-             color='m') 
+             color='m', label="ZA") 
+axes[1].set_xlabel('time', fontsize=14)
+axes[1].set_ylabel('iMVC (%)', fontsize=14)
 axes[1].set_title('Abductor Digiti Quinti', fontsize=16)  # 设置子图标题
 # 绘制第三个子图
 axes[2].plot(np.divide(np.mean(Gpro_1st.values, axis=1),
                        np.mean(Gpro_Abd.values, axis=1)),
-             color='r')  # 假设 data2 是一个 Series 或 DataFrame
+             color='r', label="Gpro")  # 假设 data2 是一个 Series 或 DataFrame
 
 axes[2].plot(np.divide(np.mean(FK_1st.values, axis=1),
                        np.mean(FK_Abd.values, axis=1)),
-             color='g')  # 假设 data2 是一个 Series 或 DataFrame
+             color='g', label="FK")  # 假设 data2 是一个 Series 或 DataFrame
 axes[2].plot(np.divide(np.mean(U_1st.values, axis=1),
                        np.mean(U_Abd.values, axis=1)),
-             color='b')  # 假设 data2 是一个 Series 或 DataFrame
+             color='b', label="U")  # 假设 data2 是一个 Series 或 DataFrame
 axes[2].plot(np.divide(np.mean(S_1st.values, axis=1),
                        np.mean(S_Abd.values, axis=1)),
-             color='c')  # 假设 data2 是一个 Series 或 DataFrame
+             color='c', label="S")  # 假设 data2 是一个 Series 或 DataFrame
 axes[2].plot(np.divide(np.mean(ZA_1st.values, axis=1),
                        np.mean(ZA_Abd.values, axis=1)),
-             color='m')  # 假设 data2 是一个 Series 或 DataFrame
-
+             color='m', label="ZA")  # 假设 data2 是一个 Series 或 DataFrame
+axes[2].set_xlabel('time', fontsize=14)
+axes[2].set_ylabel('index', fontsize=14)
 axes[2].set_title('肌肉共同收縮比值', fontsize=16)  # 设置子图标题
 # 添加整体标题
 fig.suptitle("XXXX")  # 设置整体标题
 # 调整子图之间的间距
-plt.tight_layout()
-plt.legend()
+# 在主图外部添加图例
+fig.legend(labels=labels, loc='lower center', ncol=5, fontsize=12)
+# plt.tight_layout()
+# 调整布局以防止重叠，并为图例腾出空间
+plt.tight_layout(rect=[0, 0.04, 1, 1])
 # plt.savefig(emg_fig_svae + "\\" + filename + ".jpg",
 #             dpi=100)
 # 显示图形

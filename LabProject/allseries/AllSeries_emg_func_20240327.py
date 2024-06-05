@@ -33,6 +33,7 @@ overlap_len = 0.5 # 百分比 (%)
 csv_notch_cutoff_1 = [59, 61]
 csv_notch_cutoff_2 = [295.5, 296.5]
 csv_notch_cutoff_3 = [369.5, 370.5]
+csv_notch_cutoff_4 = [179, 180]
 
 c3d_notch_cutoff_1 = [49.5, 50.5]
 c3d_notch_cutoff_2 = [99.5, 100.5]
@@ -200,8 +201,11 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
             notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
                                                 notch_filtered_1)
             notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_3,
+            notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
                                                 notch_filtered_2)
+            notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_4,
+                                                notch_filtered_3)
         elif '.c3d' in raw_data_path:
             notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
             notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
@@ -428,8 +432,11 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
                 notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
                                                     notch_filtered_1)
                 notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
-                notch_filtered = signal.sosfiltfilt(notch_sos_3,
+                notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
                                                     notch_filtered_2)
+                notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos_4,
+                                                    notch_filtered_3)
             elif '.c3d' in raw_data_path:
                 print(0)
                 notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
@@ -467,7 +474,8 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
         # 開始計算 FFT   
         yf = fft(fft_data, N)
         freqs = fftfreq(N, T) 
-        axs[x, y].plot(freqs[0:int(N/2)], abs(yf[0:int(N/2)])*2/N)
+        axs[x, y].plot(freqs[0:int(N/2)], abs(yf[0:int(N/2)])*2/N,
+                       linewidth=0.5)
         # axs[x, y].plot(xf, 2.0/N * abs(yf[0:int(N/2)]))
         axs[x, y].set_title(raw_data.columns[num_columns[col]], fontsize = 16)
         # 設定科學符號 : 小數點後幾位數
@@ -670,13 +678,11 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
                                                 notch_filtered_1)
             notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_3,
+            notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
                                                 notch_filtered_2)
-            
-   
-            # notch_sos_4 = signal.butter(2, c3d_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
-            # notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
-            #                                     notch_filtered_3)
+            notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=sample_freq, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_4,
+                                                notch_filtered_3)
             # 取絕對值，將訊號翻正
             abs_data = abs(notch_filtered)
             # ------linear envelop analysis-----------                          
@@ -851,7 +857,8 @@ def plot_plot(data, savepath, filename, filter_type):
     for i in range(np.shape(data)[1]-1):
         x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
         # 設定子圖之參數
-        axs[x, y].plot(data.iloc[:, 0], data.iloc[:, i+1])
+        axs[x, y].plot(data.iloc[:, 0], data.iloc[:, i+1],
+                       linewidth=0.5)
         axs[x, y].set_title(data.columns[i+1], fontsize=16)
         # 設定科學符號 : 小數點後幾位數
         axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))

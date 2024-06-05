@@ -11,7 +11,8 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-
+import math
+import re
 # %% Reading all of data path
 # using a recursive loop to traverse each folder
 # and find the file extension has .csv
@@ -425,11 +426,190 @@ def included_angle(x0, x1, x2):
     
     # 返回調整後的夾角值
     return angle_degrees_360
+# %%
+def remove_specific_string_from_list(input_list):
+    # 定義正規表達式模式
+    pattern1 = re.compile(r': EMG ')
+    pattern2 = re.compile(r'\d')
+    
+    # 對列表的每個元素應用處理
+    result_list = []
+    for item in input_list:
+        # 移除特定字串 EMG1、EMG2、EMG3
+        item = pattern1.sub('', item)
+        
+        # 移除不特定數字
+        item = pattern2.sub('', item)
+        
+        result_list.append(item)
+        
+    return result_list
+
+# %%
+def compare_mean_std_cloud(v1_data_path, v2_data_path, savepath, filename,
+                           smoothing, release, self_oreder=False):
+    '''
 
 
+    Parameters
+    ----------
+    v1_data_path : str
+        第一個要比較數據的資料位置.
+    v2_data_path : str
+        DESCRIPTION.
+    savepath : TYPE
+        DESCRIPTION.
+    filename : TYPE
+        DESCRIPTION.
+    smoothing : TYPE
+        DESCRIPTION.
+    release : TYPE
+        DESCRIPTION.
+    self_oreder : dict, optional
+        order_mapping = {'R EXT': 1, 'R FLX': 2, 'R UT': 3,
+                         'R LT': 4, 'R LAT': 5, 'R PD': 6,
+                         'L LT': 7, 'L MD': 8}.
+        The default is False.
 
+    Returns
+    -------
+    None.
 
+    '''
 
+    # data_path = r'D:\python\EMG_Data\To HSIN\EMG\Processing_Data\Method_1\C06\\'
+    # v1_data_path = data_path + 'test1\\data\\motion'
+    # v2_data_path = data_path + 'test2\\data\\motion'
+    # 找出所有資料夾下的 .xlsx 檔案
+    v1_file_list = Read_File(v1_data_path, ".xlsx", subfolder=False)
+    v2_file_list = Read_File(v2_data_path, ".xlsx", subfolder=False)
+    # 排除可能會擷取到暫存檔的問題，例如：~$test1_C06_SH1_Rep_2.2_iMVC_ed.xlsx
+    v1_file_list = [file for file in v1_file_list if not "~$" in file]
+    v2_file_list = [file for file in v2_file_list if not "~$" in file]
+    # 取得資料欄位名稱，並置換掉 :EMG
+    v1_data_cloumns = list(pd.read_excel(v1_file_list[0]).columns)
+    v2_data_cloumns = list(pd.read_excel(v2_file_list[0]).columns)
+    # 去掉時間欄位
+    for i in ['time']:
+        v1_data_cloumns.remove(i)
+        v2_data_cloumns.remove(i)
+    
+    # 初始化一個空列表，用來存放相同字串的位置
+    v1_data_cloumns = remove_specific_string_from_list(v1_data_cloumns)
+    v2_data_cloumns = remove_specific_string_from_list(v2_data_cloumns)
+    
+    common_elements_positions = []
+    
+    # 使用迴圈逐一比較兩個列表中的元素
+    for item1 in v1_data_cloumns:
+        if item1 in v2_data_cloumns:
+            # 找到相同的字串，取得在兩個列表中的位置
+            position1 = v1_data_cloumns.index(item1)
+            position2 = v2_data_cloumns.index(item1)
+            
+            # 將位置資訊加入到列表中
+            common_elements_positions.append((item1, position1, position2))
+    
+    # 說明兩組資料各幾筆
+    # read example data
+    example_data = pd.read_excel(v1_file_list[0])
+
+    # create multi-dimension matrix
+    type1_dict = np.zeros(((np.shape(example_data)[1] - 1), # muscle name without time
+                           (np.shape(example_data)[0]), # time length
+                           len(v1_file_list)))                 # subject number
+    type2_dict = np.zeros(((np.shape(example_data)[1] - 1), # muscle name without time
+                           (np.shape(example_data)[0]), # time length
+                           len(v2_file_list)))                 # subject number
+    if not self_oreder:
+    # 將資料逐步放入預備好的矩陣
+        for ii in range(len(v1_file_list)):
+            # read data
+            type1_data = pd.read_excel(v1_file_list[ii])
+            for iii in range(len(common_elements_positions)): # exclude time
+                type1_dict[iii, :, ii] = type1_data.iloc[:, common_elements_positions[iii][1]+1]
+        
+        for ii in range(len(v2_file_list)):
+            type2_data = pd.read_excel(v2_file_list[ii])
+            for iii in range(len(common_elements_positions)): # exclude time
+                type2_dict[iii, :, ii] = type2_data.iloc[:, common_elements_positions[iii][2]+1]
+        # 設定圖片 tilte
+        data_title = common_elements_positions
+    else:
+        # 給定編排方式
+        # order_mapping = {'R EXT': 1, 'R FLX': 2, 'R UT': 3, 'R LT': 4, 'R LAT': 5, 'R PD': 6, 'L LT': 7, 'L MD': 8}
+        # 使用 sorted 函數進行排序，根據映射方式提供的排序順序
+        sorted_data = sorted(common_elements_positions, key=lambda x: self_oreder[x[0]])
+        # 設定圖片 tilte
+        data_title = sorted_data[:len(self_oreder)]
+        for ii in range(len(v1_file_list)):
+            # read data
+            type1_data = pd.read_excel(v1_file_list[ii])
+            for iii in range(len(data_title)): # exclude time
+                type1_dict[iii, :, ii] = type1_data.iloc[:, sorted_data[iii][1]+1]
+        
+        for ii in range(len(v2_file_list)):
+            type2_data = pd.read_excel(v2_file_list[ii])
+            for iii in range(len(data_title)): # exclude time
+                type2_dict[iii, :, ii] = type2_data.iloc[:, sorted_data[iii][2]+1]
+
+    # 設定圖片大小
+    # 畫第一條線
+    save = savepath + "\\mean_std_" + filename + ".jpg"
+    n = int(math.ceil((np.shape(type2_dict)[0]) /2))
+    # 設置圖片大小
+    plt.figure(figsize=(2*n+1,10))
+    # 設定繪圖格式與字體
+    # plt.style.use('seaborn-white')
+    # 顯示輸入中文
+    plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    palette = plt.get_cmap('Set1')
+    fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')
+    
+    for i in range(len(data_title)):
+        # 確定繪圖順序與位置
+        x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
+        color = palette(0) # 設定顏色
+        iters = list(np.linspace(-release[0], release[1], 
+                                 len(type1_dict[0, :, 0])))
+        # 設定計算資料
+        avg1 = np.mean(type1_dict[i, :, :], axis=1) # 計算平均
+        std1 = np.std(type1_dict[i, :, :], axis=1) # 計算標準差
+        r1 = list(map(lambda x: x[0]-x[1], zip(avg1, std1))) # 畫一個標準差以內的線
+        r2 = list(map(lambda x: x[0]+x[1], zip(avg1, std1)))
+        axs[x, y].plot(iters, avg1, color=color, label='before', linewidth=3)
+        axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2)
+        # 找所有數值的最大值，方便畫括弧用
+        yy = max(r2)
+        # 畫第二條線
+        color = palette(1) # 設定顏色
+        avg2 = np.mean(type2_dict[i, :, :], axis=1) # 計畫平均
+        std2 = np.std(type2_dict[i, :, :], axis=1) # 計算標準差
+        r1 = list(map(lambda x: x[0]-x[1], zip(avg2, std2))) # 畫一個標準差以內的線
+        r2 = list(map(lambda x: x[0]+x[1], zip(avg2, std2)))
+        # 找所有數值的最大值，方便畫括弧用
+        yy = max([yy, max(r2)])
+        axs[x, y].plot(iters, avg2, color=color, label='after', linewidth=3) # 畫平均線
+        axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2) # 塗滿一個正負標準差以內的區塊
+        # 圖片的格式設定
+        axs[x, y].set_title(data_title[i][0], fontsize=12)
+        axs[x, y].legend(loc="upper left") # 圖例位置
+        axs[x, y].grid(True, linestyle='-.')
+        # 畫放箭時間
+        axs[x, y].set_xlim(-(release[0]), release[1])
+        axs[x, y].axvline(x=0, color = 'darkslategray', linewidth=1, linestyle = '--')
+
+    plt.suptitle(str("mean std cloud: " + filename), fontsize=16)
+    plt.tight_layout()
+    fig.add_subplot(111, frameon=False)
+    # hide tick and tick label of the big axes
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+    plt.grid(False)
+    plt.xlabel("time (second)", fontsize = 14)
+    plt.ylabel("muscle activation (%)", fontsize = 14)
+    plt.savefig(save, dpi=200, bbox_inches = "tight")
+    plt.show()
 
 
 
