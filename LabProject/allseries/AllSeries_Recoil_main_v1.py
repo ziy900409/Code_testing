@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import time
 import os
-\
+import matplotlib.image as mpimg
 import sys
 from scipy import signal, interpolate 
 # 路徑改成你放自己code的資料夾
@@ -22,6 +22,9 @@ from detecta import detect_onset
 from datetime import datetime
 import matplotlib.pyplot as plt
 import gc
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.patches import Circle
+from PIL import Image
 # 获取当前日期和时间
 now = datetime.now()
 
@@ -73,21 +76,35 @@ MVC_order = {"0": ['1st dorsal interosseous'],
              "6": ['Biceps'],
              "7": ['Triceps']}
 # 替換相異欄位名稱
-c3d_recolumns_cortex = {
-                        'EC2 Wight:R.I.Finger3_x': 'R.I.Finger3_x',# 食指遠端關節
-                        'EC2 Wight:R.I.Finger3_y': 'R.I.Finger3_y',
-                        'EC2 Wight:R.I.Finger3_z': 'R.I.Finger3_z',
-                        'EC2 Wight:R.M.Finger1_x': 'R.M.Finger1_x',# 中指掌指關節
-                        'EC2 Wight:R.M.Finger1_y': 'R.M.Finger1_y',
-                        'EC2 Wight:R.M.Finger1_z': 'R.M.Finger1_z'
-                      }
+
 # 定義滑鼠marker為 M2, M3, M4 的平均值
 mouse_marker = [
                 'M2_x', 'M2_y','M2_z', #  mouse2
                 'M3_x', 'M3_y', 'M3_z', # mouse3
                 'M4_x', 'M4_y', 'M4_z' # mouse4
                 ]
+# 要替换的前缀列表
+prefixes = ['EC2 Wight:', 'Gpro:', 'ZOWIE_U:', 'ZOWIE_ZA:', 'ZOWIE_S:',
+            'ZOWIE_FK:', 'ZOWIE_EC:', 'Mouse_1:']
 test_mouse = ["_Gpro_", "_FK_", "_ZA_", "_S_", "_U_"]
+
+AK47_spray = {"x": [0.19, 0, 0.13, 0.19, -0.500, -0.938, -1.630, -0.805, 1.63,
+                    2.735, 2.065, 2.88, 4.382, 4.592, 2.563, 1.22, 0.44, -0.930,
+                    -2.920, -1.845, -2.030, -1.558, -1.185, -2.292, -2.453, -1.410,
+                    0.578, 2.82, 3.785, 2.4],
+              "y": [0.38, 1.44, 3.06, 4.88, 6.44, 7.945, 9, 10.063, 9.75, 10.123,
+                    10.655, 10.568, 10.52, 10.637, 10.873, 11.078, 11.31, 11.575,
+                    11.06, 11.185, 11.19, 11.455, 11.83, 11.688, 11.755, 11.72,
+                    11.508, 10.82, 10.825, 10.525]}
+
+# CS_angle_convert = 360/(DPI*sen*0.022)*2.54
+
+plt.plot(AK47_spray["x"],
+         AK47_spray["y"])
+ax = plt.gca()
+ax.invert_xaxis()
+ax.invert_yaxis()
+plt.show()
 # %%
 
 def generate_mouse_dict(new_name="Mouse"):
@@ -219,6 +236,22 @@ for folder in range(len(rowdata_folder_list)):
     # 讀分期檔
     staging_file = pd.read_excel(staging_file_path,
                                  sheet_name = rowdata_folder_list[folder])
+    sub_data = pd.read_excel(staging_file_path,
+                             sheet_name = "SubjectInformation")
+    for sub in range(len(sub_data["Subject_ID"])):
+        if sub_data["Subject_ID"][sub] == rowdata_folder_list[folder]:
+            if np.isnan(sub_data["Gpro"][sub]) < 0:
+                gpro = sub_data["Gpro"][sub]
+            else:
+                gpro = sub_data["sensitiviity"][sub] / 2
+            sub_info = {"DPI": [sub_data["DPI"][sub]],
+                        "sen": [sub_data["sensitiviity"][sub]],
+                        "Gpro": [gpro],
+                        # CS_angle_convert = 360/(DPI*sen*0.022)*2.54
+                        "mm-degree": [360/(sub_data["DPI"][sub]*sub_data["sensitiviity"][sub]*0.022)*2.54 /360 *10] 
+                        }
+            
+    
     # 讀 MVC max file
     MVC_value = pd.read_excel(data_path + emg_forder + processingData_folder + \
                               rowdata_folder_list[folder] + "\\" + MVC_folder + \
@@ -250,17 +283,21 @@ for folder in range(len(rowdata_folder_list)):
                 # 1. 基本資料處理------------------------------------------------------
                 # 1.1. 檔名定義, 任務基本資訊定義 ---------------------------------------
                 # save_name, extension = os.path.splitext(motion_list["motion"][ii].split('\\', -1)[-1])
-                fig_svae_path = data_path + motion_folder + processingData_folder + \
-                                rowdata_folder_list[folder] + "\\" + filename + ".jpg"
-                
+                motion_fig_save = data_path + motion_folder + processingData_folder + \
+                                    rowdata_folder_list[folder] + "\\" "Recoil\\figure\\"
+                motion_data_save = data_path + motion_folder+ processingData_folder + \
+                                    rowdata_folder_list[folder] + "\\" + "Recoil\\data\\"
                 # 定義受試者編號以及滑鼠名稱
                 trial_info = filename.split("_")
                 # 定義開始時間
                 recoil_begin = int(staging_file['Recoil_begin'][iii])
-                recoil_end = recoil_begin + 575
+                recoil_end = recoil_begin + 522
                 # 1.2. 讀取 c3d 以及 emg file -----------------------------------------
                 motion_info, motion_data, analog_info, analog_data, np_motion_data = gen.read_c3d(motion_list["motion"][ii])
-                replace_columns = [item.replace('EC2 Wight:', '') for item in motion_data.columns]
+                # 替换列名中的前缀
+                replace_columns = motion_data.columns
+                for prefix in prefixes:
+                    replace_columns = [item.replace(prefix, '') for item in replace_columns]
                 # 處理欄位名稱問題
                 for mouse in all_mouse_name:
                     if trial_info[2] in mouse:
@@ -280,7 +317,7 @@ for folder in range(len(rowdata_folder_list)):
                 motion_onset = int(pa_start_onset[0, 0]/10 + 240)
                 # 1.4. 基本資料處理, filting motion data
                 lowpass_sos = signal.butter(2, lowpass_cutoff,  btype='low', fs=motion_info['frame_rate'], output='sos')
-                filted_motion = pd.DataFrame(np.empty([575, np.shape(motion_data)[1]]),
+                filted_motion = pd.DataFrame(np.empty([522, np.shape(motion_data)[1]]),
                                              columns = motion_data.columns)
                 filted_motion.iloc[:, 0] = motion_data.iloc[recoil_begin:recoil_end, 0]
                 for i in range(np.shape(motion_data)[1]-1):
@@ -296,7 +333,7 @@ for folder in range(len(rowdata_folder_list)):
                 4. 讀分期檔，開始時間再加 575 frame
                 """
                 
-                # %% motion  繪圖 -----------------------------------------------
+                # % motion  繪圖 -----------------------------------------------
                 # 创建一个包含四个子图的图形，并指定子图的布局
                 fig, axes = plt.subplots(4, 1, figsize=(8, 10))  
                 # 绘制第一个子图
@@ -340,49 +377,114 @@ for folder in range(len(rowdata_folder_list)):
                 fig.suptitle(filename)  # 设置整体标题
                 # 调整子图之间的间距
                 plt.tight_layout()
-                plt.savefig(fig_svae_path,
+                plt.savefig(motion_fig_save + filename + "_RIFinger_mo.jpg",
                             dpi=100)
                 # 显示图形
                 plt.show()
-                # %% 繪製壓槍軌跡
-                """
-                mouse 2, 3, 4
-                是否可以處理 marker 旋轉問題 ?
-                """
-                fig, axes = plt.subplots(2, 1, figsize=(8, 10))  
-                # 绘制第一个子图
-                axes[0].plot(filted_motion.loc[:, 'M1_x'].values,
-                             filted_motion.loc[:, 'M1_y'].values,
-                             color='blue')  # 假设 data1 是一个 Series 或 DataFrame
-                axes[0].axvline(motion_onset/motion_info['frame_rate'], color='r', linestyle='--') # trigger onset
-                axes[0].axvline((recoil_begin)/motion_info['frame_rate'], # R.I.Finger down
-                                color='c', linestyle='--') 
-                axes[0].axvline((recoil_begin + 575)/motion_info['frame_rate'], # R.I.Finger up
-                                color='c', linestyle='--')
-                axes[0].set_xlim(0, analog_data['Frame'].iloc[-1])
-                axes[0].set_title('R.I.Finger3_x')  # 设置子图标题
-                # 绘制第二个子图
-                axes[1].plot(filted_motion.loc[:, 'Frame'].values,
-                             filted_motion.loc[:, 'R.I.Finger3_y'].values,
-                             color='blue')  # 假设 data2 是一个 Series 或 DataFrame
-                axes[1].axvline((recoil_begin)/motion_info['frame_rate'], color='r', linestyle='--') # trigger onset
-                axes[1].axvline((recoil_begin + 575)/motion_info['frame_rate'], # R.I.Finger down
-                                color='c', linestyle='--') 
-                axes[1].set_xlim(0, analog_data['Frame'].iloc[-1])
-                axes[1].set_title('R.I.Finger3_y')  # 设置子图标题
+
+                # 繪製壓槍軌跡 ----------------------------------------------------
+                # 读取图像
+                img_path = r"D:\BenQ_Project\01_UR_lab\00_UR\figure\CS2CT.png"
+                img = mpimg.imread(img_path)
                 
-                # %
+                # 将图像数据类型转换为 uint8
+                img = (img * 255).astype(np.uint8)
+                
+                # 设置新的图像大小
+                new_width = int(1 * img.shape[1])  # 50% 缩放
+                new_height = int(1 * img.shape[0])  # 30% 缩放
+                resized_img = Image.fromarray(img).resize((new_width, new_height))
+                # 繪製壓槍軌跡 --------------------------------------------------
+                sub_x = filted_motion.loc[:, 'M1_y'].values - filted_motion.loc[0, 'M1_y']
+                sub_y = filted_motion.loc[:, 'M1_x'].values - filted_motion.loc[0, 'M1_x']
+
+                # 繪圖
+                fig, axes = plt.subplots(2, 1, figsize=(5.5, 12))  
+                # 绘制第一个子图
+                axes[0].plot(sub_x,
+                          sub_y,
+                          color='blue')  # 假设 data1 是一个 Series 或 DataFrame
+                axes[0].scatter((np.array(AK47_spray["x"]) - AK47_spray["x"][0])*sub_info["mm-degree"][0],
+                            (-np.array(AK47_spray["y"])- AK47_spray["y"][0])*sub_info["mm-degree"][0],
+                            color = "r")
+                # ax = plt.gca()
+                # 标注每个点
+                for i, (x, y) in enumerate(zip(AK47_spray["x"], AK47_spray["y"]), start=1):
+                    axes[0].text(x*sub_info["mm-degree"][0],
+                                  -y*sub_info["mm-degree"][0],
+                                  str(i), fontsize=9, ha='right')
+                for iiii in range(0, len(sub_x), 18):
+                    # print(iiii)
+                    circle = Circle((sub_x[iiii],
+                                      sub_y[iiii]), 
+                                    radius=0.2, color='c', fill=False)
+                    axes[0].add_patch(circle)
+                axes[0].plot(0, 0,
+                             marker = 'o', ms = 10, mec='r', mfc='none')
+                  # 反转X轴
+                # 嵌入图片
+                # 设置新的图像大小
+
+                imagebox = OffsetImage(resized_img, zoom=0.6,
+                                       alpha=0.5)  # 设置缩放比例
+                ab = AnnotationBbox(imagebox, (-1.6, -11), frameon=False)  # (2, 2) 是图片的中心位置
+                axes[0].add_artist(ab)
+                axes[0].set_xlim(-15, 20)
+                axes[0].set_ylim(-30, 5)
+                axes[0].invert_xaxis()
+                axes[0].set_xlabel("左右向 (mm)", fontsize=14)
+                axes[0].set_ylabel("前後向 (mm)", fontsize=14)
+                # 子圖二
+
+                for iiiii in range(0, 30, 1):
+                    if iiiii == 0:
+                        idx = 0
+                        emg_idx = 0
+                    else:
+                        idx = iiiii*18 - 1
+                        emg_idx = iiiii*200 - 1
+                    if AK47_spray["x"][iiiii] - AK47_spray["x"][0] > 0:
+                        spary_x = -(AK47_spray["x"][iiiii] - AK47_spray["x"][0])*sub_info["mm-degree"][0]
+                    else:
+                        spary_x = (AK47_spray["x"][iiiii] - AK47_spray["x"][0])*sub_info["mm-degree"][0]
+                    spary_y = (AK47_spray["y"][iiiii] - AK47_spray["y"][0])*sub_info["mm-degree"][0]
+                    # print((sub_x[idx] + spary_x),
+                    #       (sub_y[idx] + spary_y))
+                    circle = Circle((sub_x[idx] + spary_x,
+                                     sub_y[idx] + spary_y), 
+                                    radius=0.2, color='c', fill=False)
+                    axes[1].add_patch(circle)
+                axes[1].plot(0, 0,
+                             marker = 'o', ms = 10, mec='r', mfc='none')
+                # 嵌入图片
+                # imagebox = OffsetImage(img, zoom=0.3)  # 设置缩放比例
+                # ab = AnnotationBbox(imagebox, (0, -2), frameon=False)  # (2, 2) 是图片的中心位置
+                imagebox = OffsetImage(resized_img, zoom=0.6,
+                                       alpha=0.5)  # 设置缩放比例
+                ab_1 = AnnotationBbox(imagebox, (-1.6, -11), frameon=False)  # (2, 2) 是图片的中心位置
+                axes[1].add_artist(ab_1)
+                
+                axes[1].set_xlabel("左右向 (mm)", fontsize=14)
+                axes[1].set_ylabel("前後向 (mm)", fontsize=14)
+                axes[1].set_xlim(-15, 20)
+                axes[1].set_ylim(-30, 5)
+                axes[1].invert_xaxis()
+                plt.suptitle(str('AK47 Spray: ' + filename))  # 设置子图标题
+                plt.tight_layout()
+                plt.savefig(motion_fig_save + filename + "_AK47spray.jpg",
+                            dpi=100)
+                
                 # 3. 處理 EMG --------------------------------------------------
                 processing_data, bandpass_filtered_data = emg.EMG_processing(motion_list["emg"][ii], smoothing=smoothing)
                 emg_smaple_rate = int(1 / (bandpass_filtered_data.iloc[1, 0] - bandpass_filtered_data.iloc[0, 0]))
-                emg_data_svae = data_path + emg_forder+ processingData_folder + \
+                emg_data_save = data_path + emg_forder+ processingData_folder + \
                     rowdata_folder_list[folder] + "\\" + "Recoil\\data\\"
                 emg_fig_save = data_path + emg_forder + processingData_folder + \
                     rowdata_folder_list[folder] + "\\" + "Recoil\\figure\\"
                 
                 # 計算 iMVC，分別為 processing data and bandpass data
                 bandpass_iMVC = pd.DataFrame(np.empty(np.shape(bandpass_filtered_data)),
-                                             columns=bandpass_filtered_data.columns)
+                                              columns=bandpass_filtered_data.columns)
                 # 取得時間
                 bandpass_iMVC.iloc[:, 0] = bandpass_filtered_data.iloc[:, 0].values
                 # 除以 MVC 最大值
@@ -390,7 +492,7 @@ for folder in range(len(rowdata_folder_list)):
                                                       MVC_value.values)*100
                 # processing data
                 processing_iMVC = pd.DataFrame(np.empty(np.shape(processing_data)),
-                                               columns=processing_data.columns)
+                                                columns=processing_data.columns)
                 # 取得時間
                 processing_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
                 # 除以 MVC 最大值
@@ -413,41 +515,41 @@ for folder in range(len(rowdata_folder_list)):
                 
                 # EMG 與 motion 時間換算
                 emg_recoil_begin = int((recoil_begin - motion_onset)/ motion_info["frame_rate"] * emg_smaple_rate)
-                emg_recoil_end = emg_recoil_begin + int((575) / motion_info["frame_rate"] * emg_smaple_rate)
+                emg_recoil_end = emg_recoil_begin + int((522) / motion_info["frame_rate"] * emg_smaple_rate)
                 # 將資料輸出成 EXCEL
-                processing_iMVC.iloc[emg_recoil_begin:emg_recoil_end, :].to_excel(emg_data_svae + \
+                processing_iMVC.iloc[emg_recoil_begin:emg_recoil_end, :].to_excel(emg_data_save + \
                                                                                   filename + "_iMVC.xlsx")
                 # 3.2. EMG 繪圖 ----------------------------------------------- 
                 # 创建一个包含四个子图的图形，并指定子图的布局
                 fig, axes = plt.subplots(3, 1, figsize=(8, 10))  
                 # 绘制第一个子图
                 axes[0].plot(processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'time'].values,
-                             processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, '1st Dorsal Interosseous'].values,
-                             color='blue')  # 假设 data1 是一个 Series 或 DataFrame
+                              processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, '1st Dorsal Interosseous'].values,
+                              color='blue')  # 假设 data1 是一个 Series 或 DataFrame
 
                 axes[0].set_xlim(processing_iMVC['time'].iloc[emg_recoil_begin],
-                                 processing_iMVC['time'].iloc[emg_recoil_end])
+                                  processing_iMVC['time'].iloc[emg_recoil_end])
                 axes[0].set_xlabel('time', fontsize=14)
                 axes[0].set_ylabel('iMVC (%)', fontsize=14)
                 axes[0].set_title('1st. Dorsal Interosseous', fontsize=16)  # 设置子图标题
                 # 绘制第二个子图
                 axes[1].plot(processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'time'].values,
-                             processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'Abductor Digiti Quinti'].values,
-                             color='blue')  # 假设 data1 是一个 Series 或 DataFrame
+                              processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'Abductor Digiti Quinti'].values,
+                              color='blue')  # 假设 data1 是一个 Series 或 DataFrame
 
                 axes[1].set_xlim(processing_iMVC['time'].iloc[emg_recoil_begin],
-                                 processing_iMVC['time'].iloc[emg_recoil_end])
+                                  processing_iMVC['time'].iloc[emg_recoil_end])
                 axes[1].set_xlabel('time', fontsize=14)
                 axes[1].set_ylabel('iMVC (%)', fontsize=14)
                 axes[1].set_title('Abductor Digiti Quinti', fontsize=16)  # 设置子图标题
                 # 绘制第三个子图
                 axes[2].plot(processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'time'].values,
-                             np.divide(processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, '1st Dorsal Interosseous'].values,
-                                       processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'Abductor Digiti Quinti'].values),
-                             color='blue')  # 假设 data2 是一个 Series 或 DataFrame
+                              np.divide(processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, '1st Dorsal Interosseous'].values,
+                                        processing_iMVC.loc[emg_recoil_begin:emg_recoil_end, 'Abductor Digiti Quinti'].values),
+                              color='blue')  # 假设 data2 是一个 Series 或 DataFrame
 
                 axes[2].set_xlim(processing_iMVC['time'].iloc[emg_recoil_begin],
-                                 processing_iMVC['time'].iloc[emg_recoil_end])
+                                  processing_iMVC['time'].iloc[emg_recoil_end])
                 axes[2].set_xlabel('time', fontsize=14)
                 axes[2].set_ylabel('Index', fontsize=14)
                 axes[2].set_title('肌肉共同收縮比值', fontsize=16)  # 设置子图标题
@@ -459,6 +561,47 @@ for folder in range(len(rowdata_folder_list)):
                             dpi=100)
                 # 显示图形
                 plt.show()
+                # 輸出壓槍資料 --------------------------------------------------
+                emg_spray = processing_iMVC.iloc[emg_recoil_begin:emg_recoil_end, :].reset_index(drop=True)
+                
+                
+                
+                processing_iMVC.iloc[emg_recoil_begin:emg_recoil_end, :].to_excel(emg_data_save + \
+                                                                                  filename + "_iMVC.xlsx")
+                
+                spray_data = pd.DataFrame({}, 
+                                          columns=["sub_x", "sub_y", "spray_x", "spray_y",
+                                                   "rms_x", "rms_y", "rms_dis",
+                                                   "emg_ECR", "emg_FCR", "emg_Tri", "emg_ECU",
+                                                   "emg_1DI", "emg_ABD", "emg_EI", "emg_Bic"])
+                
+                for iiiii in range(0, 30, 1):
+                    if iiiii == 0:
+                        idx = 0
+                        emg_idx = 0
+                    else:
+                        idx = iiiii*18 - 1
+                        emg_idx = iiiii*200 - 1
+                    # print(iiiii)
+                    spray_data.loc[iiiii, "sub_x"] = sub_x[idx]
+                    spray_data.loc[iiiii, "sub_y"] = sub_y[idx]
+                    spary_x = AK47_spray["x"][iiiii] - AK47_spray["x"][0]
+                    spary_y = AK47_spray["y"][iiiii] - AK47_spray["y"][0]
+                    spray_data.loc[iiiii, "spray_x"] = spary_x
+                    spray_data.loc[iiiii, "spray_y"] = spary_y
+                    spray_data.loc[iiiii, "rms_x"] = np.sqrt((sub_x[idx] - (spary_x))**2)
+                    spray_data.loc[iiiii, "rms_y"] = np.sqrt((sub_y[idx] - (spary_y))**2)
+                    spray_data.loc[iiiii, "rms_dis"] = np.sqrt((sub_x[idx] - (spary_x))**2 + \
+                                                               (sub_y[idx] - (spary_y))**2)
+                    spray_data.loc[iiiii, "emg_ECR"] = emg_spray.loc[emg_idx, "Extensor Carpi Radialis"]
+                    spray_data.loc[iiiii, "emg_FCR"] = emg_spray.loc[emg_idx, "Flexor Carpi Radialis"]
+                    spray_data.loc[iiiii, "emg_Tri"] = emg_spray.loc[emg_idx, "Triceps Brachii"]
+                    spray_data.loc[iiiii, "emg_ECU"] = emg_spray.loc[emg_idx, "Extensor Carpi Ulnaris"]
+                    spray_data.loc[iiiii, "emg_1DI"] = emg_spray.loc[emg_idx, "1st Dorsal Interosseous"]
+                    spray_data.loc[iiiii, "emg_ABD"] = emg_spray.loc[emg_idx, "Abductor Digiti Quinti"]
+                    spray_data.loc[iiiii, "emg_EI"] = emg_spray.loc[emg_idx, "Extensor Indicis"]
+                    spray_data.loc[iiiii, "emg_Bic"] = emg_spray.loc[emg_idx, "Biceps Brachii"]
+                spray_data.to_excel(motion_data_save + filename + "_SprayPath.xlsx")
                 
 # %% 分析 Recoil cocontraction
 output_data = pd.DataFrame({},
@@ -544,34 +687,34 @@ with pd.ExcelWriter(ZA_output_path, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name=muscle_name[muscle], index=False)
 
 # %%
-Gpro_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_Gpro_2024-06-04.xlsx",
+Gpro_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_Gpro_2024-06-05.xlsx",
                           sheet_name="1st Dorsal Interosseous")
 
-Gpro_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_Gpro_2024-06-04.xlsx",
+Gpro_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_Gpro_2024-06-05.xlsx",
                           sheet_name="Abductor Digiti Quinti")
 
-FK_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_FK_2024-06-04.xlsx",
+FK_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_FK_2024-06-05.xlsx",
                           sheet_name="1st Dorsal Interosseous")
 
-FK_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_FK_2024-06-04.xlsx",
+FK_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_FK_2024-06-05.xlsx",
                           sheet_name="Abductor Digiti Quinti")
 
-U_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_U_2024-06-04.xlsx",
+U_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_U_2024-06-05.xlsx",
                           sheet_name="1st Dorsal Interosseous")
 
-U_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_U_2024-06-04.xlsx",
+U_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_U_2024-06-05.xlsx",
                           sheet_name="Abductor Digiti Quinti")
 
-S_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_S_2024-06-04.xlsx",
+S_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_S_2024-06-05.xlsx",
                           sheet_name="1st Dorsal Interosseous")
 
-S_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_S_2024-06-04.xlsx",
+S_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_S_2024-06-05.xlsx",
                           sheet_name="Abductor Digiti Quinti")
 
-ZA_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_ZA_2024-06-04.xlsx",
+ZA_1st = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_ZA_2024-06-05.xlsx",
                           sheet_name="1st Dorsal Interosseous")
 
-ZA_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_ZA_2024-06-04.xlsx",
+ZA_Abd = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_ZA_2024-06-05.xlsx",
                           sheet_name="Abductor Digiti Quinti")
 
 # %%
@@ -641,8 +784,62 @@ plt.tight_layout(rect=[0, 0.04, 1, 1])
 plt.show()        
 
 
+# %% 分析壓槍軌跡偏差值
+tic = time.process_time()
+# 建立 slope data 要儲存之位置
+all_recoil_data = pd.DataFrame({}, columns = ['mouse'])
+example_data = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\1. Motion\processing_data\S01\Recoil\data\S01_Recoil_FK_1_SprayPath.xlsx")
+
+subject_Gpro_data = np.empty([8, np.shape(example_data)[0], np.shape(example_data)[1]])
+subject_FK_data = np.empty([8, np.shape(example_data)[0], np.shape(example_data)[1]])
+subject_ZA_data = np.empty([8, np.shape(example_data)[0], np.shape(example_data)[1]])
+subject_S_data = np.empty([8, np.shape(example_data)[0], np.shape(example_data)[1]])
+subject_U_data = np.empty([8, np.shape(example_data)[0], np.shape(example_data)[1]])
+# 0. 依序讀取所有的 rowdata folder 下的資料 ------------------------------------
+for folder in range(len(rowdata_folder_list)):
+    # 讀資料夾下的 c3d data
+    recoil_list = gen.Read_File(data_path + motion_folder + processingData_folder + \
+                                rowdata_folder_list[folder] + "\\" + "Recoil\\data\\",
+                                ".xlsx", subfolder=False)
+    mouse_data = np.empty([6, np.shape(example_data)[0], np.shape(example_data)[1]])
+    for mouse in range(len(test_mouse)):
+        # print(mouse)
+        temp_data = np.empty([3, np.shape(example_data)[0], np.shape(example_data)[1]])
+        ii = 0
+        for i in range(len(recoil_list)):
+            if test_mouse[mouse] in recoil_list[i]:
+                print(recoil_list[i])
+                read_data = pd.read_excel(recoil_list[i])
+                temp_data[ii, :, :] = read_data
+                ii = ii + 1
+        if test_mouse[mouse] == "_Gpro_":
+            subject_Gpro_data[folder, :, :] = np.mean(temp_data, axis=0)
+        elif test_mouse[mouse] == "_FK_":
+            subject_FK_data[folder, :, :] = np.mean(temp_data, axis=0)
+        elif test_mouse[mouse] == "_ZA_":
+            subject_ZA_data[folder, :, :] = np.mean(temp_data, axis=0)
+        elif test_mouse[mouse] == "_S_":
+            print(np.isnan(temp_data).sum())
+            subject_S_data[folder, :, :] = np.mean(temp_data, axis=0)
+        elif test_mouse[mouse] == "_U_":
+            print(np.isnan(temp_data).sum())
+            subject_U_data[folder, :, :] = np.mean(temp_data, axis=0)
+   
 
 
+save_file_name = r"D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\3. Statistics\Recoil_bias.xlsx"
+
+with pd.ExcelWriter(save_file_name) as Writer:
+    pd.DataFrame(np.mean(subject_Gpro_data, axis=0),
+                 columns = example_data.columns).to_excel(Writer, sheet_name="Gpro", index=False)
+    pd.DataFrame(np.mean(subject_FK_data, axis=0),
+                 columns = example_data.columns).to_excel(Writer, sheet_name="FK", index=False)
+    pd.DataFrame(np.mean(subject_ZA_data, axis=0),
+                 columns = example_data.columns).to_excel(Writer, sheet_name="ZA", index=False)
+    pd.DataFrame(np.mean(subject_S_data, axis=0),
+                 columns = example_data.columns).to_excel(Writer, sheet_name="S", index=False)
+    pd.DataFrame(np.mean(subject_U_data, axis=0),
+                 columns = example_data.columns).to_excel(Writer, sheet_name="U", index=False)
 
 
 
