@@ -304,6 +304,10 @@ for subject in subject_list:
                                     # analog channel: C63
                                     """
                                     當前日期： 2024-06-06-2315 改到這裡
+                                    不知為何以下檔案放箭時間不對
+                                    r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\\EMG\\Raw_Data\Method_1\R02\motion\R02_SHL_Rep_4.16.csv"
+                                    
+                                    
                                     """
                                     triggrt_on = detect_onset(analog_data.loc[1000:, "C63"]*-1,
                                                               np.mean(analog_data["C63"][10000:10100]*-1) + trigger_threshold,
