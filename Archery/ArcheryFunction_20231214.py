@@ -529,7 +529,7 @@ def Fourier_plot(raw_data, savepath, filename):
     None.
 
     '''
-    raw_data = data
+    # raw_data = data
     save = savepath + '\\FFT_' + filename + ".jpg"
     num_columns = []
     for i in range(len(raw_data.columns)):

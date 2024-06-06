@@ -134,3 +134,68 @@ def read_c3d(path):
     analog_data.insert(0, "Frame", analog_time)
     # synchronize data (optional)
     return motion_info, motion_data, analog_info, analog_data, np_motion_data
+
+# %% 計算三維空間中兩向量的夾角
+def included_angle(x0, x1, x2):
+    """
+    計算由三個點所形成的夾角，以角度表示。
+
+    Parameters
+    ----------
+    x0 : array-like
+        第一個點的坐標。
+    x1 : array-like
+        第二個點的坐標（頂點）。
+    x2 : array-like
+        第三個點的坐標。
+
+    Returns
+    -------
+    angle_degrees_360 : ndarray
+        夾角的角度值，範圍在[0, 360]度之間。
+
+    """
+                              
+    # 將輸入的點轉換為NumPy數組
+    x0 = np.array(x0)
+    x1 = np.array(x1)
+    x2 = np.array(x2)
+    
+    # 計算向量A（從點x1到點x0的向量）
+    vector_A = x0 - x1
+    # 計算向量B（從點x1到點x2的向量）
+    vector_B = x2 - x1
+    
+    # 計算向量A和向量B的點積
+    dot_product = np.sum(vector_A * vector_B, axis=1)
+    # 計算向量A的模長（即向量A的大小）
+    magnitude_A = np.linalg.norm(vector_A, axis=1)
+    # 計算向量B的模長（即向量B的大小）
+    magnitude_B = np.linalg.norm(vector_B, axis=1)
+    
+    # 計算向量A和向量B的夾角的余弦值
+    cosines = dot_product / (magnitude_A * magnitude_B)
+    # 將余弦值裁剪到[-1, 1]之間，以避免反餘弦函數中出現無效值
+    cosines = np.clip(cosines, -1, 1)
+    
+    # 計算夾角的弧度值
+    angle_radians = np.arccos(cosines)
+    # 將弧度值轉換為角度值
+    angle_degrees = np.degrees(angle_radians)
+    # 將角度值轉換到[0, 360]度範圍內
+    angle_degrees_360 = (angle_degrees + 360) % 360
+    
+    # 返回最終的角度值
+    return angle_degrees_360
+
+
+
+
+
+
+
+
+
+
+
+
