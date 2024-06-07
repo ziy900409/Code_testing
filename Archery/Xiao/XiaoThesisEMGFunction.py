@@ -422,7 +422,7 @@ def find_release_time(folder_path, save_path, save_fig=True):
             release_timing_list = pd.concat([release_timing_list, release_time_number], ignore_index=True)
 
     # 設定整張圖片之參數
-    plt.suptitle(str("release time: " + save_path.split('\\')[-1]), fontsize = 16)
+    plt.suptitle(str("release time: " + save_path.split('\\')[-3]), fontsize = 16)
     plt.tight_layout()
     fig.add_subplot(111, frameon=False)
     # hide tick and tick label of the big axes
@@ -430,21 +430,16 @@ def find_release_time(folder_path, save_path, save_fig=True):
     plt.grid(False)
     plt.xlabel("time (second)", fontsize = 14)
     plt.ylabel("acc (g)", fontsize = 14)
-    plt.savefig(str(save_path + '\\' + save_path.split('\\')[-2] + "_" \
-                    + save_path.split('\\')[-1] + "_ReleaseTiming.jpg"),
+    plt.savefig(str(save_path + '\\' + save_path.split('\\')[-3] + "_ReleaseTiming.jpg"),
                 dpi=100)
     plt.show()
     # writting data to a excel file
-    save_iMVC_name = save_path + '\\' + save_path.split('\\')[-2] + "_" \
-        + save_path.split('\\')[-1] + '_ReleaseTiming.xlsx' 
+    save_iMVC_name = save_path + '\\' + save_path.split('\\')[-3] + '_ReleaseTiming.xlsx' 
     DataFrame(release_timing_list).to_excel(save_iMVC_name, sheet_name='Sheet1', index=False, header=True)
     return release_index
     
     
-    
-    
-    
-    
+# save_path = r'E:\\Hsin\\NTSU_lab\\Archery\\Xiao\\202406\\202405\\\\\\motion\\\\Processing_Data\\Method_1\\R04\\figure\\release'
     
     
     

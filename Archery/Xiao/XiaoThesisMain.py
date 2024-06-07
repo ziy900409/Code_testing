@@ -59,15 +59,11 @@ now = datetime.now()
 formatted_date = datetime.now().strftime('%Y-%m-%d-%H%M')
 print("當前日期：", formatted_date)
 # %% parameter setting 
-staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v1_input.xlsx"
-# c3d_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\R01\SH1_1OK.c3d"
+staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
 data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\"
-# staging_path = r"D:\BenQ_Project\python\Archery\Archery_stage_v1_input.xlsx"
-# c3d_path = r"D:\BenQ_Project\python\Archery\R01\SH1_1OK.c3d"
-# data_path = r"C:/Users/angel/Documents/NTSU/data/112_Plan2_YFMSArchery/"
-# data_path = r"D:\BenQ_Project\python\Archery\\"
 
-
+# 測試組
+subject_list = ["R01", "R02", "R03", "R04"]
 # ------------------------------------------------------------------------
 # 設定資料夾
 folder_paramter = {
@@ -189,14 +185,11 @@ gc.collect(generation=2)
      設定放箭的振幅大小值
             
 """
-subject_list = ["R02"]
 
-for subject in subject_list:
-    for emg_folder in all_rawdata_folder_path["EMG"]:
-        emg.find_release_time(emg_folder + "\\" + folder_paramter["fourth_layer"]["EMG"][0],
-                              emg_folder.replace("EMG", "motion").replace("Raw_Data", "Processing_Data") + "\\figure\\release")
+for emg_folder in all_rawdata_folder_path["EMG"]:
+    emg.find_release_time(emg_folder + "\\" + folder_paramter["fourth_layer"]["EMG"][0],
+                          emg_folder.replace("EMG", "motion").replace("Raw_Data", "Processing_Data") + "\\figure\\release")
         
-
 gc.collect(generation=2)
 
 
@@ -305,7 +298,7 @@ for subject in subject_list:
                                     """
                                     當前日期： 2024-06-06-2315 改到這裡
                                     不知為何以下檔案放箭時間不對
-                                    r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\\EMG\\Raw_Data\Method_1\R02\motion\R02_SHL_Rep_4.16.csv"
+                                    "R02_SHL_Rep_4.16.csv"
                                     
                                     
                                     """
@@ -351,7 +344,7 @@ for subject in subject_list:
                                     # 4. E4: 放箭時間:根據 Extensor_acc ，往前抓0.3~1.3秒, R. Elbow Lat X 軸
                                     #       超出前1秒數據3個標準差，判定為放箭
                                     E4_idx = detect_onset(-filted_motion.loc[motion_release_frame-225:end_index, "R.Epi.Lat_x"].values,
-                                                          np.mean(-filted_motion.loc[motion_release_frame-225:motion_release_frame-75,
+                                                          np.mean(-filted_motion.loc[motion_release_frame-125:motion_release_frame-75,
                                                                                      "R.Epi.Lat_x"].values) + \
                                                               np.std(-filted_motion.loc[motion_release_frame-225:motion_release_frame-75,
                                                                                          "R.Epi.Lat_x"].values)*3,
