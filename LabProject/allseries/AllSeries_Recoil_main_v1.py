@@ -97,7 +97,7 @@ AK47_spray = {"x": [0.19, 0, 0.13, 0.19, -0.500, -0.938, -1.630, -0.805, 1.63,
                     11.06, 11.185, 11.19, 11.455, 11.83, 11.688, 11.755, 11.72,
                     11.508, 10.82, 10.825, 10.525]}
 
-# CS_angle_convert = 360/(DPI*sen*0.022)*2.54
+# CS_angle_convert = 360/(DPI*sen*0.022)*2.54 = mm
 
 plt.plot(AK47_spray["x"],
          AK47_spray["y"])
@@ -381,43 +381,46 @@ for folder in range(len(rowdata_folder_list)):
                             dpi=100)
                 # 显示图形
                 plt.show()
-
                 # 繪製壓槍軌跡 ----------------------------------------------------
                 # 读取图像
+                # %%
                 img_path = r"D:\BenQ_Project\01_UR_lab\00_UR\figure\CS2CT.png"
                 img = mpimg.imread(img_path)
-                
                 # 将图像数据类型转换为 uint8
                 img = (img * 255).astype(np.uint8)
                 
                 # 设置新的图像大小
-                new_width = int(1 * img.shape[1])  # 50% 缩放
-                new_height = int(1 * img.shape[0])  # 30% 缩放
+                new_width = int(0.8 * img.shape[1])  # 50% 缩放
+                new_height = int(0.8 * img.shape[0])  # 30% 缩放
                 resized_img = Image.fromarray(img).resize((new_width, new_height))
                 # 繪製壓槍軌跡 --------------------------------------------------
-                sub_x = filted_motion.loc[:, 'M1_y'].values - filted_motion.loc[0, 'M1_y']
-                sub_y = filted_motion.loc[:, 'M1_x'].values - filted_motion.loc[0, 'M1_x']
+                sub_x = (filted_motion.loc[:, 'M1_y'].values - filted_motion.loc[0, 'M1_y'])/sub_info["mm-degree"][0]
+                sub_y = (filted_motion.loc[:, 'M1_x'].values - filted_motion.loc[0, 'M1_x'])/sub_info["mm-degree"][0]
 
                 # 繪圖
                 fig, axes = plt.subplots(2, 1, figsize=(5.5, 12))  
                 # 绘制第一个子图
                 axes[0].plot(sub_x,
-                          sub_y,
-                          color='blue')  # 假设 data1 是一个 Series 或 DataFrame
-                axes[0].scatter((np.array(AK47_spray["x"]) - AK47_spray["x"][0])*sub_info["mm-degree"][0],
-                            (-np.array(AK47_spray["y"])- AK47_spray["y"][0])*sub_info["mm-degree"][0],
-                            color = "r")
+                             sub_y,
+                             color='deepskyblue')  # 假设 data1 是一个 Series 或 DataFrame
+                axes[0].scatter((np.array(AK47_spray["x"]) - AK47_spray["x"][0]),
+                                (-np.array(AK47_spray["y"])- AK47_spray["y"][0]),
+                                color = "r")
                 # ax = plt.gca()
                 # 标注每个点
                 for i, (x, y) in enumerate(zip(AK47_spray["x"], AK47_spray["y"]), start=1):
-                    axes[0].text(x*sub_info["mm-degree"][0],
-                                  -y*sub_info["mm-degree"][0],
+                    axes[0].text(x,
+                                 -y,
                                   str(i), fontsize=9, ha='right')
                 for iiii in range(0, len(sub_x), 18):
+                    if iiii < 126:
+                        color_c = 'c'
+                    else:
+                        color_c = 'skyblue'
                     # print(iiii)
                     circle = Circle((sub_x[iiii],
-                                      sub_y[iiii]), 
-                                    radius=0.2, color='c', fill=False)
+                                     sub_y[iiii]), 
+                                    radius=0.2, color=color_c, fill=False)
                     axes[0].add_patch(circle)
                 axes[0].plot(0, 0,
                              marker = 'o', ms = 10, mec='r', mfc='none')
@@ -426,14 +429,14 @@ for folder in range(len(rowdata_folder_list)):
                 # 设置新的图像大小
 
                 imagebox = OffsetImage(resized_img, zoom=0.6,
-                                       alpha=0.5)  # 设置缩放比例
-                ab = AnnotationBbox(imagebox, (-1.6, -11), frameon=False)  # (2, 2) 是图片的中心位置
+                                       alpha=0.4)  # 设置缩放比例
+                ab = AnnotationBbox(imagebox, (-0.7, -5.8), frameon=False)  # (2, 2) 是图片的中心位置
                 axes[0].add_artist(ab)
-                axes[0].set_xlim(-15, 20)
-                axes[0].set_ylim(-30, 5)
+                axes[0].set_xlim(-11, 11)
+                axes[0].set_ylim(-17, 5)
                 axes[0].invert_xaxis()
-                axes[0].set_xlabel("左右向 (mm)", fontsize=14)
-                axes[0].set_ylabel("前後向 (mm)", fontsize=14)
+                axes[0].set_xlabel("左右向 (deg)", fontsize=14)
+                axes[0].set_ylabel("前後向 (deg)", fontsize=14)
                 # 子圖二
 
                 for iiiii in range(0, 30, 1):
@@ -444,10 +447,10 @@ for folder in range(len(rowdata_folder_list)):
                         idx = iiiii*18 - 1
                         emg_idx = iiiii*200 - 1
                     if AK47_spray["x"][iiiii] - AK47_spray["x"][0] > 0:
-                        spary_x = -(AK47_spray["x"][iiiii] - AK47_spray["x"][0])*sub_info["mm-degree"][0]
+                        spary_x = -(AK47_spray["x"][iiiii] - AK47_spray["x"][0])
                     else:
-                        spary_x = (AK47_spray["x"][iiiii] - AK47_spray["x"][0])*sub_info["mm-degree"][0]
-                    spary_y = (AK47_spray["y"][iiiii] - AK47_spray["y"][0])*sub_info["mm-degree"][0]
+                        spary_x = (AK47_spray["x"][iiiii] - AK47_spray["x"][0])
+                    spary_y = (AK47_spray["y"][iiiii] - AK47_spray["y"][0])
                     # print((sub_x[idx] + spary_x),
                     #       (sub_y[idx] + spary_y))
                     circle = Circle((sub_x[idx] + spary_x,
@@ -460,20 +463,20 @@ for folder in range(len(rowdata_folder_list)):
                 # imagebox = OffsetImage(img, zoom=0.3)  # 设置缩放比例
                 # ab = AnnotationBbox(imagebox, (0, -2), frameon=False)  # (2, 2) 是图片的中心位置
                 imagebox = OffsetImage(resized_img, zoom=0.6,
-                                       alpha=0.5)  # 设置缩放比例
-                ab_1 = AnnotationBbox(imagebox, (-1.6, -11), frameon=False)  # (2, 2) 是图片的中心位置
+                                       alpha=0.3)  # 设置缩放比例
+                ab_1 = AnnotationBbox(imagebox, (-0.7, -5.8), frameon=False)  # (2, 2) 是图片的中心位置
                 axes[1].add_artist(ab_1)
                 
-                axes[1].set_xlabel("左右向 (mm)", fontsize=14)
-                axes[1].set_ylabel("前後向 (mm)", fontsize=14)
-                axes[1].set_xlim(-15, 20)
-                axes[1].set_ylim(-30, 5)
+                axes[1].set_xlabel("左右向 (deg)", fontsize=14)
+                axes[1].set_ylabel("前後向 (deg)", fontsize=14)
+                axes[1].set_xlim(-11, 11)
+                axes[1].set_ylim(-17, 5)
                 axes[1].invert_xaxis()
                 plt.suptitle(str('AK47 Spray: ' + filename))  # 设置子图标题
                 plt.tight_layout()
                 plt.savefig(motion_fig_save + filename + "_AK47spray.jpg",
                             dpi=100)
-                
+                # %%
                 # 3. 處理 EMG --------------------------------------------------
                 processing_data, bandpass_filtered_data = emg.EMG_processing(motion_list["emg"][ii], smoothing=smoothing)
                 emg_smaple_rate = int(1 / (bandpass_filtered_data.iloc[1, 0] - bandpass_filtered_data.iloc[0, 0]))
