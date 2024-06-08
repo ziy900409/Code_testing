@@ -809,7 +809,6 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
 # %%
 
 def Find_MVC_max_order(staging_file, MVC_folder, MVC_save_path):
-    # MVC_folder = r'D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\2. EMG\processing_data\S01\MVC\data'
     # MVC_save_path = r'D:\BenQ_Project\01_UR_lab\2024_05 ZOWIE AllSeries Appendix\2. EMG\processing_data\S01\MVC'
     MVC_file_list = os.listdir(MVC_folder)
     MVC_data = pd.read_excel(MVC_folder + '\\' + MVC_file_list[0], engine='openpyxl')

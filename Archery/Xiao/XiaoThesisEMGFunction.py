@@ -19,6 +19,7 @@ import os
 import pandas as pd
 import numpy as np
 from scipy import signal, interpolate
+import ezc3d
 import math
 import logging #print 警告用
 from pandas import DataFrame
@@ -31,13 +32,47 @@ import XiaoThesisGeneralFunction as gen
 # downsampling frequency
 down_freq = 2000
 # 帶通濾波頻率
-bandpass_cutoff = [30/0.802, 450/0.802]
+bandpass_cutoff = [20/0.802, 450/0.802]
 # 低通濾波頻率
 lowpass_freq = 6/0.802
 # 設定移動平均數與移動均方根之參數
 # 更改window length, 更改overlap length
 time_of_window = 0.1 # 窗格長度 (單位 second)
 overlap_len = 0.5 # 百分比 (%)
+# 設定 notch filter cutoff frequency
+csv_notch_cutoff_1 = [59, 61]
+csv_notch_cutoff_2 = [295.5, 296.5]
+csv_notch_cutoff_3 = [369.5, 370.5]
+csv_notch_cutoff_4 = [179, 180]
+
+c3d_notch_cutoff_1 = [49.5, 50.5]
+c3d_notch_cutoff_2 = [99.5, 100.5]
+c3d_notch_cutoff_3 = [149.5, 150.5]
+c3d_notch_cutoff_4 = [249.5, 250.5]
+c3d_notch_cutoff_5 = [349.5, 350.5]
+
+csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
+                     'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
+                     'Mini sensor 3: EMG 3': 'Triceps Brachii',
+                     'Quattro sensor 4: EMG.A 4': 'Extensor Carpi Ulnaris', 
+                     'Quattro sensor 4: EMG.B 4': '1st Dorsal Interosseous', 
+                     'Quattro sensor 4: EMG.C 4': 'Abductor Digiti Quinti', 
+                     'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
+                     'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
+
+c3d_recolumns_name = {'ExtRad.IM EMG1': 'Extensor Carpi Radialis',
+                     'FleRad.IM EMG2': 'Flexor Carpi Radialis',
+                     'Triceps.IM EMG3': 'Triceps Brachii',
+                     'ExtUlnar.IM EMG4': 'Extensor Carpi Ulnaris', 
+                     'DorInter_1st.IM EMG5': '1st Dorsal Interosseous', 
+                     'AbdDigMin.IM EMG6': 'Abductor Digiti Quinti', 
+                     'ExtInd.IM EMG7': 'Extensor Indicis',
+                     'Biceps.IM EMG8': 'Biceps Brachii'}
+
+c3d_analog_cha = ['ExtRad.IM EMG1', 'FleRad.IM EMG2', 'Triceps.IM EMG3', 'ExtUlnar.IM EMG4',
+                  'DorInter_1st.IM EMG5', 'AbdDigMin.IM EMG6',  'ExtInd.IM EMG7', 'Biceps.IM EMG8']
+
+c3d_analog_idx = [64, 72, 73, 74, 75, 76, 77, 78]
 # ---------------------找放箭時間用----------------------------
 # 設定最接近放箭位置之acc sensor的欄位編號，建議看完三軸資料再選最大的
 # 可設定數字或是欄位名稱：ex: R EXTENSOR GROUP: ACC.Y 1 or 5
@@ -46,7 +81,7 @@ release_acc = 17
 release_peak = 1.5
 
 # %% EMG data processing
-def EMG_processing(raw_data_path, smoothing="lowpass"):
+def EMG_processing(raw_data, smoothing="lowpass"):
     '''
     Parameters
     ----------
@@ -74,7 +109,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
     3. 插入時間軸
             
     '''
-    raw_data = pd.read_csv(raw_data_path)
+    # raw_data = pd.read_csv(raw_data_path)
 
     # 測試用
     # raw_data = pd.read_csv(r"C:\Users\Public\BenQ\myPyCode\Lab\Raw_Data\Method_2\a04\MVC\a04_MVC_R Biceps.csv",
@@ -179,12 +214,11 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
         lowpass_filtered_data.iloc[:resample_length, col] = lowpass_filtered
         # -------Data smoothing. Compute Moving mean
         # window width = window length(second)*sampling rate
-        
         for ii in range(np.shape(moving_data)[0]):
             data_location = int(ii*(1-overlap_len)*window_width)
             # print(data_location, data_location+window_width_rms)
             moving_data.iloc[int(ii), col] = (np.sum((abs_data[data_location:data_location+window_width])**2)
-                                          /window_width)
+                                              /window_width)
             
         # -------Data smoothing. Compute RMS
         # The user should change window length and overlap length that suit for your experiment design
@@ -193,7 +227,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             data_location = int(ii*(1-overlap_len)*window_width)
             # print(data_location, data_location+window_width_rms)
             rms_data.iloc[int(ii), col] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width])**2)
-                                          /window_width)
+                                                  /window_width)
                 
     # 3. -------------插入時間軸-------------------
     # 定義bandpass filter的時間
@@ -224,8 +258,9 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
 # %% to find maximum MVC value
 
 def Find_MVC_max(MVC_folder, MVC_save_path):
-    # MVC_folder = r'D:\NTSU\TenLab\Archery\Archery_20220225\S1\Processing\MVC'
-    # MVC_save_path = r'D:\NTSU\TenLab\Archery\Archery_20220225\S1\Processing'
+    # MVC_folder = r'D:\\BenQ_Project\\python\\Archery\\202405\\202405\\202405\\\\\\EMG\\\\Processing_Data\\Method_1\\R01\\data\\\\MVC\\'
+    
+    # MVC_save_path = r'D:\\BenQ_Project\\python\\Archery\\202405\\202405\\202405\\\\\\EMG\\\\Processing_Data\\Method_2\\R08\\'
     MVC_file_list = os.listdir(MVC_folder)
     MVC_data = pd.read_excel(MVC_folder + '\\' + MVC_file_list[0], engine='openpyxl')
     find_max_all = []
@@ -249,13 +284,15 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     # find_max_all = find_max_all.append(MVC_max)
     find_max_all = pd.concat([find_max_all, MVC_max], axis=0, ignore_index=True)
     # writting data to EXCEl file
-    find_max_name = MVC_save_path + "\\" + MVC_save_path.split('\\')[-2] + '\\' + MVC_save_path.split('\\')[-1] + '_all_MVC.xlsx'
+    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-2] + '_all_MVC.xlsx'
     pd.DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
+
 # %% 傅立葉轉換與畫圖
 # 計算傅立葉轉換
-def Fourier_plot(raw_data, savepath, filename):
+def Fourier_plot(raw_data_path, savepath, filename, notch=False):
     '''
-
+    最終修訂時間: 20240329
+    
     Parameters
     ----------
     data : pandas,DataFrame
@@ -269,14 +306,38 @@ def Fourier_plot(raw_data, savepath, filename):
     -------
     None.
 
+    1. 新增可以處理 c3d 的方法
     '''
-    # raw_data = data
-    save = savepath + '\\FFT_' + filename + ".jpg"
+    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\raw_data\S01\S01_GridShot_Rep_2.1.csv"
+    
+    if '.csv' in raw_data_path:
+        raw_data = pd.read_csv(raw_data_path)
+    elif '.c3d' in raw_data_path:
+        c = ezc3d.c3d(raw_data_path)
+        # 3. convert c3d analog data to DataFrame format
+        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, c3d_analog_idx, :]),
+                                columns=c3d_analog_cha)
+        ## 3.3 insert time frame
+        ### 3.3.1 create time frame
+        analog_time = np.linspace(
+            0, # start
+            ((c['header']['analogs']['last_frame'])/c['header']['analogs']['frame_rate']), # stop = last_frame/frame_rate
+            num = (np.shape(c['data']['analogs'])[-1]) # num = last_frame
+            )
+        raw_data.insert(0, 'Frame', analog_time)
+    
+    
     num_columns = []
     for i in range(len(raw_data.columns)):
         for ii in range(len(raw_data.columns[raw_data.columns.str.contains("EMG")])):
             if raw_data.columns[i] == raw_data.columns[raw_data.columns.str.contains("EMG")][ii]:
                 num_columns.append(i)
+    # 讀取資料並重新定義 columns name
+    if '.csv' in raw_data_path:
+        raw_data.rename(columns=csv_recolumns_name, inplace=True)
+    elif '.c3d' in raw_data_path:
+        raw_data.rename(columns=c3d_recolumns_name, inplace=True)
+    # 定義畫圖的子圖數量
     n = int(math.ceil(len(num_columns)/2))
     # due to our data type is series, therefore we need to extract value in the series
     # --------畫圖用與計算FFT----------------------
@@ -284,12 +345,22 @@ def Fourier_plot(raw_data, savepath, filename):
     # 設定圖片大小
     plt.figure(figsize=(2*n+1,10))
     fig, axs = plt.subplots(n, 2, figsize = (10,12))
+    # 設定圖片儲存位置，確認是否有做 notch
+    if notch:
+        save = savepath + '\\FFT_' + filename + "_notch.jpg"
+    else:
+        save = savepath + '\\FFT_' + filename + ".jpg"
+    # 開始畫圖
     for col in range(len(num_columns)):
         x, y = col - n*math.floor(abs(col)/n), math.floor(abs(col)/n)
         # print(col)
         # 設定資料時間
         # 採樣頻率計算 : 取前十個時間點做差值平均
-        freq = int(1/np.mean(np.array(raw_data.iloc[2:11, num_columns[col]-1])-np.array(raw_data.iloc[1:10, num_columns[col]-1])))
+        # 因為新增 c3d 故採樣頻率依 ['analogs']['frame_rate']
+        if '.csv' in raw_data_path:
+            freq = int(1/np.mean(np.array(raw_data.iloc[2:11, num_columns[col]-1])-np.array(raw_data.iloc[1:10, num_columns[col]-1])))
+        elif '.c3d' in raw_data_path:
+            freq = c['header']['analogs']['frame_rate']
         data_len = (np.shape(raw_data)[0] - (raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))
         # convert sampling rate to period
         # 計算取樣週期
@@ -300,24 +371,65 @@ def Fourier_plot(raw_data, savepath, filename):
         isnan = np.where(np.isnan(raw_data.iloc[:data_len, num_columns[col]]))
         if isnan[0].size == 0:
         # 計算Bandpass filter
-            bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            # b, a = signal.butter(2, 20,  btype='high', fs=freq)
+            # bandpass_filtered = signal.filtfilt(b, a, raw_data.iloc[:data_len, num_columns[col]].values)
+            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
-                                                   raw_data.iloc[:data_len, num_columns[col]].values)
+                                                    raw_data.iloc[:data_len, num_columns[col]].values)
+
         # 設定給斷訊超過 0.1 秒的 sensor 警告
         elif isnan[0].size > 0.1*freq:
             logging.warning(str(raw_data.columns[num_columns[col]] + "sensor 總訊號斷訊超過 0.1 秒，"))
-            bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
                                                    raw_data.iloc[:(np.shape(raw_data)[0] - data_len[col]), num_columns[col]].values)
+
         else:
             logging.warning(str("共發現 " + str(isnan[0].size) + " 個缺值,位置為 " + str(isnan[0])))
             logging.warning("已將 NAN 換為 0")
-            bandpass_sos = signal.butter(1, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
                                                    raw_data.iloc[:data_len, num_columns[col]].fillna(0))
+        # -----------------是否需要 notch data----------------------------------
+        if notch:
+            # print(0)
+            if '.csv' in raw_data_path:
+                notch_sos_1 = signal.butter(2, csv_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
+                                                    bandpass_filtered)
+                notch_sos_2 = signal.butter(2, csv_notch_cutoff_2, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
+                                                    notch_filtered_1)
+                notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
+                                                    notch_filtered_2)
+                notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos_4,
+                                                    notch_filtered_3)
+            elif '.c3d' in raw_data_path:
+                print(0)
+                notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
+                                                    bandpass_filtered)
+                notch_sos_2 = signal.butter(2, c3d_notch_cutoff_2, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
+                                                    notch_filtered_1)
+                notch_sos_3 = signal.butter(2, c3d_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
+                                                    notch_filtered_2)
+                notch_sos_4 = signal.butter(2, c3d_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
+                                                    notch_filtered_3)
+                notch_sos_5 = signal.butter(2, c3d_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos_5,
+                                                    notch_filtered_4)
+            fft_data = notch_filtered
+        else:
+            # print(1)
+            fft_data = bandpass_filtered
         # 2. 資料前處理
         # 計算資料長度
-        N = len(bandpass_filtered)#length of the array
+        N = len(fft_data)#length of the array
         # N = int(np.prod(fft_data.shape[0]))#length of the array
         N2 = 2**(N.bit_length()-1) #last power of 2
         # convert sampling rate to period 
@@ -329,13 +441,41 @@ def Fourier_plot(raw_data, savepath, filename):
         # print("# Samples length:",N)
         # print("# Sampling rate:",freq)
         # 開始計算 FFT   
-        yf = fft(bandpass_filtered, N)
+        yf = fft(fft_data, N)
         freqs = fftfreq(N, T) 
-        axs[x, y].plot(freqs[0:int(N/2)], abs(yf[0:int(N/2)])*2/N)
+        axs[x, y].plot(freqs[0:int(N/2)], abs(yf[0:int(N/2)])*2/N,
+                       linewidth=0.5)
+        # axs[x, y].plot(xf, 2.0/N * abs(yf[0:int(N/2)]))
         axs[x, y].set_title(raw_data.columns[num_columns[col]], fontsize = 16)
         # 設定科學符號 : 小數點後幾位數
         axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
-        axs[x, y].set_xlim(0, 500)
+        # 標出第一、二、三大值的位置
+        float_array = 2.0/N * abs(yf[0:int(N/2)])
+        max_value = np.max(float_array)
+        max_index = np.argmax(float_array)
+        # print(xf[max_index])
+        axs[x, y].plot(xf[max_index], max_value, 'o', color='red')
+        slope = [xf[max_index], max_value]
+        axs[x, y].annotate('{:.2f}, {:.2f}'.format(*slope), xy=(xf[max_index], max_value))
+        
+        # 將最大值的位置設為負無窮大，以找到第二大的值
+        float_array[max_index] = float('-inf')
+        second_max_value = np.max(float_array)
+        second_max_index = np.argmax(float_array)
+        slope = [xf[second_max_index], second_max_value]
+        axs[x, y].plot(xf[second_max_index], second_max_value, 'o', color='red')
+        axs[x, y].annotate('{:.2f}, {:.2f}'.format(*slope), xy=(xf[second_max_index], second_max_value))
+        # print(xf[second_max_index])
+
+        # 將第二大值的位置設為負無窮大，以找到第三大的值
+        float_array[second_max_index] = float('-inf')
+        third_max_value = np.max(float_array)
+        third_max_index = np.argmax(float_array)
+        slope = [xf[third_max_index], third_max_value]
+        axs[x, y].plot(xf[third_max_index], third_max_value, 'o', color='red')
+        axs[x, y].annotate('{:.2f}, {:.2f}'.format(*slope), xy=(xf[third_max_index], third_max_value))
+        # print(xf[third_max_index])
+        # axs[x, y].set_xlim(0, 500)
     # 設定整張圖片之參數
     plt.suptitle(str("FFT Analysis " + filename), fontsize = 16)
     plt.tight_layout()
