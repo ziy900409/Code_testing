@@ -60,8 +60,9 @@ def Read_File(file_path, file_type, subfolder=None):
             if os.path.splitext(i)[1] == file_type:
                 # replace "\\" to '/', due to MAC version
                 file_list_name = file_path + "\\" + i
-                csv_file_list.append(file_list_name)                
-        
+                csv_file_list.append(file_list_name)
+    # 排除可能會擷取到暫存檔的問題，例如：~$test1_C06_SH1_Rep_2.2_iMVC_ed.xlsx                
+    csv_file_list = [file for file in csv_file_list if not "~$" in file]
     return csv_file_list
 
 # %%

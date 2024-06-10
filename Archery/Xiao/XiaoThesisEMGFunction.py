@@ -581,7 +581,7 @@ def find_release_time(folder_path, save_path, save_fig=True):
     
 # save_path = r'E:\\Hsin\\NTSU_lab\\Archery\\Xiao\\202406\\202405\\\\\\motion\\\\Processing_Data\\Method_1\\R04\\figure\\release'
     
-    
+# %%
     
     
     

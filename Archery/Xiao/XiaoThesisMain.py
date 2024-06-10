@@ -27,8 +27,8 @@ import gc
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -59,11 +59,13 @@ now = datetime.now()
 formatted_date = datetime.now().strftime('%Y-%m-%d-%H%M')
 print("當前日期：", formatted_date)
 # %% parameter setting 
-staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
-data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\"
+# staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
+# data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\"
+staging_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\Archery_stage_v5_input.xlsx"
+data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
 
 # 測試組
-subject_list = ["R01", "R02", "R03", "R04"]
+subject_list = ["R01"]
 # ------------------------------------------------------------------------
 # 設定資料夾
 folder_paramter = {
@@ -84,7 +86,7 @@ folder_paramter = {
                                   "EMG": ["motion", "MVC", "SAVE", "X"],
                                   }
                   }
-folder_paramter["fourth_layer"]["EMG"][0]
+# folder_paramter["fourth_layer"]["EMG"][0]
 
 # 第三層 ----------------------------------------------------------------------
 
@@ -209,7 +211,7 @@ all_algorithm = pd.DataFrame({},
                                         "Bow_Height_Peak_Norm", "Anchor_Threadshold[mm]",
                                         "Anchor_Frame", "Anchor_Time[s]", "Release_Threadshold[mm]", 
                                         "Release_Frame", "Release_Time[s]",
-                                        "E1 frame", "E3-1 frame", "E5 frame"])
+                                        "E1 frame", "E3-1 frame", "E5 frame", "trigger"])
 
 for subject in subject_list:
     for motion_folder in all_rawdata_folder_path["motion"]:
@@ -335,21 +337,21 @@ for subject in subject_list:
                                     # 應該用變化量來計算，設定變化量的閾值
                                     # 修改從 E1 idx 開始找，避免受試者靜止不動的情形
                                     E3_2_cal = []
-                                    for i in range(len(filted_motion.loc[E1_idx:, "C7_x"])):
-                                        E3_2_cal.append(gen.euclidean_distance(filted_motion.loc[E1_idx + i, ["C7_x", "C7_y", "C7_z"]],
-                                                                               filted_motion.loc[E1_idx + i, ["R.Wrist.Rad_x", "R.Wrist.Rad_y", "R.Wrist.Rad_z"]]))
+                                    for i in range(len(filted_motion.loc[E3_1_idx:, "C7_x"])):
+                                        E3_2_cal.append(gen.euclidean_distance(filted_motion.loc[E3_1_idx + i, ["C7_x", "C7_y", "C7_z"]],
+                                                                               filted_motion.loc[E3_1_idx + i, ["R.Wrist.Rad_x", "R.Wrist.Rad_y", "R.Wrist.Rad_z"]]))
                                     E3_2_diff = abs(np.array(E3_2_cal)[1:] - np.array(E3_2_cal)[:-1])
 
-                                    E3_2_idx = gen.find_index(E3_2_diff, threshold, window_size) + E1_idx
+                                    E3_2_idx = gen.find_index(E3_2_diff, threshold, window_size) + E3_1_idx
                                     # 4. E4: 放箭時間:根據 Extensor_acc ，往前抓0.3~1.3秒, R. Elbow Lat X 軸
                                     #       超出前1秒數據3個標準差，判定為放箭
-                                    E4_idx = detect_onset(-filted_motion.loc[motion_release_frame-225:end_index, "R.Epi.Lat_x"].values,
+                                    E4_onset = detect_onset(-filted_motion.loc[motion_release_frame-225:end_index, "R.Epi.Lat_x"].values,
                                                           np.mean(-filted_motion.loc[motion_release_frame-125:motion_release_frame-75,
                                                                                      "R.Epi.Lat_x"].values) + \
                                                               np.std(-filted_motion.loc[motion_release_frame-225:motion_release_frame-75,
                                                                                          "R.Epi.Lat_x"].values)*3,
                                                           n_above=0, n_below=0, show=True)
-                                    E4_idx = E4_idx[0, 0] + motion_release_frame - 225
+                                    E4_idx = E4_onset[0, 0] + motion_release_frame - 225
                                     # 5. E5: 擷取直到弓身低於 T10 Z 軸高度，停止擷取。
                                     # find bow_middle < T10_z and time begin from E2
                                     E5_idx = np.argmax(filted_motion.loc[E2_idx:, "Middle_z"] < filted_motion.loc[E2_idx:, "T10_z"]) + E2_idx
@@ -384,7 +386,9 @@ for subject in subject_list:
                                                                 "Release_Time[s]": filted_motion.loc[E4_idx, 'Frame'],
                                                                 "E1 frame": E1_idx,
                                                                 "E3-1 frame": E3_1_idx,
-                                                                "E5 frame": E5_idx})
+                                                                "E5 frame": E5_idx,
+                                                                "trigger": (triggrt_on[0, 0] + 1000)\
+                                                                    / analog_info["frame_rate"] * motion_sampling_rate})
                                     all_algorithm = pd.concat([all_algorithm, temp_output])
                                     # 7. 繪圖 -------------------------------------------------
                                     # 7.1. 繪製: 資料經平滑、按事件 1、5 剪裁，標記事件2、3原時間點之資料
@@ -436,8 +440,8 @@ for subject in subject_list:
                                     axes[0].axvline(filted_motion.loc[E3_2_idx, 'Frame'],
                                                     color='r', linestyle='--', linewidth=0.5) # trigger onset
                                     # 添加标注
-                                    axes[0].text(filted_motion.loc[E3_2_idx, 'Frame'] + 0.9,
-                                                 axes[0].get_ylim()[1], f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
+                                    axes[0].text(filted_motion.loc[E3_2_idx, 'Frame'],
+                                                 axes[0].get_ylim()[1]*0.95, f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
                                                  color='r', fontsize=10, ha='center', va='bottom')
                                     # E4 劃分期線
                                     axes[0].axvline(filted_motion.loc[E4_idx, 'Frame'],
@@ -500,8 +504,8 @@ for subject in subject_list:
                                     axes[1].axvline(filted_motion.loc[E3_2_idx, 'Frame'],
                                                     color='r', linestyle='--', linewidth=0.5) # trigger onset
                                     # 添加标注
-                                    axes[1].text(filted_motion.loc[E3_2_idx, 'Frame'] + 0.9,
-                                                 axes[1].get_ylim()[1], f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
+                                    axes[1].text(filted_motion.loc[E3_2_idx, 'Frame'],
+                                                 axes[1].get_ylim()[1]*0.95, f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
                                                  color='r', fontsize=10, ha='center', va='bottom')
                                     # E4 劃分期線
                                     axes[1].axvline(filted_motion.loc[E4_idx, 'Frame'],
@@ -566,8 +570,8 @@ for subject in subject_list:
                                     axes[2].axvline(filted_motion.loc[E3_2_idx, 'Frame'] ,
                                                     color='r', linestyle='--', linewidth=0.5) # trigger onset
                                     # 添加标注
-                                    axes[2].text(filted_motion.loc[E3_2_idx, 'Frame'] + 0.9,
-                                                 axes[2].get_ylim()[1], f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
+                                    axes[2].text(filted_motion.loc[E3_2_idx, 'Frame'],
+                                                 axes[2].get_ylim()[1]*0.95, f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
                                                  color='r', fontsize=10, ha='center', va='bottom')
                                     # E4 劃分期線
                                     axes[2].axvline(filted_motion.loc[E4_idx, 'Frame'],
@@ -596,11 +600,6 @@ for subject in subject_list:
                                     # plt.ylabel("mm", fontsize = 14)
                                     # 在主图外部添加图例
                                     fig.legend(labels=labels, loc='center left', bbox_to_anchor=(0.98, 0.5))
-
-                                    # 使用 tight_layout 调整子图布局
-                                    # plt.tight_layout(rect=[0, 0, 0.85, 1])
-                                    # plt.legend(labels=labels, loc='lower center', ncol=3, fontsize=12)
-                                    # plt.tight_layout()
                                     # 调整布局以防止重叠，并为图例腾出空间
                                     plt.tight_layout(rect=[0.1, 0.04, 1, 1])
                                     plt.savefig(fig_save + "\\angle\\" + filename + "_stage.jpg",
@@ -830,9 +829,9 @@ for subject in subject_list:
                                     # 显示图形
                                     plt.show()
 
-all_algorithm.to_excel(data_path + "_algorithm_output_formatted_date" + ".xlsx")
+    all_algorithm.to_excel(data_path + "_algorithm_output_formatted_date" + ".xlsx",
+                           sheet_name=subject)
 
-# %% 資料前處理 : bandpass filter, absolute value, smoothing
 
 
 
