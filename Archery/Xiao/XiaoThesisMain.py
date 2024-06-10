@@ -59,10 +59,10 @@ now = datetime.now()
 formatted_date = datetime.now().strftime('%Y-%m-%d-%H%M')
 print("當前日期：", formatted_date)
 # %% parameter setting 
-# staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
-# data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\"
-staging_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\Archery_stage_v5_input.xlsx"
-data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
+data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\"
+# staging_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\Archery_stage_v5_input.xlsx"
+# data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
 
 # 測試組
 subject_list = ["R01"]
