@@ -688,7 +688,27 @@ def compare_mean_std_cloud(data_path, savepath, filename, smoothing,
     plt.show()
 
 
+# %%
+# 假设 muscle_name 和 total_time 已经定义
+muscle_length = len(muscle_name)
+time_length = int(total_time * 10 * 2)
+subject_numbers = [len(compare_data[key]) for key in compare_data]
 
+# 初始化空字典来存储数据数组
+data_arrays = {}
+
+# 根据 compare_data 的长度，创建相应数量的数据数组
+for i, subject_count in enumerate(subject_numbers):
+    data_arrays[f"data_{i + 1}"] = np.empty([muscle_length, time_length, subject_count])
+
+# 访问数据数组示例
+data_1 = data_arrays.get("data_1", None)
+data_2 = data_arrays.get("data_2", None)
+data_3 = data_arrays.get("data_3", None)
+
+# 打印结果以确认
+for key, value in data_arrays.items():
+    print(f"{key}: {value.shape}")
 
 
 
