@@ -27,8 +27,8 @@ import gc
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -59,10 +59,10 @@ now = datetime.now()
 formatted_date = datetime.now().strftime('%Y-%m-%d-%H%M')
 print("當前日期：", formatted_date)
 # %% parameter setting 
-staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
-data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\"
-# staging_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\Archery_stage_v5_input.xlsx"
-# data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+# staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
+# data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\\"
+staging_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\Archery_stage_v5_input.xlsx"
+data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
 
 # 測試組
 subject_list = ["R01"]
@@ -392,206 +392,39 @@ for subject in subject_list:
                                     all_algorithm = pd.concat([all_algorithm, temp_output])
                                     # 7. 繪圖 -------------------------------------------------
                                     # 7.1. 繪製: 資料經平滑、按事件 1、5 剪裁，標記事件2、3原時間點之資料
-                                    labels = ["R.Wrist.Rad", "R.Elbow.Lat", "L.Acromin", "L.Wrist.Rad", "T10", "Middle"]
+                                    labels = ["R.Wrist.Rad", "R.Epi.Lat", "L.Acromion", "L.Wrist.Rad", "T10", "Middle"]
+                                    axis_label = ["x", "y", "z"]
+                                    E_idx = {"E1": E1_idx,
+                                             "E2": E2_idx,
+                                             "E3-1": E3_1_idx,
+                                             "E3-2": E3_2_idx,
+                                             "E4": E4_idx,
+                                             "E5": E5_idx}
+                                    
                                     fig, axes = plt.subplots(3, 1, figsize=(8, 10), sharex='col')
                                     
-                                    # 繪製第一個子圖 X 軸: R.Wrist.Rad, R.Elbow.Lat, L.Acromin, L.Wrist.Rad, T10, Middle 
-                                    # 繪製 motion data
-                                    axes[0].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Wrist.Rad
-                                                 filted_motion.loc[E1_idx:E5_idx, "R.Wrist.Rad_x"].values,
-                                                 color=colors[0], label = "R.Wrist.Rad")
-                                    axes[0].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Epi.Lat
-                                                 filted_motion.loc[E1_idx:E5_idx, "R.Epi.Lat_x"].values,
-                                                 color=colors[1], label = "R.Epi.Lat")
-                                    axes[0].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # L.Acromion
-                                                 filted_motion.loc[E1_idx:E5_idx, "L.Acromion_x"].values,
-                                                 color=colors[2], label = "L.Acromion")
-                                    axes[0].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # L.Wrist.Rad
-                                                 filted_motion.loc[E1_idx:E5_idx, "L.Wrist.Rad_x"].values,
-                                                 color=colors[3], label = "L.Wrist.Rad")
-                                    axes[0].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # T10
-                                                 filted_motion.loc[E1_idx:E5_idx, "T10_x"].values,
-                                                 color=colors[4], label = "T10")
-                                    axes[0].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # Middle
-                                                 filted_motion.loc[E1_idx:E5_idx, "Middle_x"].values,
-                                                 color=colors[5], label = "Middle")
-                                    # E1 劃分期線
-                                    axes[0].axvline(filted_motion.loc[E1_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[0].text(filted_motion.loc[E1_idx, 'Frame'],
-                                                 axes[0].get_ylim()[1], f"E1:{filted_motion.loc[E1_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E2 劃分期線
-                                    axes[0].axvline(filted_motion.loc[E2_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[0].text(filted_motion.loc[E2_idx, 'Frame'],
-                                                 axes[0].get_ylim()[1], f"E2:{filted_motion.loc[E2_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E3-1 劃分期線
-                                    axes[0].axvline(filted_motion.loc[E3_1_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[0].text(filted_motion.loc[E3_1_idx, 'Frame'],
-                                                 axes[0].get_ylim()[1], f"E3-1:{filted_motion.loc[E3_1_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E3-2 劃分期線
-                                    axes[0].axvline(filted_motion.loc[E3_2_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[0].text(filted_motion.loc[E3_2_idx, 'Frame'],
-                                                 axes[0].get_ylim()[1]*0.95, f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E4 劃分期線
-                                    axes[0].axvline(filted_motion.loc[E4_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[0].text(filted_motion.loc[E4_idx, 'Frame']-1,
-                                                 axes[0].get_ylim()[1], f"E4:{filted_motion.loc[E4_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E5 劃分期線
-                                    axes[0].axvline(filted_motion.loc[E5_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[0].text(filted_motion.loc[E5_idx, 'Frame'],
-                                                 axes[0].get_ylim()[1],  f"E5:{filted_motion.loc[E5_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # 子圖資訊設定，坐標軸
-                                    axes[0].set_ylabel('X 軸 data', fontsize = 14)  # 设置子图标题
-                                    # 繪製第二個子圖 Y 軸 ---------------------------
-                                    # 繪製 motion data
-                                    axes[1].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Wrist.Rad
-                                                 filted_motion.loc[E1_idx:E5_idx, "R.Wrist.Rad_y"].values,
-                                                 color=colors[0], label = "R.Wrist.Rad")
-                                    axes[1].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Epi.Lat
-                                                 filted_motion.loc[E1_idx:E5_idx, "R.Epi.Lat_y"].values,
-                                                 color=colors[1], label = "R.Epi.Lat")
-                                    axes[1].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # L.Acromion
-                                                 filted_motion.loc[E1_idx:E5_idx, "L.Acromion_y"].values,
-                                                 color=colors[2], label = "L.Acromion")
-                                    axes[1].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # L.Wrist.Rad
-                                                 filted_motion.loc[E1_idx:E5_idx, "L.Wrist.Rad_y"].values,
-                                                 color=colors[3], label = "L.Wrist.Rad")
-                                    axes[1].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # T10
-                                                 filted_motion.loc[E1_idx:E5_idx, "T10_y"].values,
-                                                 color=colors[4], label = "T10")
-                                    axes[1].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # Middle
-                                                 filted_motion.loc[E1_idx:E5_idx, "Middle_y"].values,
-                                                 color=colors[5], label = "Middle")
-                                    # E1 劃分期線
-                                    axes[1].axvline(filted_motion.loc[E1_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[1].text(filted_motion.loc[E1_idx, 'Frame'],
-                                                 axes[1].get_ylim()[1], f"E1:{filted_motion.loc[E1_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E2 劃分期線
-                                    axes[1].axvline(filted_motion.loc[E2_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[1].text(filted_motion.loc[E2_idx, 'Frame'],
-                                                 axes[1].get_ylim()[1], f"E2:{filted_motion.loc[E2_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E3-1 劃分期線
-                                    axes[1].axvline(filted_motion.loc[E3_1_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[1].text(filted_motion.loc[E3_1_idx, 'Frame'],
-                                                 axes[1].get_ylim()[1], f"E3-1:{filted_motion.loc[E3_1_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E3-2 劃分期線
-                                    axes[1].axvline(filted_motion.loc[E3_2_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[1].text(filted_motion.loc[E3_2_idx, 'Frame'],
-                                                 axes[1].get_ylim()[1]*0.95, f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E4 劃分期線
-                                    axes[1].axvline(filted_motion.loc[E4_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[1].text(filted_motion.loc[E4_idx, 'Frame']-1,
-                                                 axes[1].get_ylim()[1], f"E4:{filted_motion.loc[E4_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E5 劃分期線
-                                    axes[1].axvline(filted_motion.loc[E5_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[1].text(filted_motion.loc[E5_idx, 'Frame'],
-                                                 axes[1].get_ylim()[1],  f"E5:{filted_motion.loc[E5_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    axes[1].set_xlim(filted_motion.loc[E1_idx, 'Frame'],
-                                                     filted_motion.loc[E5_idx, 'Frame'])
-                                    # 子圖資訊設定，坐標軸
-                                    axes[1].set_ylabel('Y 軸 data', fontsize = 14)# 设置子图标题
-                                    # 繪製第三個子圖 Z 軸 --------------------------------------------------
-                                    # 繪製 motion data
-                                    axes[2].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Wrist.Rad
-                                                 filted_motion.loc[E1_idx:E5_idx, "R.Wrist.Rad_z"].values,
-                                                 color=colors[0], label = "R.Wrist.Rad")
-                                    axes[2].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Epi.Lat
-                                                 filted_motion.loc[E1_idx:E5_idx, "R.Epi.Lat_z"].values,
-                                                 color=colors[1], label = "R.Epi.Lat")
-                                    axes[2].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # L.Acromion
-                                                 filted_motion.loc[E1_idx:E5_idx, "L.Acromion_z"].values,
-                                                 color=colors[2], label = "L.Acromion")
-                                    axes[2].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # L.Wrist.Rad
-                                                 filted_motion.loc[E1_idx:E5_idx, "L.Wrist.Rad_z"].values,
-                                                 color=colors[3], label = "L.Wrist.Rad")
-                                    axes[2].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # T10
-                                                 filted_motion.loc[E1_idx:E5_idx, "T10_z"].values,
-                                                 color=colors[4], label = "T10")
-                                    axes[2].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # Middle
-                                                 filted_motion.loc[E1_idx:E5_idx, "Middle_z"].values,
-                                                 color=colors[5], label = "Middle")
-                                    # E1 劃分期線
-                                    axes[2].axvline(filted_motion.loc[E1_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[2].text(filted_motion.loc[E1_idx, 'Frame'],
-                                                 axes[2].get_ylim()[1], f"E1:{filted_motion.loc[E1_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E2 劃分期線
-                                    axes[2].axvline(filted_motion.loc[E2_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[2].text(filted_motion.loc[E2_idx, 'Frame'],
-                                                 axes[2].get_ylim()[1], f"E2:{filted_motion.loc[E2_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E3-1 劃分期線
-                                    axes[2].axvline(filted_motion.loc[E3_1_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[2].text(filted_motion.loc[E3_1_idx, 'Frame'],
-                                                 axes[2].get_ylim()[1], f"E3-1:{filted_motion.loc[E3_1_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E3-2 劃分期線
-                                    axes[2].axvline(filted_motion.loc[E3_2_idx, 'Frame'] ,
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[2].text(filted_motion.loc[E3_2_idx, 'Frame'],
-                                                 axes[2].get_ylim()[1]*0.95, f"E3-2:{filted_motion.loc[E3_2_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E4 劃分期線
-                                    axes[2].axvline(filted_motion.loc[E4_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[2].text(filted_motion.loc[E4_idx, 'Frame']-1,
-                                                 axes[2].get_ylim()[1], f"E4:{filted_motion.loc[E4_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    # E5 劃分期線
-                                    axes[2].axvline(filted_motion.loc[E5_idx, 'Frame'],
-                                                    color='r', linestyle='--', linewidth=0.5) # trigger onset
-                                    # 添加标注
-                                    axes[2].text(filted_motion.loc[E5_idx, 'Frame'],
-                                                 axes[2].get_ylim()[1],  f"E5:{filted_motion.loc[E5_idx, 'Frame']:.2f}s",
-                                                 color='r', fontsize=10, ha='center', va='bottom')
-                                    axes[2].set_xlim(filted_motion.loc[E1_idx, 'Frame'],
-                                                     filted_motion.loc[E5_idx, 'Frame'])
-                                    # 子圖資訊設定，坐標軸
-                                    axes[2].set_ylabel('z 軸 data', fontsize = 14)  # 设置子图标题
-                                    # 添加整体标题
+                                    for subfig in range(len(axes)):
+                                        for marker in range(len(labels)):
+                                            axes[subfig].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Wrist.Rad
+                                                              filted_motion.loc[E1_idx:E5_idx, str(labels[marker] + "_" + axis_label[subfig])].values,
+                                                             color=colors[marker], label = marker)
+                                            axes[subfig].set_ylabel(str(axis_label[subfig] + ' 軸 data'), fontsize = 14)  # 设置子图标题
+                                            axes[subfig].set_xlim(filted_motion.loc[E1_idx, 'Frame'],
+                                                                  filted_motion.loc[E5_idx, 'Frame'])
+                                        for key in E_idx.keys():
+                                            # print(key)
+                                            if key == "E3-2" or key == "E5":
+                                                # print(key)
+                                                y = axes[subfig].get_ylim()[1]*0.93
+                                            else:
+                                                y = axes[subfig].get_ylim()[1]
+                                            axes[subfig].axvline(filted_motion.loc[E_idx[key], 'Frame'],
+                                                                 color='r', linestyle='--', linewidth=0.5) # trigger onset
+                                            # 添加标注
+                                            axes[subfig].text(filted_motion.loc[E_idx[key], 'Frame'],
+                                                             y, str(key + f":{filted_motion.loc[E_idx[key], 'Frame']:.2f}s"),
+                                                             color='r', fontsize=10, ha='center', va='bottom')
+                                     # 添加整体标题
                                     plt.suptitle(tempfilename)  # 设置整体标题
                                     # 调整子图之间的间距
                                     plt.tight_layout()
@@ -606,6 +439,8 @@ for subject in subject_list:
                                                 dpi=100)
                                     # 显示图形
                                     plt.show()
+                                            
+                                      
                                     # 7.2. 舉弓角度畫圖 ------------------------------------------------------------------------------
                                     # -----------------------------------------------------------------------------------------------
                                     fig, axes = plt.subplots(4, 1, figsize=(8, 12), sharex='col')

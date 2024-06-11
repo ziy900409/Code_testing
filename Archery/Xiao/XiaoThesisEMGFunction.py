@@ -18,7 +18,7 @@ X軸超出前1秒數據3個標準差，判定為放箭
 import os
 import pandas as pd
 import numpy as np
-from scipy import signal, interpolate
+from scipy import signal
 import ezc3d
 import math
 import logging #print 警告用
@@ -26,6 +26,7 @@ from pandas import DataFrame
 import matplotlib.pyplot as plt
 from scipy.fftpack import fft, fftfreq
 import XiaoThesisGeneralFunction as gen
+from scipy.interpolate import interp1d
 
 # %%
 # ---------------------前處理用--------------------------------
@@ -51,34 +52,36 @@ c3d_notch_cutoff_3 = [149.5, 150.5]
 c3d_notch_cutoff_4 = [249.5, 250.5]
 c3d_notch_cutoff_5 = [349.5, 350.5]
 
-csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
-                     'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
-                     'Mini sensor 3: EMG 3': 'Triceps Brachii',
-                     'Quattro sensor 4: EMG.A 4': 'Extensor Carpi Ulnaris', 
-                     'Quattro sensor 4: EMG.B 4': '1st Dorsal Interosseous', 
-                     'Quattro sensor 4: EMG.C 4': 'Abductor Digiti Quinti', 
-                     'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
-                     'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
+csv_recolumns_name = {}
 
-c3d_recolumns_name = {'ExtRad.IM EMG1': 'Extensor Carpi Radialis',
-                     'FleRad.IM EMG2': 'Flexor Carpi Radialis',
-                     'Triceps.IM EMG3': 'Triceps Brachii',
-                     'ExtUlnar.IM EMG4': 'Extensor Carpi Ulnaris', 
-                     'DorInter_1st.IM EMG5': '1st Dorsal Interosseous', 
-                     'AbdDigMin.IM EMG6': 'Abductor Digiti Quinti', 
-                     'ExtInd.IM EMG7': 'Extensor Indicis',
-                     'Biceps.IM EMG8': 'Biceps Brachii'}
+c3d_recolumns_name = {}
 
-c3d_analog_cha = ['ExtRad.IM EMG1', 'FleRad.IM EMG2', 'Triceps.IM EMG3', 'ExtUlnar.IM EMG4',
-                  'DorInter_1st.IM EMG5', 'AbdDigMin.IM EMG6',  'ExtInd.IM EMG7', 'Biceps.IM EMG8']
+c3d_analog_cha = []
 
-c3d_analog_idx = [64, 72, 73, 74, 75, 76, 77, 78]
+c3d_analog_idx = []
 # ---------------------找放箭時間用----------------------------
 # 設定最接近放箭位置之acc sensor的欄位編號，建議看完三軸資料再選最大的
 # 可設定數字或是欄位名稱：ex: R EXTENSOR GROUP: ACC.Y 1 or 5
 release_acc = 17
 # 設定放箭的振幅大小值
 release_peak = 1.5
+# 設置繪圖參數 --------------------------------------------------------------
+compare_name = ["SH1", "SHM"],
+muscle_name = ["R EXT: EMG 1", "R TRI : EMG 2", "R FLX: EMG 3",
+               "R BI: EMG 4", "R UT: EMG 5", "R LT: EMG 6"]
+
+# 創造資料儲存位置
+time_ratio = {"E1-E2": 1,
+              "E2-E3-1": 1,
+              "E3-1-E3-2": 0.5,
+              "E3-2-E4": 3,
+              "E4-E5": 0.2}
+
+total_time = 0
+for ratio in time_ratio.keys():
+    total_time += time_ratio[ratio]
+
+time_length = int(total_time * 10 * 2)
 
 # %% EMG data processing
 def EMG_processing(raw_data, smoothing="lowpass"):
@@ -585,9 +588,9 @@ def find_release_time(folder_path, save_path, save_fig=True):
     
 # %%
 def compare_mean_std_cloud(data_path, savepath, filename, smoothing,
-                           compare_name = ["SH1", "SHM"],
-                           muscle_name = ["R EXT: EMG 1", "R TRI : EMG 2", "R FLX: EMG 3",
-                                          "R BI: EMG 4", "R UT: EMG 5", "R LT: EMG 6"]):
+                           compare_name = compare_name,
+                           muscle_name = muscle_name):
+    
     '''
 
     比较多个数据集的均值和标准差，并生成相应的图表。
@@ -626,21 +629,17 @@ def compare_mean_std_cloud(data_path, savepath, filename, smoothing,
                 
     # 假设 muscle_name 和 total_time 已经定义
     muscle_length = len(muscle_name)
-    time_length = int(total_time * 10 * 2)
-    
+
     # 初始化空字典来存储数据数组
     data_arrays = {}
-    
     # 根据 compare_data 的长度，创建相应数量的数据数组
     # muscle name * time length * subject number
     for key in compare_data:
         subject_count = len(compare_data[key])
         data_arrays[key] = np.empty([muscle_length, time_length, subject_count])
 
-    
     for key in compare_data:
         for idx in range(len(compare_data[key])):
-            
             time_idx = 0
             for period in time_ratio.keys():
                 raw_data = pd.read_excel(compare_data[key][idx],
@@ -692,7 +691,7 @@ def compare_mean_std_cloud(data_path, savepath, filename, smoothing,
             # 圖片的格式設定
             axs[x, y].set_title(muscle_name[muscle], fontsize=12)
             axs[x, y].legend(loc="upper left") # 圖例位置
-            axs[x, y].grid(True, linestyle='-.')
+            # axs[x, y].grid(True, linestyle='-.')
             # 畫放箭時間
             axs[x, y].set_xlim(0, time_length)
             axs[x, y].axvline(x=110, color = 'darkslategray', linewidth=1, linestyle = '--')

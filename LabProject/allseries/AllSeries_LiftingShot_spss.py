@@ -13,7 +13,8 @@ sys.path.append(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\4. code")
 
 import AllSeries_general_func_20240327 as gen
 # %% parameter setting
-emg_muscle = ['Extensor carpi radialis_RMS', 'Flexor Carpi Radialis_RMS',
+emg_muscle = ['max_value',
+              'Extensor carpi radialis_RMS', 'Flexor Carpi Radialis_RMS',
               'Triceps_RMS', 'Extensor carpi ulnaris_RMS',
               '1st. dorsal interosseous_RMS', 'Abductor digiti quinti_RMS',
               'Extensor Indicis_RMS', 'Biceps_RMS']
@@ -32,7 +33,7 @@ formatted_date = now.strftime("%Y-%m-%d")
 print("当前日期：", formatted_date)
 
 # %% read data
-raw_data = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\LiftingShot_data_2024-04-15_1.xlsx",
+raw_data = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\LiftingShot_LiftZ_2024-06-11_v1.xlsx",
                          sheet_name="Sheet1")
 
 mouse_group = raw_data.loc[:, 'file_name'].str.split("_")
@@ -49,7 +50,7 @@ left_group = raw_data[raw_data['direction'] == 'L']
 left_group = left_group.loc[:, emg_muscle]
 
 
-# remove_left = gen.removeoutliers(left_group)
+remove_left = gen.removeoutliers(left_group)
 
 # remove_left.isna().sum()
 subject_number = raw_data['subject'].value_counts().index
@@ -57,7 +58,8 @@ subject_number = raw_data['subject'].value_counts().index
 # 找到同肌肉名稱的 columns 的 index
 index_dict = {col: raw_data.columns.get_loc(col) for col in emg_muscle}
 # 創建資料儲存的地方
-emg_data_table = pd.DataFrame({}, columns = list(['subject','direction', 'mouse'] + emg_muscle)
+emg_data_table = pd.DataFrame({},
+                              columns = list(['subject','direction', 'mouse'] + emg_muscle)
                               )
 for sub in subject_number:
     for direction in ['R', 'L']:
@@ -91,11 +93,11 @@ for sub in subject_number:
 file_name = "LiftingShot_statistic_auto_" + formatted_date + ".xlsx"
 path = r'D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\\'
 emg_data_table.to_excel(path + file_name,
-                    sheet_name='Sheet1', index=False, header=True)       
+                        sheet_name='Sheet1', index=False, header=True)       
 
 # %% remove outlier hand angle
-raw_data = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\LiftingShot_angle_data_2024-04-24.xlsx",
-                         sheet_name="Sheet1")
+# raw_data = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\LiftingShot_angle_data_2024-04-24.xlsx",
+#                          sheet_name="Sheet1")
 
 mouse_group = raw_data.loc[:, 'file_name'].str.split("_")
 mouse_element = pd.DataFrame(mouse_group.str[2])

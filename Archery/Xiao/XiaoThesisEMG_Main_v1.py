@@ -9,8 +9,8 @@ import gc
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ import XiaoThesisGeneralFunction as gen
 import XiaoThesisEMGFunction as emg
 # from detecta import detect_onset
 # from scipy import signal
-from scipy.interpolate import interp1d
+
 import time
 
 from datetime import datetime
@@ -40,11 +40,12 @@ now = datetime.now()
 formatted_date = datetime.now().strftime('%Y-%m-%d-%H%M')
 print("當前日期：", formatted_date)
 # %% parameter setting 
-staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
-data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405"
+# staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
+# data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405"
 
-# staging_path = r"D:\BenQ_Project\python\Archery\202405\Archery_stage_v5_input.xlsx"
-# data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+staging_path = r"D:\BenQ_Project\python\Archery\202405\Archery_stage_v5_input.xlsx"
+data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+shooting_staging_file = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\_algorithm_output_formatted_date.xlsx"
 
 # 測試組
 subject_list = ["R01"]
@@ -84,8 +85,8 @@ down_freq = 2000
 motion_fs = 250
 # 設定移動平均數與移動均方根之參數
 # 更改window length, 更改overlap length
-time_of_window = 0.1 # 窗格長度 (單位 second)
-overlap_len = 0.5 # 百分比 (%)
+time_of_window = 0.2 # 窗格長度 (單位 second)
+overlap_len = 0.98 # 百分比 (%)
 # 預處理資料可修改檔名，並新增標籤，如：S2_MVC_Rep_1.16 -> S2_MVC_Rep_1.16_low
 end_name = "_ed"
 # 平滑處理方式 ex: lowpass, rms, moving
@@ -109,20 +110,6 @@ trigger_threshold = 0.02
 threshold = 0.03
 window_size = 5
 # 設置繪圖參數 --------------------------------------------------------------
-compare_name = ["SH1", "SHM"],
-muscle_name = ["R EXT: EMG 1", "R TRI : EMG 2", "R FLX: EMG 3",
-               "R BI: EMG 4", "R UT: EMG 5", "R LT: EMG 6"]
-
- 
-# 創造資料儲存位置
-time_ratio = {"E1-E2": 1,
-              "E2-E3-1": 1,
-              "E3-1-E3-2": 0.5,
-              "E3-2-E4": 3,
-              "E4-E5": 0.2}
-total_time = 0
-for ratio in time_ratio.keys():
-    total_time += time_ratio[ratio]
 
 # 设置颜色
 cmap = plt.get_cmap('Set2')
@@ -290,7 +277,7 @@ for subject in subject_list:
             MVC_value = MVC_value.iloc[-1, 2:]
             # 確認資料夾路徑下是否有 staging file
             subject = all_rawdata_folder_path["EMG"][i].split("\\")[-1]
-            staging_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\_algorithm_output_formatted_date.xlsx",
+            staging_data = pd.read_excel(shooting_staging_file,
                                          # data_path + "_algorithm_output_formatted_date" + ".xlsx"
                                          sheet_name=subject)
         
@@ -326,6 +313,7 @@ for subject in subject_list:
                                      / motion_fs * emg_fs)
                         
                         processing_data, bandpass_filtered_data = emg.EMG_processing(data, smoothing=smoothing_method)
+                        
                         # 去做條件判斷要輸出何種資料
                         if smoothing_method == 'lowpass':
                             ## 擷取 EMG data
@@ -382,30 +370,28 @@ for subject in subject_list:
     for i in range(len(all_rawdata_folder_path["EMG"])):
         if subject in all_rawdata_folder_path["EMG"][i]:
             print(all_rawdata_folder_path["EMG"][i])
-            Shooting_path = all_rawdata_folder_path["EMG"][i] + "\\" + motion_folder
-            Shooting_list = gen.Read_File(Shooting_path, '.csv')
-            # 設定儲存照片路徑
-            fig_save_path = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") \
-                + "\\" + fig_folder
-            motion_folder_path = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data")\
-                + data_folder + motion_folder
-            save_path =  all_processing_folder_path[i]
-            print("圖片存檔路徑: ", save_path)
-            emg.compare_mean_std_cloud(motion_folder_path,
-                                      all_processing_folder_path[i] + "\\" + folder_paramter["subject_subfolder"][1] +"\\data\\motion",
-                                      save_path, all_processing_folder_path[i].split("\\")[-1],
-                                      smoothing_method,
-                                      self_oreder=False)
+            temp_motion_folder = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + data_folder + motion_folder
+            temp_fig_save = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + "\\figure\\Cut1_figure"
+            emg.compare_mean_std_cloud(temp_motion_folder,
+                                      temp_fig_save,
+                                       str(subject + "_SH1 vs SHM"),
+                                       "rms",
+                                       compare_name = ["SH1", "SHM"],
+                                       muscle_name = ["R EXT: EMG 1", "R TRI : EMG 2", "R FLX: EMG 3",
+                                                      "R BI: EMG 4", "R UT: EMG 5", "R LT: EMG 6"])
+            
+            emg.compare_mean_std_cloud(temp_motion_folder,
+                                       temp_fig_save,
+                                       str(subject + "_SH1 vs SHM vs SHH"),
+                                       "rms",
+                                       compare_name = ["SH1", "SHM", "SHH", "SHL"],
+                                       muscle_name = ["R EXT: EMG 1", "R TRI : EMG 2", "R FLX: EMG 3",
+                                                      "R BI: EMG 4", "R UT: EMG 5", "R LT: EMG 6"])
 toc = time.process_time()
 print("Total Time Spent: ",toc-tic)
 gc.collect(generation=2)
 
 
-
-
-# %%
-
-import math
 
 
         
