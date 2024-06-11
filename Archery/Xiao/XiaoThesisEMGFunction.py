@@ -84,7 +84,7 @@ for ratio in time_ratio.keys():
 time_length = int(total_time * 10 * 2)
 
 # %% EMG data processing
-def EMG_processing(raw_data, smoothing="lowpass"):
+def EMG_processing(raw_data, smoothing="lowpass", notch=False):
     '''
     Parameters
     ----------
@@ -203,8 +203,24 @@ def EMG_processing(raw_data, smoothing="lowpass"):
         # 進行 bandpass filter
         bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=sample_freq, output='sos')
         bandpass_filtered = signal.sosfiltfilt(bandpass_sos, data)
+        if notch:
+            # 做 band stop filter
+            notch_sos_1 = signal.butter(2, csv_notch_cutoff_1, btype='bandstop', fs=sample_freq, output='sos')
+            notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
+                                                  bandpass_filtered)
+            notch_sos_2 = signal.butter(2, csv_notch_cutoff_2, btype='bandstop', fs=sample_freq, output='sos')
+            notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
+                                                  notch_filtered_1)
+            notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=sample_freq, output='sos')
+            notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
+                                                  notch_filtered_2)
+            notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=sample_freq, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_4,
+                                                notch_filtered_3)
+        else:
+            notch_filtered = bandpass_filtered
         # 取絕對值，將訊號翻正
-        abs_data = abs(bandpass_filtered)
+        abs_data = abs(notch_filtered)
         # ------linear envelop analysis-----------                          
         # ------lowpass filter parameter that the user must modify for your experiment        
         lowpass_sos = signal.butter(2, lowpass_freq, btype='low', fs=sample_freq, output='sos')        
@@ -646,7 +662,7 @@ def compare_mean_std_cloud(data_path, savepath, filename, smoothing,
                                          sheet_name=period)
                 for muscle in range(len(muscle_name)):
                     time_period = int(time_ratio[period]*10*2)
-                    print(muscle_name[muscle])
+                    # print(muscle_name[muscle])
                     # print(time_period)
                     # 使用 cubic 將資料內插
                     x = raw_data.iloc[:, 0] # time

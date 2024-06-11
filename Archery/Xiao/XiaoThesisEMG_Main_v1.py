@@ -9,8 +9,8 @@ import gc
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -40,12 +40,13 @@ now = datetime.now()
 formatted_date = datetime.now().strftime('%Y-%m-%d-%H%M')
 print("當前日期：", formatted_date)
 # %% parameter setting 
-# staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
-# data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405"
-
-staging_path = r"D:\BenQ_Project\python\Archery\202405\Archery_stage_v5_input.xlsx"
-data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
+data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405"
 shooting_staging_file = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\_algorithm_output_formatted_date.xlsx"
+
+# staging_path = r"D:\BenQ_Project\python\Archery\202405\Archery_stage_v5_input.xlsx"
+# data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+# shooting_staging_file = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\_algorithm_output_formatted_date.xlsx"
 
 # 測試組
 subject_list = ["R01"]
@@ -111,9 +112,15 @@ threshold = 0.03
 window_size = 5
 # 設置繪圖參數 --------------------------------------------------------------
 
+muscle_group = {"release": ['R EXT: EMG 1', 'R TRI : EMG 2', 'R FLX: EMG 3', 'R BI: EMG 4'],
+                "right": ['R UT: EMG 5', 'R LT: EMG 6', 'R INF: EMG 7 (IM)', 'R LAT: EMG 8', 'R PD: EMG 13'],
+                "left": ['L UT: EMG 9', 'L LT: EMG 10', 'L INF: EMG 11', 'L LAT: EMG 12', 'L MD: EMG 14']}
+
 # 设置颜色
 cmap = plt.get_cmap('Set2')
 colors = [cmap(i) for i in np.linspace(0, 1, 6)]
+
+
 
                                     
 
@@ -280,15 +287,16 @@ for subject in subject_list:
             staging_data = pd.read_excel(shooting_staging_file,
                                          # data_path + "_algorithm_output_formatted_date" + ".xlsx"
                                          sheet_name=subject)
-        
-            # --------------------------------------------------------------------------------------
             for ii in range(len(Shooting_list)):
                 for iii in range(len(staging_data['EMG_filename'])):
                     # for mac version replace "\\" by '/'
                     if Shooting_list[ii].split('\\')[-1] == staging_data['EMG_filename'][iii].split('\\')[-1]:
                         print(staging_data['EMG_filename'][iii])
-                        # 讀取資料
+                        # 1. 讀取資料及資料前處理 ------------------------------
                         data = pd.read_csv(Shooting_list[ii], encoding='UTF-8')
+                        processing_data, bandpass_filtered_data = emg.EMG_processing(data,
+                                                                                     smoothing=smoothing_method,
+                                                                                     notch=True)
                         # 擷取檔名
                         filepath, tempfilename = os.path.split(Shooting_list[ii])
                         filename, extension = os.path.splitext(tempfilename)
@@ -297,8 +305,26 @@ for subject in subject_list:
                             + data_folder + '\\' + motion_folder + '\\' + filename + end_name + ".xlsx"
                         # EMG sampling rate
                         emg_fs = 1 / (data.iloc[1, 0] - data.iloc[0, 0])
+                        # 2. 前處理資料繪圖 ----------------------------------------------------------
+                        # 畫 FFT analysis 的圖
+                        emg.Fourier_plot(Shooting_list[ii],
+                                        (fig_save_path + "\\FFT\\motion"),
+                                        filename,
+                                        notch=False)
+                        emg.Fourier_plot(Shooting_list[ii],
+                                        (fig_save_path + "\\FFT\\motion"),
+                                        filename,
+                                        notch=True)
+                        # 畫 bandpass 後之資料圖
+                        emg.plot_plot(bandpass_filtered_data,
+                                      str(fig_save_path + "\\processing\\bandpass\\" + motion_folder),
+                                     filename, "Bandpass_")
+                        # 畫前處理後之資料圖
+                        emg.plot_plot(processing_data,
+                                      str(fig_save_path + "\\processing\\smoothing\\" + motion_folder),
+                                     filename, str("_" + smoothing_method))
                         
-                        # 定義分期時間，staging file 的時間為 motion，需轉為 EMG
+                        # 3. 定義分期時間，staging file 的時間為 motion，需轉為 EMG -----------------------------
                         E1_idx = int((staging_data["E1 frame"][iii] - staging_data["trigger"][iii]) \
                                      / motion_fs * emg_fs)
                         E2_idx = int((staging_data["Bow_Height_Peak_Frame"][iii] - staging_data["trigger"][iii])\
@@ -312,7 +338,7 @@ for subject in subject_list:
                         E5_idx = int((staging_data["E5 frame"][iii] - staging_data["trigger"][iii])\
                                      / motion_fs * emg_fs)
                         
-                        processing_data, bandpass_filtered_data = emg.EMG_processing(data, smoothing=smoothing_method)
+                        
                         
                         # 去做條件判斷要輸出何種資料
                         if smoothing_method == 'lowpass':
@@ -371,22 +397,29 @@ for subject in subject_list:
         if subject in all_rawdata_folder_path["EMG"][i]:
             print(all_rawdata_folder_path["EMG"][i])
             temp_motion_folder = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + data_folder + motion_folder
-            temp_fig_save = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + "\\figure\\Cut1_figure"
-            emg.compare_mean_std_cloud(temp_motion_folder,
-                                      temp_fig_save,
-                                       str(subject + "_SH1 vs SHM"),
-                                       "rms",
-                                       compare_name = ["SH1", "SHM"],
-                                       muscle_name = ["R EXT: EMG 1", "R TRI : EMG 2", "R FLX: EMG 3",
-                                                      "R BI: EMG 4", "R UT: EMG 5", "R LT: EMG 6"])
-            
-            emg.compare_mean_std_cloud(temp_motion_folder,
-                                       temp_fig_save,
-                                       str(subject + "_SH1 vs SHM vs SHH"),
-                                       "rms",
-                                       compare_name = ["SH1", "SHM", "SHH", "SHL"],
-                                       muscle_name = ["R EXT: EMG 1", "R TRI : EMG 2", "R FLX: EMG 3",
-                                                      "R BI: EMG 4", "R UT: EMG 5", "R LT: EMG 6"])
+            fig_save_1 = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + "\\figure\\Cut1_figure"
+            fig_save_2 = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + "\\figure\\Cut2_figure"
+            for muscle in muscle_group:
+                # print(muscle)
+                emg.compare_mean_std_cloud(temp_motion_folder,
+                                          fig_save_1,
+                                           str(subject + "_SH1 vs SHM_" + muscle),
+                                           "rms",
+                                           compare_name = ["SH1", "SHM"],
+                                           muscle_name = muscle_group[muscle])
+                
+                emg.compare_mean_std_cloud(temp_motion_folder,
+                                           fig_save_1,
+                                           str(subject + "_SHH vs SHM vs SHH_" + muscle),
+                                           "rms",
+                                           compare_name = ["SHH", "SHM", "SHL"],
+                                           muscle_name = muscle_group[muscle])
+                emg.compare_mean_std_cloud(temp_motion_folder,
+                                           fig_save_2,
+                                           str(subject + "_SH1 vs SHH vs SHM vs SHH_" + muscle),
+                                           "rms",
+                                           compare_name = ["SH1", "SHH", "SHM", "SHL"],
+                                           muscle_name = muscle_group[muscle])
 toc = time.process_time()
 print("Total Time Spent: ",toc-tic)
 gc.collect(generation=2)
