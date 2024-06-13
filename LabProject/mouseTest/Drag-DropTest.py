@@ -103,6 +103,7 @@ temp_params = {}
 if "DragDropTest_temp.txt" in os.listdir(current_path):
     print(0)
     temp_txt_path = current_path + "\\" + "DragDropTest_temp.txt"
+    
     # 1. 如果當前路徑有 temp 檔案, 讀取檔案
     with open(temp_txt_path, 'r') as file:
         for line in file:
@@ -118,7 +119,8 @@ if "DragDropTest_temp.txt" in os.listdir(current_path):
                 except ValueError:
                     pass
             temp_params[key] = value
-    if len(temp_params) > 0: # 這個要再確認
+    temp_file_exist = os.path.exists(temp_params["folder_path"])
+    if len(temp_params) > 0 and temp_file_exist: # 這個要再確認
         print(1)
         # 2. 利用上次的 temp 路徑找上次測驗是第幾個 task
         judge_B01 = func.Read_File(temp_params["folder_path"],
@@ -311,7 +313,6 @@ submit_button.grid(row=6, columnspan=3, pady=20)
 
 # 開始主事件循環
 root.mainloop()
-# %%
 
 
 # %% 儲存一個 .txt 的暫存檔

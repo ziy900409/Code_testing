@@ -1,6 +1,6 @@
 user_id: S01
 condition: C01
-test_number: B08
-width_range: [30, 40]
-distance_range: [200, 400]
-folder_path: C:/Users/Hsin.YH.Yang/Desktop/ttt
+test_number: B01
+circle_radius: [50, 100]
+target_y: [800, 600]
+folder_path: d:\benq_project\git\code_testing\labproject\mousetest
