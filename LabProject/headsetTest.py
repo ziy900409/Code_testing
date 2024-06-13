@@ -17,6 +17,8 @@ analysis the answer sheet of heatset test
 import pandas as pd
 import numpy as np
 import os
+from datetime import datetime
+
 
 # %% parameter
 # 方向設定
@@ -89,9 +91,11 @@ all_data_path = [f for f in all_data_path if not os.path.split(f)[1].startswith(
 direction_answer = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                           len(subject_info + direct_columns))),
                                 columns=[subject_info + direct_columns])
+# 人數對
 number_answer = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                        len(subject_info + direct_columns))),
                              columns=[subject_info + direct_columns])
+# 樓層對
 # columns change to floor columns name
 floor_answer = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                       len(subject_info + floor_columns))),
@@ -104,18 +108,23 @@ sam_direction_answer_noO = pd.DataFrame({},
                                         columns=[subject_info + ["測試順序"] + direct_columns])
 
 # 方向對，去掉 NAN vs NAN
+# 計算正確的欄位數，並除以出現方位數
 direction_answer_noO = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                               len(subject_info + direct_columns))),
                                     columns=[subject_info + direct_columns])
+# 方向對的題數，有出現目標，並且有填答
 direction_answer_noOO = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                               len(subject_info + direct_columns))),
                                     columns=[subject_info + direct_columns])
+# 沒有出現目標，但是有填寫
 direction_answer_noX = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                               len(subject_info + direct_columns))),
                                     columns=[subject_info + direct_columns])
+# 有出現目標，但是沒有填寫
 direction_answer_noXX = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                                  len(subject_info + direct_columns))),
                                      columns=[subject_info + direct_columns])
+# 各方向出題數量
 answer_direction_noOO = pd.DataFrame(np.zeros((len(all_data_path)*len(headset_name),
                                               len(subject_info + direct_columns))),
                                     columns=[subject_info + direct_columns])
@@ -208,6 +217,7 @@ for subject in range(len(all_data_path)):
                         if pd.isna(answer_sheet.loc[i, direct]) == False and\
                             pd.isna(data_sheet.loc[row, direct]) == True:
                             direction_answer_noXX.loc[columns_number, direct] = direction_answer_noXX.loc[columns_number, direct].values + 1
+                        #  計算各方向出題數量
                         if pd.isna(answer_sheet.loc[i, direct]) == False :
                             answer_direction_noOO.loc[columns_number, direct] = answer_direction_noOO.loc[columns_number, direct].values + \
                                 answer_sheet.loc[i, direct]
@@ -259,7 +269,22 @@ for subject in range(len(all_data_path)):
                             if pd.notna(data_sheet.loc[row, floor]) and pd.notna(answer_sheet.loc[i, floor]):
                                 floor_answer.loc[columns_number, floor] = floor_answer.loc[columns_number, floor].values + 1
                                 print(direct)    
-                
+
+# %% 將檔案輸出成 EXCEL
+save_file = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
+
+with pd.ExcelWriter(save_file) as Writer:
+    sam_direction_answer.to_excel(Writer, sheet_name="方向對-簡易", index=True)
+    direction_answer.to_excel(Writer, sheet_name="方向錯", index=True)
+    number_answer.to_excel(Writer, sheet_name="人數錯", index=True)
+    floor_answer.to_excel(Writer, sheet_name="樓層錯", index=True)
+    answer_direction_noOO.to_excel(Writer, sheet_name="各方向出題數量", index=True)
+    direction_answer_noOO.to_excel(Writer, sheet_name="各方向答對題數", index=True)
+    direction_answer_noX.to_excel(Writer, sheet_name="方向_沒出現但有填", index=True)
+    direction_answer_noXX.to_excel(Writer, sheet_name="方向_有出現但沒填", index=True)
+    
+   
+
 # %% 統計分析        
 # 創建統計表格
 # number_statistic = pd.DataFrame(np.zeros((len(headset_name),
