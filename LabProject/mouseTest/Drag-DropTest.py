@@ -119,7 +119,11 @@ if "DragDropTest_temp.txt" in os.listdir(current_path):
                 except ValueError:
                     pass
             temp_params[key] = value
-    temp_file_exist = os.path.exists(temp_params["folder_path"])
+    for key in temp_params:
+        if key =="folder_path":
+                temp_file_exist = os.path.exists(temp_params["folder_path"])
+        else:
+            temp_file_exist = False
     if len(temp_params) > 0 and temp_file_exist: # 這個要再確認
         print(1)
         # 2. 利用上次的 temp 路徑找上次測驗是第幾個 task
