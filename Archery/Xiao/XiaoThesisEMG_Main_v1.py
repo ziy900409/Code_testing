@@ -14,14 +14,9 @@ sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-# import XiaoThesisMotionFunction as mot
 import XiaoThesisGeneralFunction as gen
 import XiaoThesisEMGFunction as emg
-# from detecta import detect_onset
-# from scipy import signal
-
 import time
-
 from datetime import datetime
 # matplotlib 設定中文顯示，以及圖片字型
 plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
@@ -192,45 +187,46 @@ gc.collect(generation=2)
         3.2.3. motion data 僅繪圖，資料貯存在 motion data 裁切的部分
 """
 # 處理MVC data
-
-for i in range(len(all_rawdata_folder_path["EMG"])):
-    tic = time.process_time()
-    
-    MVC_folder_path = all_rawdata_folder_path["EMG"][i] + "\\" + MVC_folder
-    MVC_list = gen.Read_File(MVC_folder_path, ".csv")
-    fig_save_path = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") \
-                + "\\" + fig_folder
-    print("Now processing MVC data in " + all_rawdata_folder_path["EMG"][i] + "\\")
-    for MVC_path in MVC_list:
-        print(MVC_path)
-        # 讀取資料
-        raw_data = pd.read_csv(MVC_path)
-        # EMG data 前處理
-        processing_data, bandpass_filtered_data = emg.EMG_processing(raw_data, smoothing=smoothing_method)
-        # 將檔名拆開
-        filepath, tempfilename = os.path.split(MVC_path)
-        filename, extension = os.path.splitext(tempfilename)
-        # 畫 FFT analysis 的圖
-        emg.Fourier_plot(MVC_path,
-                        (fig_save_path + "\\FFT\\MVC"),
-                        filename,
-                        notch=False)
-        emg.Fourier_plot(MVC_path,
-                        (fig_save_path + "\\FFT\\MVC"),
-                        filename,
-                        notch=True)
-        # 畫 bandpass 後之資料圖
-        emg.plot_plot(bandpass_filtered_data, str(fig_save_path + "\\processing\\bandpass\\" + MVC_folder),
-                     filename, "Bandpass_")
-        # 畫smoothing 後之資料圖
-        emg.plot_plot(processing_data, str(fig_save_path + "\\processing\\smoothing\\" + MVC_folder),
-                     filename, str(smoothing_method + "_"))
-        # writting data in worksheet
-        file_name =  all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data")\
-                + data_folder + MVC_folder + '\\' + filename + end_name + ".xlsx"
-        pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
-    toc = time.process_time()
-    print("Total Time:",toc-tic)  
+for subject in subject_list:
+    for i in range(len(all_rawdata_folder_path["EMG"])):
+        if subject in all_rawdata_folder_path["EMG"][i]:
+            tic = time.process_time()
+            
+            MVC_folder_path = all_rawdata_folder_path["EMG"][i] + "\\" + MVC_folder
+            MVC_list = gen.Read_File(MVC_folder_path, ".csv")
+            fig_save_path = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") \
+                        + "\\" + fig_folder
+            print("Now processing MVC data in " + all_rawdata_folder_path["EMG"][i] + "\\")
+            for MVC_path in MVC_list:
+                print(MVC_path)
+                # 讀取資料
+                raw_data = pd.read_csv(MVC_path)
+                # EMG data 前處理
+                processing_data, bandpass_filtered_data = emg.EMG_processing(raw_data, smoothing=smoothing_method)
+                # 將檔名拆開
+                filepath, tempfilename = os.path.split(MVC_path)
+                filename, extension = os.path.splitext(tempfilename)
+                # 畫 FFT analysis 的圖
+                emg.Fourier_plot(MVC_path,
+                                (fig_save_path + "\\FFT\\MVC"),
+                                filename,
+                                notch=False)
+                emg.Fourier_plot(MVC_path,
+                                (fig_save_path + "\\FFT\\MVC"),
+                                filename,
+                                notch=True)
+                # 畫 bandpass 後之資料圖
+                emg.plot_plot(bandpass_filtered_data, str(fig_save_path + "\\processing\\bandpass\\" + MVC_folder),
+                             filename, "Bandpass_")
+                # 畫smoothing 後之資料圖
+                emg.plot_plot(processing_data, str(fig_save_path + "\\processing\\smoothing\\" + MVC_folder),
+                             filename, str(smoothing_method + "_"))
+                # writting data in worksheet
+                file_name =  all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data")\
+                        + data_folder + MVC_folder + '\\' + filename + end_name + ".xlsx"
+                pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+            toc = time.process_time()
+            print("Total Time:",toc-tic)  
 gc.collect(generation=2)
 
 # %% 找 MVC 最大值
@@ -238,12 +234,14 @@ gc.collect(generation=2)
 4. 
 """
 tic = time.process_time()
-for i in range(len(all_processing_folder_path["EMG"])):
-    print("To find the maximum value of all of MVC data in: " + \
-          all_processing_folder_path["EMG"][i].split("\\")[-1])
-    
-    emg.Find_MVC_max(all_processing_folder_path["EMG"][i] + data_folder + MVC_folder,
-                     all_processing_folder_path["EMG"][i] + "\\")
+for subject in subject_list:
+    for i in range(len(all_processing_folder_path["EMG"])):
+        if subject in all_rawdata_folder_path["EMG"][i]:
+            print("To find the maximum value of all of MVC data in: " + \
+                  all_processing_folder_path["EMG"][i].split("\\")[-1])
+            
+            emg.Find_MVC_max(all_processing_folder_path["EMG"][i] + data_folder + MVC_folder,
+                             all_processing_folder_path["EMG"][i] + "\\")
 toc = time.process_time()
 print("MVC Data Total Time Spent: ",toc-tic)      
 gc.collect(generation=2)
@@ -263,6 +261,8 @@ gc.collect(generation=2)
 # 4.4 輸出moving average to excel file
 ------------------------------------------------------------------------------
 '''
+
+add_emg_statics = pd.DataFrame({})
 tic = time.process_time()
 
 # 開始處理 motion 資料
@@ -349,6 +349,13 @@ for subject in subject_list:
                             emg_iMVC.iloc[:, 0] = processing_data.iloc[E1_idx:E5_idx, 0].values
                             emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[E1_idx:E5_idx, 1:].values),
                                                              MVC_value.values)*100
+                            segments = [
+                                        (E1_idx, E2_idx, 'cut1'),
+                                        (E2_idx, E3_1_idx, 'cut2'),
+                                        (E3_1_idx, E3_2_idx, 'cut3'),
+                                        (E3_2_idx, E4_idx, 'cut4'),
+                                        (E4_idx, E5_idx, 'cut5')
+                                    ]
                         elif smoothing_method == 'rms' or smoothing_method == 'moving':
                             moving_E1_idx = np.abs(processing_data.iloc[:, 0] - (E1_idx)/down_freq).argmin()
                             moving_E2_idx = np.abs(processing_data.iloc[:, 0] - (E2_idx)/down_freq).argmin()
@@ -356,6 +363,13 @@ for subject in subject_list:
                             moving_E3_2_idx = np.abs(processing_data.iloc[:, 0] - (E3_2_idx)/down_freq).argmin()
                             moving_E4_idx = np.abs(processing_data.iloc[:, 0] - (E4_idx)/down_freq).argmin()
                             moving_E5_idx = np.abs(processing_data.iloc[:, 0] - (E5_idx)/down_freq).argmin()
+                            segments = [
+                                        (moving_E1_idx, moving_E2_idx, 'cut1'),
+                                        (moving_E2_idx, moving_E3_1_idx, 'cut2'),
+                                        (moving_E3_1_idx, moving_E3_2_idx, 'cut3'),
+                                        (moving_E3_2_idx, moving_E4_idx, 'cut4'),
+                                        (moving_E4_idx, moving_E5_idx, 'cut5')
+                                    ]
                             
                             # iMVC
                             emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
@@ -364,6 +378,31 @@ for subject in subject_list:
                             # 加絕對值，以避免數值趨近 0 時，會出現負數問題
                             emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
                                                              MVC_value.values)*100
+                        # 儲存結果的列表
+                        results = pd.DataFrame({})
+                                
+                        for start_idx, end_idx, task in segments:
+                            segment_data = emg_iMVC.iloc[start_idx:end_idx, :]
+                            mean_values = pd.DataFrame([segment_data.mean(axis=0)],
+                                                    columns = emg_iMVC.columns)
+                            max_values = pd.DataFrame([segment_data.max(axis=0)],
+                                                      columns = emg_iMVC.columns)
+                            min_values = pd.DataFrame([segment_data.min(axis=0)],
+                                                      columns = emg_iMVC.columns)
+                                    
+                            mean_values.insert(0, 'task', f'{task} mean')
+                            mean_values.insert(1, 'trial', filename)
+                            max_values.insert(0, 'task', f'{task} max')
+                            max_values.insert(1, 'trial', filename)
+                            min_values.insert(0, 'task', f'{task} min')
+                            min_values.insert(1, 'trial', filename)
+                                    
+                            results = pd.concat([results, mean_values, max_values, min_values],
+                                                ignore_index=True)
+
+                        # 合併計算資料
+                        add_emg_statics = pd.concat([add_emg_statics, results],
+                                                    ignore_index=True)
                         print(save_file)
                         # writting data in worksheet
                         pd.DataFrame(emg_iMVC).to_excel(save_file, sheet_name='Sheet1',
@@ -374,11 +413,10 @@ for subject in subject_list:
                             emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :].to_excel(Writer, sheet_name="E3-1-E3-2", index=False)
                             emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :].to_excel(Writer, sheet_name="E3-2-E4", index=False)
                             emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :].to_excel(Writer, sheet_name="E4-E5", index=False)
-                try:
-                    if staging_data in globals() or staging_data in locals():
-                        del staging_data
-                except TypeError:
-                    print('The variable does not exist')
+    
+        add_emg_statics.to_excel(str(all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data")\
+                                     + "\\" + subject + "_statistic.xlsx"),
+                                    sheet_name=subject)
     
 toc = time.process_time()
 print("Motion Data Total Time Spent: ",toc-tic)
@@ -433,7 +471,59 @@ gc.collect(generation=2)
 
 
 
+# %%
 
+                      # # 處理統計資料
+                      # temp_cut1_mean = np.mean(emg_iMVC.iloc[moving_E1_idx:moving_E2_idx, :])
+                      # temp_cut1_mean.insert(0, 'task', 'cut1 mean')
+                      # temp_cut1_mean.insert(1, 'trial', filename)
+                      # temp_cut1_max = np.max(emg_iMVC.iloc[moving_E1_idx:moving_E2_idx, :])
+                      # temp_cut1_max.insert(0, 'task', 'cut1 max')
+                      # temp_cut1_max.insert(1, 'trial', filename)
+                      # temp_cut1_min = np.min(emg_iMVC.iloc[moving_E1_idx:moving_E2_idx, :])
+                      # temp_cut1_min.insert(0, 'task', 'cut1 min')
+                      # temp_cut1_min.insert(1, 'trial', filename)
+                      
+                      # temp_cut2_mean = np.mean(emg_iMVC.iloc[moving_E2_idx:moving_E3_1_idx, :])
+                      # temp_cut2_mean.insert(0, 'task', 'cut2 mean')
+                      # temp_cut2_mean.insert(1, 'trial', filename)
+                      # temp_cut2_max = np.max(emg_iMVC.iloc[moving_E2_idx:moving_E3_1_idx, :])
+                      # temp_cut2_max.insert(0, 'task', 'cut2 max')
+                      # temp_cut2_max.insert(1, 'trial', filename)
+                      # temp_cut2_min = np.min(emg_iMVC.iloc[moving_E2_idx:moving_E3_1_idx, :])
+                      # temp_cut2_min.insert(0, 'task', 'cut2 min')
+                      # temp_cut2_min.insert(1, 'trial', filename)
+                      
+                      # temp_cut3_mean = np.mean(emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :])
+                      # temp_cut3_mean.insert(0, 'task', 'cut3 mean')
+                      # temp_cut3_mean.insert(1, 'trial', filename)
+                      # temp_cut3_max = np.max(emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :])
+                      # temp_cut3_max.insert(0, 'task', 'cut3 max')
+                      # temp_cut3_max.insert(1, 'trial', filename)
+                      # temp_cut3_min = np.min(emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :])
+                      # temp_cut3_min.insert(0, 'task', 'cut3 min')
+                      # temp_cut3_min.insert(1, 'trial', filename)
+                      
+                      # temp_cut4_mean = np.mean(emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :])
+                      # temp_cut4_mean.insert(0, 'task', 'cut4 mean')
+                      # temp_cut4_mean.insert(1, 'trial', filename)
+                      # temp_cut4_max = np.max(emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :])
+                      # temp_cut4_max.insert(0, 'task', 'cut4 max')
+                      # temp_cut4_max.insert(1, 'trial', filename)
+                      # temp_cut4_min = np.min(emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :])
+                      # temp_cut4_min.insert(0, 'task', 'cut4 min')
+                      # temp_cut4_min.insert(1, 'trial', filename)
+                      
+                      # temp_cut5_mean = np.mean(emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :])
+                      # temp_cut5_mean.insert(0, 'task', 'cut5 mean')
+                      # temp_cut5_mean.insert(1, 'trial', filename)
+                      # temp_cut5_max = np.max(emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :])
+                      # temp_cut5_max.insert(0, 'task', 'cut5 max')
+                      # temp_cut5_max.insert(1, 'trial', filename)
+                      # temp_cut5_min = np.min(emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :])
+                      # temp_cut5_min.insert(0, 'task', 'cut5 min')
+                      # temp_cut5_min.insert(1, 'trial', filename)
+                      
 
 
 

@@ -27,8 +27,8 @@ import gc
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -211,7 +211,7 @@ all_algorithm = pd.DataFrame({},
                                         "Bow_Height_Peak_Norm", "Anchor_Threadshold[mm]",
                                         "Anchor_Frame", "Anchor_Time[s]", "Release_Threadshold[mm]", 
                                         "Release_Frame", "Release_Time[s]",
-                                        "E1 frame", "E3-1 frame", "E5 frame", "trigger"])
+                                        "E1 frame", "E2 frame", "E3-1 frame", "E3-2 frame", "E4 frame", "E5 frame", "trigger"])
 
 for subject in subject_list:
     for motion_folder in all_rawdata_folder_path["motion"]:
@@ -297,13 +297,7 @@ for subject in subject_list:
                                     
                                     # 0. 抓 trigger onset, release time ----------------------------------------------------------
                                     # analog channel: C63
-                                    """
-                                    當前日期： 2024-06-06-2315 改到這裡
-                                    不知為何以下檔案放箭時間不對
-                                    "R02_SHL_Rep_4.16.csv"
-                                    
-                                    
-                                    """
+       
                                     triggrt_on = detect_onset(analog_data.loc[1000:, "C63"]*-1,
                                                               np.mean(analog_data["C63"][10000:10100]*-1) + trigger_threshold,
                                                               n_above=0, n_below=0, show=True)
@@ -385,10 +379,13 @@ for subject in subject_list:
                                                                 "Release_Frame": E4_idx,
                                                                 "Release_Time[s]": filted_motion.loc[E4_idx, 'Frame'],
                                                                 "E1 frame": E1_idx,
+                                                                "E2 frame": E2_idx,
                                                                 "E3-1 frame": E3_1_idx,
+                                                                "E3-2 frame": E3_2_idx,
+                                                                "E4 frame": E4_idx,
                                                                 "E5 frame": E5_idx,
-                                                                "trigger": (triggrt_on[0, 0] + 1000)\
-                                                                    / analog_info["frame_rate"] * motion_sampling_rate})
+                                                                "trigger": round((triggrt_on[0, 0] + 1000)\
+                                                                    / analog_info["frame_rate"] * motion_sampling_rate)})
                                     all_algorithm = pd.concat([all_algorithm, temp_output])
                                     # 7. 繪圖 -------------------------------------------------
                                     # 7.1. 繪製: 資料經平滑、按事件 1、5 剪裁，標記事件2、3原時間點之資料
@@ -458,7 +455,23 @@ for subject in subject_list:
                                                 axes[subfig].plot(filted_motion.loc[E1_idx:E5_idx, 'Frame'].values, # R.Wrist.Rad
                                                                   mAG,
                                                                  color=colors[marker], label = "mAG角度")
+                                                # 圈出最大的角度位置及時間
+                                                axes[subfig].plot(filted_motion.loc[(np.argmax(mAG) + E1_idx), 'Frame'],
+                                                                  np.max(mAG),
+                                                            marker = 'o', ms = 10, mec='r', mfc='none')
+                                                axes[subfig].text(filted_motion.loc[(np.argmax(mAG) + E1_idx), 'Frame'], # 最大角度值
+                                                                  np.max(mAG)*0.8,
+                                                                  str("Max" + f":{np.max(mAG):.2f}$^o$"),
+                                                                  color='r', fontsize=12, va='bottom')
+                                                axes[subfig].text(filted_motion.loc[(np.argmax(mAG) + E1_idx), 'Frame'],
+                                                                  np.max(mAG)*0.7,
+                                                                  str("Max time" + f":{filted_motion.loc[(np.argmax(mAG) + E1_idx), 'Frame']:.2f}s"),
+                                                                  color='r', fontsize=12, va='bottom')
+                                                
                                                 axes[subfig].set_ylabel('舉弓角度 (deg)', fontsize = 14)  # 设置子图标题
+                                                # "Bow_Angle_Peak":np.max(mAG),
+                                                # "Bow_Angle_Peak_Frame": (np.argmax(mAG) + E1_idx),
+                                                # "Bow_Angle_Peak_Time[s]": filted_motion.loc[(np.argmax(mAG) + E1_idx), 'Frame'],
                                             axes[subfig].set_xlim(filted_motion.loc[E1_idx, 'Frame'],
                                                                   filted_motion.loc[E5_idx, 'Frame'])
                                         for key in E_idx.keys():
@@ -472,8 +485,8 @@ for subject in subject_list:
                                                                  color='r', linestyle='--', linewidth=0.5) # trigger onset
                                             # 添加标注
                                             axes[subfig].text(filted_motion.loc[E_idx[key], 'Frame'],
-                                                             y, str(key + f":{filted_motion.loc[E_idx[key], 'Frame']:.2f}s"),
-                                                             color='r', fontsize=10, ha='center', va='bottom')
+                                                              y, str(key + f":{filted_motion.loc[E_idx[key], 'Frame']:.2f}s"),
+                                                              color='r', fontsize=10, ha='center', va='bottom')
                                      
                                     # 添加整体标题
                                     plt.suptitle(str("舉弓角度運算: " + tempfilename))  # 设置整体标题

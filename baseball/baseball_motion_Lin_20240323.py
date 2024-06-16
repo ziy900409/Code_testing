@@ -11,8 +11,8 @@ import os
 import matplotlib.pyplot as plt
 import math
 import sys
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import spm1d
@@ -1459,10 +1459,12 @@ plt.show()
 
 """
 
-staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+staging_file = pd.read_excel(#r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+                             r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
                              sheet_name='T1_memo2')
 staging_file = staging_file.dropna(axis=0, thresh=14)
-staging_file_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+staging_file_T2 = pd.read_excel(#r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+                                r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
                              sheet_name='T2_motion')
 staging_file_T2 = staging_file_T2.dropna(axis=0, thresh=14)
 
@@ -1498,7 +1500,8 @@ wrist_vel_T2 = pd.DataFrame(np.zeros([150, 20]),
  
 for subject in range(len(staging_file["Subject"])):
     print(staging_file["Subject"][subject])
-    finger_data = pd.read_excel(r"D:\BenQ_Project\python\Lin\forearm_motion_figure_T1.xlsx",
+    finger_data = pd.read_excel(#r"D:\BenQ_Project\python\Lin\forearm_motion_figure_T1.xlsx",
+                                r"E:\Hsin\NTSU_lab\Baseball\forearm_motion_figure_T1.xlsx",
                                 sheet_name = staging_file["Subject"][subject])
 
     
@@ -1535,7 +1538,8 @@ for subject in range(len(staging_file["Subject"])):
 # --------------------------for T2------------------------------------
 for subject in range(len(staging_file_T2["Subject"])):
     print(staging_file_T2["Subject"][subject])
-    finger_data_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\forearm_motion_figure_T2.xlsx",
+    finger_data_T2 = pd.read_excel(#r"D:\BenQ_Project\python\Lin\forearm_motion_figure_T2.xlsx",
+                                   r"E:\Hsin\NTSU_lab\Baseball\forearm_motion_figure_T2.xlsx",
                                    sheet_name = staging_file_T2["Subject"][subject])
     # --------------------for T2------------------------------------
     SER = staging_file_T2.loc[subject, "shoulder external rotation"]
@@ -1571,10 +1575,10 @@ for subject in range(len(staging_file_T2["Subject"])):
     
 # %%
 # coluns name
-finger_columns = ["手肘屈曲-伸展角度","手腕屈曲-伸展角度",
-                  "手肘屈曲-伸展角速度", "手腕屈曲-伸展角速度"]
-med_columns = ["手肘屈曲-伸展角度","手腕屈曲-伸展角度",
-                  "手肘屈曲-伸展角速度", "手腕屈曲-伸展角速度"]
+finger_columns = ["手肘屈曲-伸展角度","手腕旋前-旋後角度",
+                  "手肘屈曲-伸展角速度", "手腕旋前-旋後角速度"]
+med_columns = ["手肘屈曲-伸展角度","手腕旋前-旋後角度",
+               "手肘屈曲-伸展角速度", "手腕旋前-旋後角速度"]
 # create multi-dimension matrix
 # 關節角度
 # 快轉組
@@ -1662,11 +1666,11 @@ for i in range(np.shape(fast_dict)[0]):
     elif y == 1:
         axs[x, y].set_ylabel('deg/s', fontsize=14)
     
-plt.suptitle(str("前臂關節角度/角速度時序圖"), fontsize=20)
+plt.suptitle(str("前臂關節角度/角速度時序圖"), fontsize=18)
 plt.legend(loc='lower right', bbox_to_anchor=(0.8, -0.4), ncol=2)
 plt.tight_layout()
 fig.add_subplot(111, frameon=False)
-# hide tick and tick label of the big axes
+# hide tick and tick label of the big axes 
 plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
 plt.grid(False)
 plt.xlabel("time (%)", labelpad=8, fontsize = 16)
