@@ -20,7 +20,7 @@ import numpy as np
 
 # %%
 
-def Read_File(file_path, file_type, subfolder=None):
+def Read_File(file_path, file_type, subfolder=False):
     '''
     Parameters
     ----------
@@ -29,7 +29,7 @@ def Read_File(file_path, file_type, subfolder=None):
     y : str
         給定欲讀取資料之副檔名.
     subfolder : boolean, optional
-        是否子資料夾一起讀取. The default is 'None'.
+        是否子資料夾一起讀取. The default is 'False'.
 
     Returns
     -------

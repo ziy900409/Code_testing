@@ -438,26 +438,26 @@ for subject in subject_list:
             fig_save_1 = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + "\\figure\\Cut1_figure"
             fig_save_2 = all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data") + "\\figure\\Cut2_figure"
             for muscle in muscle_group:
-                # print(muscle)
-                emg.compare_mean_std_cloud(temp_motion_folder,
-                                          fig_save_1,
-                                           str(subject + "_SH1 vs SHM_" + muscle),
-                                           "rms",
-                                           compare_name = ["SH1", "SHM"],
-                                           muscle_name = muscle_group[muscle])
+                print(muscle)
+                emg.compare_mean_std_cloud_onecol(temp_motion_folder,
+                                                  fig_save_1,
+                                                  str(subject + "_SH1 vs SHM_" + muscle),
+                                                  "rms",
+                                                  compare_name = ["SH1", "SHM"],
+                                                  muscle_name = muscle_group[muscle])
                 
-                emg.compare_mean_std_cloud(temp_motion_folder,
-                                           fig_save_1,
-                                           str(subject + "_SHH vs SHM vs SHH_" + muscle),
-                                           "rms",
-                                           compare_name = ["SHH", "SHM", "SHL"],
-                                           muscle_name = muscle_group[muscle])
-                emg.compare_mean_std_cloud(temp_motion_folder,
-                                           fig_save_2,
-                                           str(subject + "_SH1 vs SHH vs SHM vs SHH_" + muscle),
-                                           "rms",
-                                           compare_name = ["SH1", "SHH", "SHM", "SHL"],
-                                           muscle_name = muscle_group[muscle])
+                emg.compare_mean_std_cloud_onecol(temp_motion_folder,
+                                                   fig_save_1,
+                                                   str(subject + "_SHH vs SHM vs SHH_" + muscle),
+                                                   "rms",
+                                                   compare_name = ["SHH", "SHM", "SHL"],
+                                                   muscle_name = muscle_group[muscle])
+                emg.compare_mean_std_cloud_onecol(temp_motion_folder,
+                                                  fig_save_2,
+                                                  str(subject + "_SH1 vs SHH vs SHM vs SHH_" + muscle),
+                                                  "rms",
+                                                  compare_name = ["SH1", "SHH", "SHM", "SHL"],
+                                                  muscle_name = muscle_group[muscle])
 toc = time.process_time()
 print("Total Time Spent: ",toc-tic)
 gc.collect(generation=2)
@@ -465,66 +465,50 @@ gc.collect(generation=2)
 
 
 
-        
-  
-
-
 
 
 # %%
 
-                      # # 處理統計資料
-                      # temp_cut1_mean = np.mean(emg_iMVC.iloc[moving_E1_idx:moving_E2_idx, :])
-                      # temp_cut1_mean.insert(0, 'task', 'cut1 mean')
-                      # temp_cut1_mean.insert(1, 'trial', filename)
-                      # temp_cut1_max = np.max(emg_iMVC.iloc[moving_E1_idx:moving_E2_idx, :])
-                      # temp_cut1_max.insert(0, 'task', 'cut1 max')
-                      # temp_cut1_max.insert(1, 'trial', filename)
-                      # temp_cut1_min = np.min(emg_iMVC.iloc[moving_E1_idx:moving_E2_idx, :])
-                      # temp_cut1_min.insert(0, 'task', 'cut1 min')
-                      # temp_cut1_min.insert(1, 'trial', filename)
-                      
-                      # temp_cut2_mean = np.mean(emg_iMVC.iloc[moving_E2_idx:moving_E3_1_idx, :])
-                      # temp_cut2_mean.insert(0, 'task', 'cut2 mean')
-                      # temp_cut2_mean.insert(1, 'trial', filename)
-                      # temp_cut2_max = np.max(emg_iMVC.iloc[moving_E2_idx:moving_E3_1_idx, :])
-                      # temp_cut2_max.insert(0, 'task', 'cut2 max')
-                      # temp_cut2_max.insert(1, 'trial', filename)
-                      # temp_cut2_min = np.min(emg_iMVC.iloc[moving_E2_idx:moving_E3_1_idx, :])
-                      # temp_cut2_min.insert(0, 'task', 'cut2 min')
-                      # temp_cut2_min.insert(1, 'trial', filename)
-                      
-                      # temp_cut3_mean = np.mean(emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :])
-                      # temp_cut3_mean.insert(0, 'task', 'cut3 mean')
-                      # temp_cut3_mean.insert(1, 'trial', filename)
-                      # temp_cut3_max = np.max(emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :])
-                      # temp_cut3_max.insert(0, 'task', 'cut3 max')
-                      # temp_cut3_max.insert(1, 'trial', filename)
-                      # temp_cut3_min = np.min(emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :])
-                      # temp_cut3_min.insert(0, 'task', 'cut3 min')
-                      # temp_cut3_min.insert(1, 'trial', filename)
-                      
-                      # temp_cut4_mean = np.mean(emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :])
-                      # temp_cut4_mean.insert(0, 'task', 'cut4 mean')
-                      # temp_cut4_mean.insert(1, 'trial', filename)
-                      # temp_cut4_max = np.max(emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :])
-                      # temp_cut4_max.insert(0, 'task', 'cut4 max')
-                      # temp_cut4_max.insert(1, 'trial', filename)
-                      # temp_cut4_min = np.min(emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :])
-                      # temp_cut4_min.insert(0, 'task', 'cut4 min')
-                      # temp_cut4_min.insert(1, 'trial', filename)
-                      
-                      # temp_cut5_mean = np.mean(emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :])
-                      # temp_cut5_mean.insert(0, 'task', 'cut5 mean')
-                      # temp_cut5_mean.insert(1, 'trial', filename)
-                      # temp_cut5_max = np.max(emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :])
-                      # temp_cut5_max.insert(0, 'task', 'cut5 max')
-                      # temp_cut5_max.insert(1, 'trial', filename)
-                      # temp_cut5_min = np.min(emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :])
-                      # temp_cut5_min.insert(0, 'task', 'cut5 min')
-                      # temp_cut5_min.insert(1, 'trial', filename)
-                      
+"""
+1. SH1以用來判斷E2的peak值 分成 高中低三組，每段分期都是三組比較 
+    one Way anova?
 
+2. 所有受試者
+    SHH SHM SHL 比較，每段分期都是三組比較
+    one Way repeated anova?
+    
+3. SHM SH1比較，每段分期都是二組比較
+    paired T-test
+"""
+# 1. SH1以用來判斷E2的peak值 分成 高中低三組，每段分期都是三組比較
+emg.compare_mean_std_cloud_onecol(r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\EMG\Processing_Data",
+                                  fig_save_2,
+                                  str(subject + "_Group1 vs Gropu2_" + muscle),
+                                  "rms",
+                                  compare_name = {"group1" :["SH1"], # 這邊自己改成受試者的檔名，ex: ["R01", "R02] 
+                                                  "group2": ["SHM"],
+                                                  "group3": ["SHL"]},
+                                  muscle_name = muscle_group[muscle],
+                                  compare_group=True,
+                                  subfolder=True)
+# 2. 所有受試者
+emg.compare_mean_std_cloud_onecol(r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\EMG\Processing_Data",
+                                  fig_save_2,
+                                  str(subject + "_Group1 vs Gropu2_" + muscle), # 這邊檔案名稱改一下
+                                  "rms",
+                                  compare_name = ["SHH", "SHM", "SHL"],
+                                  muscle_name = muscle_group[muscle],
+                                  compare_group=False,
+                                  subfolder=True)
+# 3. SHM SH1比較，每段分期都是二組比較
+emg.compare_mean_std_cloud_onecol(r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\EMG\Processing_Data",
+                                  fig_save_2,
+                                  str(subject + "_Group1 vs Gropu2_" + muscle), # 這邊檔案名稱改一下
+                                  "rms",
+                                  compare_name = ["SH1", "SHM"],
+                                  muscle_name = muscle_group[muscle],
+                                  compare_group=False,
+                                  subfolder=True)
 
 
 
