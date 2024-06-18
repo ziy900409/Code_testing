@@ -118,26 +118,12 @@ def submit():
     user_id = selected_user_id.get()
     condition = selected_condition.get()
     test_number = entry_test_number.get()
-    # width_range = entry_width_range.get()
-    # distance_range = entry_distance_range.get()
     folder_path = entry_folder_path.get()
 
     # 簡單的輸入檢查
     if not user_id or not condition or not test_number or not folder_path:
         messagebox.showerror("輸入錯誤", "所有欄位都是必填的")
         return
-
-    # try:
-    #     width_range = eval(width_range)
-    #     distance_range = eval(distance_range)
-    # except:
-    #     messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是有效的列表")
-    #     return
-
-    # if not (isinstance(width_range, list) and isinstance(distance_range, list) and
-    #         len(width_range) == 2 and len(distance_range) == 2):
-    #     messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是包含兩個數字的列表")
-    #     return
 
     # 保存輸入的值到全局變量
     params = {
@@ -357,22 +343,3 @@ txt_file_name =  os.path.join(current_path, "ReactionTimeTest_temp.txt")
 with open(txt_file_name, 'w') as file:
     for key, value in params.items():
         file.write(f'{key}: {value}\n')
-# %%
-Participant = params["user_id"]
-Condition = params["condition"]
-Block = params["test_number"]
-# file_name = params["user_id"] + "-" + params["condition"] + "-" + params["test_number"] \
-#     + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
-# 設定輸出檔案儲存路徑
-# data_save_path = os.path.join(file_path, ("DragDropTask-" + file_name))
-
-
-
-
-# 執行反應時間測試
-run_reaction_test()
-
-# 每次測試到達上限後，重新顯示輸入對話框
-while test_count >= max_tests:
-    show_input_dialog()
-    run_reaction_test()
