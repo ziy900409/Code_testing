@@ -882,10 +882,12 @@ for i in range(np.shape(staging_file)[0]):
 # %% 繪圖用
 # "D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx"
 # "E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx"
-staging_file = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+staging_file = pd.read_excel(#r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+                             r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
                              sheet_name='T1_motion')
 staging_file = staging_file.dropna(axis=0, thresh=14)
-staging_file_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+staging_file_T2 = pd.read_excel(#r"D:\BenQ_Project\python\Lin\motion分期肌電用_20240420.xlsx",
+                                r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
                              sheet_name='T2_motion')
 staging_file_T2 = staging_file_T2.dropna(axis=0, thresh=14)
 
