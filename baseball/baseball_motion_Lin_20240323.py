@@ -11,15 +11,15 @@ import os
 import matplotlib.pyplot as plt
 import math
 import sys
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
-sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import spm1d
 
 # data path setting
-motion_folder_path = r"E:\Hsin\NTSU_lab\Baseball\衛宣博論運動學\\"
 # motion_folder_path = r"E:\Hsin\NTSU_lab\Baseball\衛宣博論運動學\\"
+motion_folder_path = r"E:\Hsin\NTSU_lab\Baseball\衛宣博論運動學\\"
 # 設定繪圖格式與字體
 # plt.style.use('seaborn-white')
 # 顯示輸入中文
@@ -1066,7 +1066,7 @@ for subject in range(len(staging_file_T2["Subject"])):
 # 給畫圖的欄位使用
 finger_columns = ["食指掌指關節角度","食指近端指關節角度", "食指遠端指關節角度",
                   "中指掌指關節角度", "中指近端指關節角度", "中指遠端指關節角度"]
-med_columns = ["食指掌指關節角速度", "食指遠端指關節角速度", "食指近端指關節角速度",
+med_columns = ["食指掌指關節角速度", "食指近端指關節角速度", "食指遠端指關節角速度",
                "中指掌指關節角速度", "中指近端指關節角速度","中指遠端指關節角速度"]
 # create multi-dimension matrix
 # 關節角度
@@ -1094,8 +1094,8 @@ slow_dict[5, :, :] = med_distal_angle.loc[:, slow_group]
 # 角度度
 # 快轉組
 med_fast_dict = np.zeros((6, # muscle name without time
-                      150, # time length
-                      10)) # subject number
+                          150, # time length
+                          10)) # subject number
 
 med_fast_dict[0, :, :] = finger_plam_vel.loc[:, fast_group]
 med_fast_dict[1, :, :] = finger_proximal_vel.loc[:, fast_group]
@@ -1284,7 +1284,7 @@ plt.show()
 
 # %% 指關節角速度比較圖
 
-med_columns = ["食指掌指關節角速度", "食指遠端指關節角速度", "食指近端指關節角速度",
+med_columns = ["食指掌指關節角速度", "食指近端指關節角速度", "食指遠端指關節角速度",
                "中指掌指關節角速度", "中指近端指關節角速度","中指遠端指關節角速度"]
 finger_columns = ["食指掌指關節角度","食指近端指關節角度", "食指遠端指關節角度",
                   "中指掌指關節角度", "中指近端指關節角度", "中指遠端指關節角度"]
@@ -1293,9 +1293,9 @@ fig, ax = plt.subplots(figsize=(6, 4), layout='constrained')
 ax.plot(np.mean(fast_dict[0, :, :], axis=1),
         color='r', linestyle='--', label='食指掌指關節角度')  
 ax.plot(np.mean(fast_dict[1, :, :], axis=1),
-        color='r', linestyle='dotted', label='食指遠端指關節角度')
+        color='r', linestyle='dotted', label='食指近端指關節角度')
 ax.plot(np.mean(fast_dict[2, :, :], axis=1),
-        color='r', linestyle='solid', label='食指近端指關節角度')
+        color='r', linestyle='solid', label='食指遠端指關節角度')
 ax.plot(np.mean(fast_dict[3, :, :], axis=1),
         color='b', linestyle='--', label='中指掌指關節角度')
 ax.plot(np.mean(fast_dict[4, :, :], axis=1),
