@@ -20,8 +20,6 @@ import os
 import sys
 sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest")
 import Analysis_function_v1 as func
-
-# from tkinter import messagebox
 from datetime import datetime
 # %% 判斷是否有暫存檔, 依照檔案中B01的數字來決定下一個數字
 # 獲取當前程式所在的路徑
@@ -82,6 +80,7 @@ if "ScrollWheelTest_temp.txt" in os.listdir(current_path):
             target_list['Block_numeric'] = target_list['Block'].str.extract('(\d+)').astype(int)
             # 找出 Block 的最大值
             if max(target_list["Block_numeric"]) < 9:    
+                print(3)
                 max_block_numeric = "B0" + str(max(target_list["Block_numeric"]) + 1)
             else:
                 max_block_numeric = "B" + str(max(target_list["Block_numeric"]) + 1)
@@ -99,7 +98,7 @@ else:
     org_condition = "C01"
     org_block = "B01"
     org_folder_path = current_path
-    
+print(org_block)
 
 # %% 設定 UI 介面來輸入受試者訊息
 
@@ -112,25 +111,24 @@ def submit():
     user_id = selected_user_id.get()
     condition = selected_condition.get()
     test_number = entry_test_number.get()
-    width_range = entry_width_range.get()
+    # width_range = entry_width_range.get()
     distance_range = entry_distance_range.get()
     folder_path = entry_folder_path.get()
 
     # 簡單的輸入檢查
-    if not user_id or not condition or not test_number or not width_range or not distance_range or not folder_path:
+    if not user_id or not condition or not test_number or not distance_range or not folder_path:
         messagebox.showerror("輸入錯誤", "所有欄位都是必填的")
         return
 
     try:
-        width_range = eval(width_range)
+        # width_range = eval(width_range)
         distance_range = eval(distance_range)
     except:
         messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是有效的列表")
         return
 
-    if not (isinstance(width_range, list) and isinstance(distance_range, list) and
-            len(width_range) == 2 and len(distance_range) == 2):
-        messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是包含兩個數字的列表")
+    if not  (isinstance(distance_range, list) and len(distance_range) == 2):
+        messagebox.showerror("輸入錯誤", "難度(距離)必須是包含兩個數字的列表")
         return
 
     # 保存輸入的值到全局變量
@@ -138,7 +136,7 @@ def submit():
         "user_id": user_id,
         "condition": condition,
         "test_number": test_number,
-        "circle_radius": width_range,
+        # "circle_radius": width_range,
         "target_y": distance_range,
         "folder_path": folder_path
     }
@@ -147,14 +145,14 @@ def submit():
     print(f"User ID: {params['user_id']}")
     print(f"Condition: {params['condition']}")
     print(f"Test Number: {params['test_number']}")
-    print(f"Width Range: {params['circle_radius']}")
+    # print(f"Width Range: {params['circle_radius']}")
     print(f"Distance Range: {params['target_y']}")
     print(f"Folder Path: {params['folder_path']}")
 
     # 清空輸入欄位
     # entry_user_id.delete(0, tk.END)
     entry_test_number.delete(0, tk.END)
-    entry_width_range.delete(0, tk.END)
+    # entry_width_range.delete(0, tk.END)
     entry_distance_range.delete(0, tk.END)
     entry_folder_path.delete(0, tk.END)
     
@@ -217,41 +215,41 @@ entry_test_number = tk.Entry(root, font=font_entry)
 entry_test_number.grid(row=2, column=1, pady=5)
 entry_test_number.insert(0, org_block)  # 設置預設文字
 
-tk.Label(root, text="目標寬度:", font=font_label).grid(row=3, column=0, pady=5)
-entry_width_range = tk.Entry(root, font=font_entry)
-entry_width_range.grid(row=3, column=1, pady=5)
-entry_width_range.insert(0, "[50, 100]")  # 設置預設文字
+# tk.Label(root, text="目標寬度:", font=font_label).grid(row=3, column=0, pady=5)
+# entry_width_range = tk.Entry(root, font=font_entry)
+# entry_width_range.grid(row=3, column=1, pady=5)
+# entry_width_range.insert(0, "[50, 100]")  # 設置預設文字
 
-tk.Label(root, text="目標距離:", font=font_label).grid(row=4, column=0, pady=5)
+tk.Label(root, text="目標距離:", font=font_label).grid(row=3, column=0, pady=5)
 entry_distance_range = tk.Entry(root, font=font_entry)
-entry_distance_range.grid(row=4, column=1, pady=5)
+entry_distance_range.grid(row=3, column=1, pady=5)
 entry_distance_range.insert(0, "[800, 600]")  # 設置預設文字
 
 # 增加文件夾選擇
-tk.Label(root, text="資料夾路徑:", font=font_label).grid(row=5, column=0, pady=5)
+tk.Label(root, text="資料夾路徑:", font=font_label).grid(row=4, column=0, pady=5)
 entry_folder_path = tk.Entry(root, font=font_entry)
-entry_folder_path.grid(row=5, column=1, pady=5)
+entry_folder_path.grid(row=4, column=1, pady=5)
 entry_folder_path.insert(0, org_folder_path) # 設置預設為當前路徑
 select_folder_button = tk.Button(root, text="選擇資料夾", command=select_folder, font=font_label)
-select_folder_button.grid(row=5, column=2, pady=5)
+select_folder_button.grid(row=4, column=2, pady=5)
 
 # 創建並排列提交按鈕
 submit_button = tk.Button(root, text="提交", command=submit, font=font_label)
-submit_button.grid(row=6, columnspan=3, pady=20)
+submit_button.grid(row=5, columnspan=3, pady=20)
 
 # 開始主事件循環
 root.mainloop()
 
 
 # %% 儲存一個 .txt 的暫存檔
-if "DragDropTest_temp.txt" in os.listdir(current_path) and \
+if "ScrollWheelTest_temp.txt" in os.listdir(current_path) and \
     len(temp_params) > 0:
     print(0)
     file_path = params["folder_path"]
 else:
     file_path = current_path
     
-txt_file_name =  os.path.join(current_path, "DragDropTest_temp.txt")
+txt_file_name =  os.path.join(current_path, "ScrollWheelTest_temp.txt")
 with open(txt_file_name, 'w') as file:
     for key, value in params.items():
         file.write(f'{key}: {value}\n')
@@ -273,7 +271,7 @@ Block = params["test_number"]
 file_name = params["user_id"] + "-" + params["condition"] + "-" + params["test_number"] \
     + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
 # 設定輸出檔案儲存路徑
-data_save_path = os.path.join(file_path, ("WheelTask-" + file_name))
+data_save_path = os.path.join(file_path, ("ScrollWheelTest-" + file_name))
 # 定义一些颜色
 WHITE = (255, 255, 255)
 RED = (213, 89, 111)
@@ -348,6 +346,12 @@ while running:
                                (current_level + 1), # sequemce
                                circle_radius, all_combinations[current_level]["target_y"], # ampltude, width
                                "WHEELDATA", target_y, pygame.time.get_ticks()))
+            # 紀錄如果圓圈剛好到目標圓圈的正中心
+            if (target_x, target_y) == (circle_x, circle_y):
+                wheel_data.append((Participant, Condition, Block, # 受試者, 條件, 第幾次測試
+                               (current_level + 1), # sequemce
+                               circle_radius, all_combinations[current_level]["target_y"], # ampltude, width
+                               "WHEELDATA_TOUCH", target_y, pygame.time.get_ticks()))
             # # 记录目标物的位置
             # target_positions.append((target_x, target_y))
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -410,7 +414,7 @@ while running:
     # 限制帧率
     # pygame.time.Clock().tick(60)
 
-with open(r"D:\BenQ_Project\FittsDragDropTest\mouse_data.csv", mode='w', newline='') as file:
+with open(data_save_path, mode='w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['Participant', 'Condition', 'Block',
                       'Sequence',

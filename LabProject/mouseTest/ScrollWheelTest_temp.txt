@@ -1,6 +1,5 @@
 user_id: S01
 condition: C01
-test_number: B02
-width_range: [30, 40]
-distance_range: [200, 400]
+test_number: B03
+target_y: [800, 600]
 folder_path: d:\BenQ_Project\git\Code_testing\LabProject\mouseTest

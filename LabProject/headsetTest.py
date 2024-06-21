@@ -28,8 +28,9 @@ direct_columns = ["前","右前","右","右後",
 floor_columns = ["前_2F","前_1F","前_B","右前_2F","右前_1F","右前_B","右_2F","右_1F","右_B",
                   "右後_2F","右後_1F","右後_B","後_2F","後_1F","後_B","左後_2F","左後_1F","左後_B",
                   "左_2F","左_1F","左_B","左前_2F","左前_1F","左前_B"]
-headset_name = ["耳罩式耳機A", "耳罩式耳機B", "耳罩式耳機C", "耳罩式耳機D",
-                "入耳式耳機1", "入耳式耳機2"]
+headset_name = ["耳罩式耳機A", "耳罩式耳機B", "耳罩式耳機C", "耳罩式耳機D", "耳罩式耳機A_I1",
+                "入耳式耳機1", "入耳式耳機2", "入耳式耳機3"
+                ]
 # data_path = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\S01_答案.xlsx"
 subject_answer_folder = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\subject_answer\\"
 
