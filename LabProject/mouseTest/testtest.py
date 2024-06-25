@@ -1,63 +1,48 @@
-import tkinter as tk
-import random
-import time
+import pygame
+import sys
 
+# 初始化 Pygame
+pygame.init()
 
-class ReactionTimeApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("滑鼠側鍵點擊測試")
+# 設置窗口大小
+window_size = (800, 600)
+window = pygame.display.set_mode(window_size)
 
-        self.canvas = tk.Canvas(root, width=200, height=200)
-        self.canvas.pack()
+# 顏色設置
+BLACK = (0, 0, 0)
+BACKGROUND_COLOR = (255, 255, 255)
 
-        self.circle = self.canvas.create_oval(50, 50, 150, 150, fill="gray", outline="")
-        self.canvas.tag_bind(self.circle, "<Button-1>", self.on_click)
-        self.num_tests = 3
-        self.test_count = 0
-        self.total_reaction_time = 0
-        self.reaction_times = []
-        self.run_tests()
+# 圓圈參數
+circle_x, circle_y = 400, 300
+circle_radius = 50
+circle_alpha = 128  # 透明度（0-255）
 
-    def run_tests(self):
-        if self.test_count < self.num_tests:
-            self.change_color()
-            print(self.test_count)
-            
-   
-    def change_color(self):
-        self.canvas.itemconfig(self.circle, fill="green")
-        self.start_time = time.time()
+# 創建一個臨時表面
+circle_surface = pygame.Surface((circle_radius * 2, circle_radius * 2), pygame.SRCALPHA)
+circle_surface = circle_surface.convert_alpha()
 
-        def change_to_gray():
-            self.canvas.itemconfig(self.circle, fill="gray")
-            self.end_time = time.time()
-            reaction_time = self.end_time - self.start_time
-            self.total_reaction_time += reaction_time
-            self.reaction_times.append(reaction_time)
-            self.test_count += 1
-            if self.test_count < self.num_tests:
-                self.root.after(1000 * random.randint(0, 3), self.run_tests)
+# 填充臨時表面為透明
+circle_surface.fill((0, 0, 0, 0))
 
-        self.root.after(1000, change_to_gray)
+# 在臨時表面上繪製圓圈
+pygame.draw.circle(circle_surface, (BLACK[0], BLACK[1], BLACK[2], circle_alpha), (circle_radius, circle_radius), circle_radius)
 
-    def on_click(self, event):
-        if self.canvas.itemcget(self.circle, "fill") == "green":
-            self.end_time = time.time()
-            reaction_time = self.end_time - self.start_time
-            self.total_reaction_time += reaction_time
-            self.reaction_times.append(reaction_time)
-            print("點擊反應時間:", round(reaction_time, 3), "秒")
-            
-            if self.test_count == self.num_tests-1:
-                self.calculate_average_reaction_time()
-                self.root.quit()  # 結束遊戲
-         
-            
-    def calculate_average_reaction_time(self):
-        average_reaction_time = sum(self.reaction_times) / len(self.reaction_times)
-        print("平均點擊反應時間:", round( average_reaction_time, 3), "秒")
+# 主循環
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
 
-root = tk.Tk()
-app = ReactionTimeApp(root)
-root.mainloop()
+    # 填充窗口背景
+    window.fill(BACKGROUND_COLOR)
+
+    # 將臨時表面上的圓圈繪製到主屏幕上
+    window.blit(circle_surface, (circle_x - circle_radius, circle_y - circle_radius))
+
+    # 更新顯示
+    pygame.display.flip()
+
+# 退出 Pygame
+pygame.quit()
+sys.exit()

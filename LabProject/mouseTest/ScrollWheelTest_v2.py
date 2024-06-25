@@ -5,6 +5,8 @@
 
 程式架構
 
+目標圓圈大小不會變化
+
 @author: Hsin.YH.Yang, written by June 12 2024
 """
 
@@ -127,8 +129,8 @@ def submit():
         messagebox.showerror("輸入錯誤", "難度(寬)和難度(距離)必須是有效的列表")
         return
 
-    if not  (isinstance(distance_range, list) and len(distance_range) == 2):
-        messagebox.showerror("輸入錯誤", "難度(距離)必須是包含兩個數字的列表")
+    if not  (isinstance(distance_range, list) and len(distance_range) >= 2):
+        messagebox.showerror("輸入錯誤", "難度(距離)必須是包含或以上的兩個數字列表")
         return
 
     # 保存輸入的值到全局變量
@@ -223,7 +225,7 @@ entry_test_number.insert(0, org_block)  # 設置預設文字
 tk.Label(root, text="目標距離:", font=font_label).grid(row=3, column=0, pady=5)
 entry_distance_range = tk.Entry(root, font=font_entry)
 entry_distance_range.grid(row=3, column=1, pady=5)
-entry_distance_range.insert(0, "[800, 600]")  # 設置預設文字
+entry_distance_range.insert(0, "[500, 1000, 3000]")  # 設置預設文字
 
 # 增加文件夾選擇
 tk.Label(root, text="資料夾路徑:", font=font_label).grid(row=4, column=0, pady=5)
@@ -249,7 +251,7 @@ if "ScrollWheelTest_temp.txt" in os.listdir(current_path) and \
 else:
     file_path = current_path
     
-txt_file_name =  os.path.join(current_path, "ScrollWheelTest_temp.txt")
+txt_file_name =  os.path.join(file_path, "ScrollWheelTest_temp.txt")
 with open(txt_file_name, 'w') as file:
     for key, value in params.items():
         file.write(f'{key}: {value}\n')
@@ -402,9 +404,11 @@ while running:
     # 顯示 task 資訊
     # 顯示第幾個任務
     tests_info = font.render(f"Sequence {current_level + 1} of {len(all_combinations)}",
-                              True, (0, 0, 0))
-    tests_para = font.render(f"(Circle Radius = {circle_radius}, Target Y pos = {target_y})",
-                            True, (0, 0, 0))
+                             True, (0, 0, 0))
+    # tests_para = font.render(f"(Target Distance = {all_combinations[current_level]['target_y'] - screen_height // 2}, Target Y pos = {target_y})",
+    #                          True, (0, 0, 0))
+    tests_para = font.render(f"Target Distance = {all_combinations[current_level]['target_y'] - screen_height // 2}",
+                             True, (0, 0, 0))
     screen.blit(tests_info, (20, 20))
     screen.blit(tests_para, (20, 60))
     
@@ -417,9 +421,9 @@ while running:
 with open(data_save_path, mode='w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['Participant', 'Condition', 'Block',
-                      'Sequence',
-                      'Radius', 'Distance',
-                      'Event', 'time', 'Pos_y'])
+                     'Sequence',
+                     'Radius', 'Distance',
+                     'Event', 'time', 'Pos_y'])
     for part, cond, blo, sec, amp, wid, event, t, pos in wheel_data:
         writer.writerow([part, cond, blo, sec, amp, wid, event, t, pos])
     for part, cond, blo, sec, amp, wid, event, t , pos in mouse_click_events:

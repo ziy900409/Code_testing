@@ -327,7 +327,7 @@ if "DragDropTest_temp.txt" in os.listdir(current_path) and \
 else:
     file_path = current_path
     
-txt_file_name =  os.path.join(current_path, "DragDropTest_temp.txt")
+txt_file_name =  os.path.join(file_path, "DragDropTest_temp.txt")
 with open(txt_file_name, 'w') as file:
     for key, value in params.items():
         file.write(f'{key}: {value}\n')
@@ -346,10 +346,11 @@ data_save_path = os.path.join(file_path, ("DragDropTask-" + file_name))
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
-CENTER_COLOR = (220, 190, 255)
 PURPLE = (220, 190, 255)  # 淡紫色
 # 定义圆的初始位置和大小
 # circle_radius = 20
+# 設定圓圈透明度，0 表示完全透明，255 表示完全不透明
+circle_alpha = 128  # 透明度（0-255）
 # 记录已经拖拽到的位置数量
 completed_positions = 0
 record_edge = 1
@@ -428,11 +429,12 @@ while True:
     # 獲取滑鼠位置
     mouse_pos = pygame.mouse.get_pos()
     # 在視窗上顯示文字信息
-    # mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
-    # window.blit(mouse_info, (20, 100))
+    mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
+    window.blit(mouse_info, (20, 100))
     # 計算出所有周圍圓圈的所在位置
     angle_step = math.radians(360 / num_surrounding_circles)
     surrounding_circles = []
+    # 繪製周圍圓圈及其條件 ------------------------------------------------------
     for i in range(num_surrounding_circles):
         if i % 2 == 0:
             angle_rad = int(i / 2) * angle_step
@@ -465,8 +467,16 @@ while True:
                             "EdgeCirclePos", surrounding_circles[completed_positions+1], # event, edge circle position 
                             pygame.time.get_ticks())) # time
     
-    # 繪製中心圓
-    pygame.draw.circle(window, BLACK, (circle_x, circle_y), circle_radius)
+    # 創建一個臨時表面支持透明度
+    circle_surface = pygame.Surface((circle_radius * 2, circle_radius * 2), pygame.SRCALPHA)
+    circle_surface = circle_surface.convert_alpha()
+
+    # 填充臨時表面為透明
+    circle_surface.fill((0, 0, 0, 0))
+    
+    # 在臨時表面上繪製具有透明度的圓圈
+    pygame.draw.circle(circle_surface, (BLACK[0], BLACK[1], BLACK[2], circle_alpha),
+                        (circle_radius, circle_radius), circle_radius)
 
     # 處理事件
     for event in pygame.event.get():
@@ -582,6 +592,22 @@ while True:
     # 如果有活动圆圈，根据鼠标位置更新圆圈位置
     if active_circle:
         circle_x, circle_y = pygame.mouse.get_pos()
+    
+    # 將臨時表面上的圓圈繪製到主屏幕上
+    window.blit(circle_surface, (circle_x - circle_radius, circle_y - circle_radius))
+    pygame.display.flip()
 
-    pygame.display.update()
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -9,8 +9,8 @@ import gc
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\Archery\Xiao")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\Archery\Xiao")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt

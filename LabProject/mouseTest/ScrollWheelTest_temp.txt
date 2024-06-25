@@ -1,5 +1,5 @@
 user_id: S01
 condition: C01
-test_number: B03
-target_y: [800, 600]
-folder_path: d:\BenQ_Project\git\Code_testing\LabProject\mouseTest
+test_number: B01
+target_y: [500, 1000, 3000]
+folder_path: C:/Users/Hsin.YH.Yang/Desktop/test
