@@ -346,7 +346,7 @@ data_save_path = os.path.join(file_path, ("DragDropTask-" + file_name))
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
-PURPLE = (220, 190, 255)  # 淡紫色
+PURPLE = (4, 175, 112)  # 淡紫色
 # 定义圆的初始位置和大小
 # circle_radius = 20
 # 設定圓圈透明度，0 表示完全透明，255 表示完全不透明
@@ -361,6 +361,7 @@ circle_touched = False
 mouse_click_events = []
 mouse_positions = []
 edge_circle = []
+monitor_info = []
 
 # 設定採樣間隔（毫秒）
 sampling_interval = 10  # 每10毫秒採樣一次
@@ -410,7 +411,6 @@ for i in range(len(all_combinations)):
 circle_x = all_combinations[0]['circle_x'] 
 circle_y = all_combinations[0]['circle_y'] 
 
-
 # 游戏循环
 while True:
     window.fill(WHITE)
@@ -431,6 +431,8 @@ while True:
     # 在視窗上顯示文字信息
     mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
     window.blit(mouse_info, (20, 100))
+    
+
     # 計算出所有周圍圓圈的所在位置
     angle_step = math.radians(360 / num_surrounding_circles)
     surrounding_circles = []
@@ -497,7 +499,7 @@ while True:
             if active_circle:
                 active_circle = False
             distance = math.sqrt((circle_x - event.pos[0]) ** 2 + (circle_y - event.pos[1]) ** 2)
-            # 如果按鍵釋放時，游標沒有碰到中心原，就不算事件的紀錄
+            # 如果按鍵釋放時，游標沒有碰到中心圓，就不算事件的紀錄
             if distance > circle_radius:
                 active_circle = False
                 break
@@ -544,7 +546,7 @@ while True:
                        circle_touched = True
                     else:
                         circle_touched = False
-    
+                        
     # 固定時間採樣一次滑鼠位置，檢查是否到達採樣時間
     if pygame.time.get_ticks() >= next_sample_time:
         # 保存滑鼠位置
@@ -554,9 +556,9 @@ while True:
         # 保存鼠标移动轨迹
         mouse_positions.append((Participant, Condition, Block, 
                                 (current_test_index + 1), (completed_positions+1), # sequemce, trial
-                                  current_test['target_amplitudes'], surrounding_circle_radius,
-                                  mouse_pos, current_time))
-
+                                current_test['target_amplitudes'], surrounding_circle_radius,
+                                mouse_pos, current_time))
+   
     # 如果完成了所有位置，切換到下一個測試
     if completed_positions+1 == num_surrounding_circles:
         # 重置完成的位置
@@ -570,6 +572,12 @@ while True:
             circle_x = all_combinations[current_test_index]['circle_x']
             circle_y = all_combinations[current_test_index]['circle_y']
         else:
+            # 新增螢幕資訊
+            monitor_info.append((Participant, Condition, Block, 
+                                1, 1, # sequemce, trial 隨意給編號
+                                current_test['target_amplitudes'], surrounding_circle_radius,
+                                WINDOW_WIDTH, WINDOW_HEIGHT, # 改成螢幕的寬度與高度
+                                current_time))
             # 將滑鼠軌跡和事件資料寫入 CSV 檔案
             with open(data_save_path, mode='w', newline='') as file:
                 writer = csv.writer(file)
@@ -577,8 +585,8 @@ while True:
                                   'Sequence', 'Trial',
                                   'Amplitudes', 'Width',
                                 'Event', 'time', 'Pos_x', 'Pos_y'])
-                # for part, cond, blo, sec, trial, amp, wid, pos, time in mouse_trajectory:
-                #     writer.writerow([part, cond, blo, sec, trial, amp, wid, 'MOUSEMOTION', time, pos[0], pos[1]])
+                for part, cond, blo, sec, trial, amp, wid, pos_x, pos_y, time in monitor_info:
+                    writer.writerow([part, cond, blo, sec, trial, amp, wid, 'MONITOR_INFO', time, pos_x, pos_y])
                 for part, cond, blo, sec, trial, amp, wid, pos, time in mouse_positions:
                     writer.writerow([part, cond, blo, sec, trial, amp, wid, 'MOUSEPOS', time, pos[0], pos[1]])
                 for part, cond, blo, sec, trial, amp, wid, event, pos, time in mouse_click_events:

@@ -237,7 +237,7 @@ def initial_format():
                           }
                       }
     return sd1_table, sd2_table, sd3_data_format
-
+# %%
 def sd3_formating(duplicate_info, raw_data, sd3_data_format,
                   amplitude_info,width_info, trial_info):
     """
@@ -274,14 +274,7 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
             for iii in range(len(duplicate_info['Trial'])-1):
                 print(amplitude_info[i], width_info[ii], trial_info[iii])
                 # 1. 找出索引 -----------------------------------------------------
-                # 找出每次任務的滑鼠軌跡
-                condition = (
-                            (raw_data['Event'] == 'MOUSEPOS') &
-                            (raw_data['Amplitudes'] == amplitude_info[i]) &
-                            (raw_data['Width'] == width_info[ii]) &
-                            (raw_data['Trial'] == trial_info[iii])
-                            )
-                matched_indices = raw_data.index[condition].tolist()
+                
                 # 找出目標物的圓心
                 target_cond = (
                                 (raw_data['Event'] == 'EdgeCirclePos') &
@@ -298,6 +291,24 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
                                 (raw_data['Trial'] == trial_info[iii])
                                 )
                 buttomDown_indices = raw_data.index[buttomDown].tolist()
+                # 找出每次任務的滑鼠軌跡
+                condition = (
+                            (raw_data['Event'] == 'MOUSEPOS') &
+                            (raw_data['Amplitudes'] == amplitude_info[i]) &
+                            (raw_data['Width'] == width_info[ii]) &
+                            (raw_data['Trial'] == trial_info[iii])
+                            )
+                """
+                改到這裡
+                """
+                matched_indices = raw_data.index[condition].tolist()
+                buttomDown_time = raw_data['time'][buttomDown_indices[0]]
+                matched_start = (np.abs(raw_data['time'][matched_indices] - buttomDown_time)).idxmin()
+                
+                print(matched_indices[-1] - matched_start)
+                filtered_numbers = [num for num in matched_indices if num >= matched_start]
+                
+                
                 # 計算 movement time: 按鍵按壓開始 -> 按鍵釋放
                 # 如果沒有記錄到按鍵按壓的時間，則以 trial 的第一個 frame 做開始時間
                 if len(buttomDown_indices) == 0:
@@ -337,152 +348,157 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
                                                       begin_time))       
                 
                 # 更新 {t_x_y} 部分, 每一次拖曳的軌跡
-                sd3_data_format["{t_x_y}"]["t"].append(raw_data["time"][matched_indices])
-                sd3_data_format["{t_x_y}"]["x"].append(raw_data["Pos_x"][matched_indices])
-                sd3_data_format["{t_x_y}"]["y"].append(raw_data["Pos_y"][matched_indices])
+                sd3_data_format["{t_x_y}"]["t"].append(raw_data["time"][filtered_numbers])
+                sd3_data_format["{t_x_y}"]["x"].append(raw_data["Pos_x"][filtered_numbers])
+                sd3_data_format["{t_x_y}"]["y"].append(raw_data["Pos_y"][filtered_numbers])
     return sd3_data_format
 
+# %%
 def sd1_formating(sd1_table, sd3_data_format, select_cir_radius_ratio):
+    # sd1_table = sd1_data
     for i in range(len(sd3_data_format["task"]["Trial"])):
+        print(i)
         # 1. 基本數據定義 ---------------------------------------------------------
         # 1.1. 目標圓心
+        
         edge_cir_x = sd3_data_format["task"]["to_x"][i] 
         edge_cir_y = sd3_data_format["task"]["to_y"][i] 
         # 1.2. 游標初始位置, 需要定義每個 trial 游標移動的位置
         pointer_pos = pd.DataFrame({"x": sd3_data_format["{t_x_y}"]["x"][i].values,
                                     "y": sd3_data_format["{t_x_y}"]["y"][i].values,
                                     "t": sd3_data_format["{t_x_y}"]["t"][i].values})
-        
-        # 2. 數據計算 -------------------------------------------------------------
-        # 2.0. 判斷該次 trail 是否成功
-        if sd3_data_format["task"]["Errors"][i] == 'MOUSEBUTTONUP_SUCC':
-            trial_Errors = 0
-        else:
-            trial_Errors = 1
-        # 2.1. 初始參數: a, b, c, dx, Ae
-        temp_a = math.hypot((sd3_data_format["task"]["to_x"][i] - sd3_data_format["task"]["from_x"][i]),
-                            (sd3_data_format["task"]["to_y"][i] - sd3_data_format["task"]["from_y"][i]))
-        temp_b = math.hypot((sd3_data_format["task"]["select_x"][i] - sd3_data_format["task"]["to_x"][i]),
-                            (sd3_data_format["task"]["select_y"][i] - sd3_data_format["task"]["to_y"][i]))
-        temp_c = math.hypot((sd3_data_format["task"]["select_x"][i] - sd3_data_format["task"]["from_x"][i]),
-                            (sd3_data_format["task"]["select_y"][i] - sd3_data_format["task"]["from_y"][i]))
-        temp_dx = (temp_c * temp_c - temp_b * temp_b - temp_a * temp_a) / (2.0 * temp_a)
-        if sd3_data_format["task"]["Trial"][i] == 1:
-            pre_temp_dx = 0
-        temp_Ae = temp_a + temp_dx + pre_temp_dx
-        pre_temp_dx = (temp_c * temp_c - temp_b * temp_b - temp_a * temp_a) / (2.0 * temp_a)
-        
-        # 2.2. PT(ms), ST(ms), MT(ms)
-        # 2.2.1. PT - pointing time (ms): 
-        # 拖曳的圓圈進入邊緣圓圈後開始計算，但是必須扣除被拖曳的圓圈又離開目標圓圈的時間，
-        # 因此只計算最後一次進入目標圓圈的時間
-        # 方法：計算中心圓與邊界圓之間的邊界點座標，距離必須小於周圍圓的半徑
-        in_edge_cir = []
-        for pos in range(len(pointer_pos)):
-            edge_point = edge_calculate(pointer_pos.loc[pos, 'x'], pointer_pos.loc[pos, 'y'], # 拖曳圓圈的圓心位置
-                                        edge_cir_x, edge_cir_y, # 周圍圓圈的圓心位置
-                                        sd3_data_format["task"]["W"][i]*select_cir_radius_ratio) # 拖曳圓圈的半徑
-            distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
-            if distance <= sd3_data_format["task"]["W"][i]:
-                in_edge_cir.append(True)
+        # 避免計算到按鍵誤觸的問題
+        if len(pointer_pos["t"]) > 0:
+            # 2. 數據計算 -------------------------------------------------------------
+            # 2.0. 判斷該次 trail 是否成功
+            if sd3_data_format["task"]["Errors"][i] == 'MOUSEBUTTONUP_SUCC':
+                trial_Errors = 0
             else:
-                in_edge_cir.append(False)
-        # 找出第一個 Fasle 的位置
-        for first_False in range(len(in_edge_cir) - 1, -1, -1):
-            if not in_edge_cir[first_False]:
-                False_idx = first_False
-                break
-        PT = pointer_pos.loc[False_idx, 't'] - pointer_pos.loc[0, 't']
-        # 2.2.2. selection time (ms) - the time the button is down
-        ST = pointer_pos.loc[len(pointer_pos)-1, 't'] - pointer_pos.loc[False_idx, 't']
-        # 2.2.3. movement time (ms) - Note: MT = PT + ST
-        MT = pointer_pos.loc[len(pointer_pos)-1, 't'] - pointer_pos.loc[0, 't']
+                trial_Errors = 1
+            # 2.1. 初始參數: a, b, c, dx, Ae
+            temp_a = math.hypot((sd3_data_format["task"]["to_x"][i] - sd3_data_format["task"]["from_x"][i]),
+                                (sd3_data_format["task"]["to_y"][i] - sd3_data_format["task"]["from_y"][i]))
+            temp_b = math.hypot((sd3_data_format["task"]["select_x"][i] - sd3_data_format["task"]["to_x"][i]),
+                                (sd3_data_format["task"]["select_y"][i] - sd3_data_format["task"]["to_y"][i]))
+            temp_c = math.hypot((sd3_data_format["task"]["select_x"][i] - sd3_data_format["task"]["from_x"][i]),
+                                (sd3_data_format["task"]["select_y"][i] - sd3_data_format["task"]["from_y"][i]))
+            temp_dx = (temp_c * temp_c - temp_b * temp_b - temp_a * temp_a) / (2.0 * temp_a)
+            if sd3_data_format["task"]["Trial"][i] == 1:
+                pre_temp_dx = 0
+            temp_Ae = temp_a + temp_dx + pre_temp_dx
+            pre_temp_dx = (temp_c * temp_c - temp_b * temp_b - temp_a * temp_a) / (2.0 * temp_a)
+            
+            # 2.2. PT(ms), ST(ms), MT(ms)
+            # 2.2.1. PT - pointing time (ms): 
+            # 拖曳的圓圈進入邊緣圓圈後開始計算，但是必須扣除被拖曳的圓圈又離開目標圓圈的時間，
+            # 因此只計算最後一次進入目標圓圈的時間
+            # 方法：計算中心圓與邊界圓之間的邊界點座標，距離必須小於周圍圓的半徑
+            in_edge_cir = []
+            for pos in range(len(pointer_pos)):
+                edge_point = edge_calculate(pointer_pos.loc[pos, 'x'], pointer_pos.loc[pos, 'y'], # 拖曳圓圈的圓心位置
+                                            edge_cir_x, edge_cir_y, # 周圍圓圈的圓心位置
+                                            sd3_data_format["task"]["W"][i]*select_cir_radius_ratio) # 拖曳圓圈的半徑
+                distance = math.sqrt((edge_point[0] - edge_cir_x) ** 2 + (edge_point[1] - edge_cir_y) ** 2)
+                if distance <= sd3_data_format["task"]["W"][i]:
+                    in_edge_cir.append(True)
+                else:
+                    in_edge_cir.append(False)
+            # 找出第一個 Fasle 的位置
+            for first_False in range(len(in_edge_cir) - 1, -1, -1):
+                if not in_edge_cir[first_False]:
+                    False_idx = first_False
+                    break
+            PT = pointer_pos.loc[False_idx, 't'] - pointer_pos.loc[0, 't']
+            # 2.2.2. selection time (ms) - the time the button is down
+            ST = pointer_pos.loc[len(pointer_pos)-1, 't'] - pointer_pos.loc[False_idx, 't']
+            # 2.2.3. movement time (ms) - Note: MT = PT + ST
+            MT = pointer_pos.loc[len(pointer_pos)-1, 't'] - pointer_pos.loc[0, 't']
+            
+            # 3. 計算 Movement Variability --------------------------------------------
+            # 3.1. Target Re-entry (TRE)
+            # If the pointer enters the target region, leaves, 
+            # then re-enters the target region, then target re-entry (TRE ) occurs. 
+            TRE = find_true_indices_and_check_continuity(in_edge_cir)
+            # 3.2. Task Axis Crossing (TAC)
+            # 定義 from -> to 的連線
+            from_to_line = pd.DataFrame(np.zeros([len(pointer_pos), 2]),
+                                        columns = ["x", "y"])
+            for idx in range(len(pointer_pos)):
+                slope = (sd3_data_format["task"]["to_y"][i] - sd3_data_format["task"]["from_y"][i]) / \
+                    (len(pointer_pos) -1)
+                    
+                from_to_line.loc[idx, "x"] = sd3_data_format["task"]["from_x"][i] + \
+                    (idx)*((sd3_data_format["task"]["to_x"][i] - sd3_data_format["task"]["from_x"][i])/(len(pointer_pos)-1))
+          
+                from_to_line.loc[idx, "y"] = slope * (idx) + sd3_data_format["task"]["from_y"][i]
         
-        # 3. 計算 Movement Variability --------------------------------------------
-        # 3.1. Target Re-entry (TRE)
-        # If the pointer enters the target region, leaves, 
-        # then re-enters the target region, then target re-entry (TRE ) occurs. 
-        TRE = find_true_indices_and_check_continuity(in_edge_cir)
-        # 3.2. Task Axis Crossing (TAC)
-        # 定義 from -> to 的連線
-        from_to_line = pd.DataFrame(np.zeros([len(pointer_pos), 2]),
-                                    columns = ["x", "y"])
-        for idx in range(len(pointer_pos)):
-            slope = (sd3_data_format["task"]["to_y"][i] - sd3_data_format["task"]["from_y"][i]) / \
-                (len(pointer_pos) -1)
-                
-            from_to_line.loc[idx, "x"] = sd3_data_format["task"]["from_x"][i] + \
-                (idx)*((sd3_data_format["task"]["to_x"][i] - sd3_data_format["task"]["from_x"][i])/(len(pointer_pos)-1))
-      
-            from_to_line.loc[idx, "y"] = slope * (idx) + sd3_data_format["task"]["from_y"][i]
-    
-        # 找出數列中是有有數字跨過 from -> to 的連線，判定數據在連線位置的上下
-        TAC_list = []
-        for idx in range(len(pointer_pos)):
-            # 如果在連線位置的上方，給 1
-            if pointer_pos.loc[idx, "y"] >= from_to_line.loc[idx, "y"]:
-                TAC_list.append(1)
-            # 如果在連線位置的上方，給 -1
-            else:
-                TAC_list.append(-1)
-        TAC = count_sign_changes(TAC_list)
-        # 3.3. Movement Direction Change (MDC) and Orthogonal Direction Change (ODC)
-        # 判斷是否有方向改變，使用速度做判斷
-        vel_pointer = pointer_pos.loc[:len(pointer_pos)-2, ["x", "y"]].values - \
-            pointer_pos.loc[1:, ["x", "y"]].values
-        MDC_list = []
-        ODC_list = []
-        for idx in range(len(vel_pointer)):
-            # 利用是否跨過 X 軸做判斷
-            if vel_pointer[idx, 1] >= 0:
-                MDC_list.append(1)
-            else:
-                MDC_list.append(-1)
-            # 利用是否跨過 Y 軸做判斷
-            if vel_pointer[idx, 0] >= 0:
-                ODC_list.append(1)
-            else:
-                ODC_list.append(-1)
-        MDC = count_sign_changes(MDC_list)
-        ODC = count_sign_changes(ODC_list)
-        # 3.4. Movement Variability (MV): sqrt(sum(yi-y)**2/n-1)
-        # Assuming the task axis is y = 0
-        MV_vector = pointer_pos.loc[:, "y"].values - from_to_line.loc[:, "y"]
-        MV = np.sqrt(np.sum((MV_vector - np.mean(MV_vector))**2)/ \
-                     (len(pointer_pos.loc[:, "y"]) - 1))
-        # 3.5. Movement Error (ME): sum(abs(yi))/n
-        ME = np.sum(abs(MV_vector))/len(pointer_pos.loc[:, "y"])
-        # 3.6. Movement offset (MO) is the mean deviation of sample points from the task axis.
-        MO = np.mean(MV_vector)
-        
-        # 4. 將任務條件及計算資料輸入至表格 ----------------------------------------
-        
-        # trial info
-        sd1_table.loc[i, "Participant"] = sd3_data_format["info"]["participants"][i] # 受試者
-        sd1_table.loc[i, "Condition"] = sd3_data_format["info"]["condition"][i] # 不同條件
-        sd1_table.loc[i, "Block"] =  sd3_data_format["info"]["blocks"][i] # 第幾次測試
-        sd1_table.loc[i, "A"] = sd3_data_format["task"]["A"][i]
-        sd1_table.loc[i, "W"] = sd3_data_format["task"]["W"][i]
-        sd1_table.loc[i, "Trial"] = sd3_data_format["task"]["Trial"][i]
-        
-        # calculate data
-        sd1_table.loc[i, "Ae"] = temp_Ae
-        sd1_table.loc[i, "dx"] = pre_temp_dx
-        sd1_table.loc[i, "PT(ms)"] = PT
-        sd1_table.loc[i, "ST(ms)"] = ST
-        sd1_table.loc[i, "MT(ms)"] = MT
-        sd1_table.loc[i, "Errors"] = trial_Errors
-        
-        sd1_table.loc[i, "TRE"] = TRE
-        sd1_table.loc[i, "TAC"] = TAC
-        sd1_table.loc[i, "MDC"] = MDC
-        sd1_table.loc[i, "ODC"] = ODC
-        sd1_table.loc[i, "MV"] = MV
-        sd1_table.loc[i, "ME"] = ME
-        sd1_table.loc[i, "MO"] = MO
+            # 找出數列中是有有數字跨過 from -> to 的連線，判定數據在連線位置的上下
+            TAC_list = []
+            for idx in range(len(pointer_pos)):
+                # 如果在連線位置的上方，給 1
+                if pointer_pos.loc[idx, "y"] >= from_to_line.loc[idx, "y"]:
+                    TAC_list.append(1)
+                # 如果在連線位置的上方，給 -1
+                else:
+                    TAC_list.append(-1)
+            TAC = count_sign_changes(TAC_list)
+            # 3.3. Movement Direction Change (MDC) and Orthogonal Direction Change (ODC)
+            # 判斷是否有方向改變，使用速度做判斷
+            vel_pointer = pointer_pos.loc[:len(pointer_pos)-2, ["x", "y"]].values - \
+                pointer_pos.loc[1:, ["x", "y"]].values
+            MDC_list = []
+            ODC_list = []
+            for idx in range(len(vel_pointer)):
+                # 利用是否跨過 X 軸做判斷
+                if vel_pointer[idx, 1] >= 0:
+                    MDC_list.append(1)
+                else:
+                    MDC_list.append(-1)
+                # 利用是否跨過 Y 軸做判斷
+                if vel_pointer[idx, 0] >= 0:
+                    ODC_list.append(1)
+                else:
+                    ODC_list.append(-1)
+            MDC = count_sign_changes(MDC_list)
+            ODC = count_sign_changes(ODC_list)
+            # 3.4. Movement Variability (MV): sqrt(sum(yi-y)**2/n-1)
+            # Assuming the task axis is y = 0
+            MV_vector = pointer_pos.loc[:, "y"].values - from_to_line.loc[:, "y"]
+            MV = np.sqrt(np.sum((MV_vector - np.mean(MV_vector))**2)/ \
+                         (len(pointer_pos.loc[:, "y"]) - 1))
+            # 3.5. Movement Error (ME): sum(abs(yi))/n
+            ME = np.sum(abs(MV_vector))/len(pointer_pos.loc[:, "y"])
+            # 3.6. Movement offset (MO) is the mean deviation of sample points from the task axis.
+            MO = np.mean(MV_vector)
+            
+            # 4. 將任務條件及計算資料輸入至表格 ----------------------------------------
+            
+            # trial info
+            sd1_table.loc[i, "Participant"] = sd3_data_format["info"]["participants"][i] # 受試者
+            sd1_table.loc[i, "Condition"] = sd3_data_format["info"]["condition"][i] # 不同條件
+            sd1_table.loc[i, "Block"] =  sd3_data_format["info"]["blocks"][i] # 第幾次測試
+            sd1_table.loc[i, "A"] = sd3_data_format["task"]["A"][i]
+            sd1_table.loc[i, "W"] = sd3_data_format["task"]["W"][i]
+            sd1_table.loc[i, "Trial"] = sd3_data_format["task"]["Trial"][i]
+            
+            # calculate data
+            sd1_table.loc[i, "Ae"] = temp_Ae
+            sd1_table.loc[i, "dx"] = pre_temp_dx
+            sd1_table.loc[i, "PT(ms)"] = PT
+            sd1_table.loc[i, "ST(ms)"] = ST
+            sd1_table.loc[i, "MT(ms)"] = MT
+            sd1_table.loc[i, "Errors"] = trial_Errors
+            
+            sd1_table.loc[i, "TRE"] = TRE
+            sd1_table.loc[i, "TAC"] = TAC
+            sd1_table.loc[i, "MDC"] = MDC
+            sd1_table.loc[i, "ODC"] = ODC
+            sd1_table.loc[i, "MV"] = MV
+            sd1_table.loc[i, "ME"] = ME
+            sd1_table.loc[i, "MO"] = MO
     return sd1_table
 
-
+# %%
 def sd2_formating(sd1_table, sd2_table, duplicate_info):
     # 0. 定義表格: 欄位名稱 xFrom, yFrom, xTo, yTo, xSelect, ySelect, MT -----------
     
@@ -498,7 +514,7 @@ def sd2_formating(sd1_table, sd2_table, duplicate_info):
     for a_indi in range(len(A_cond)):
         for w_indi in range(len(W_cond)):
             i = a_indi*len(W_cond) + w_indi
-            print(i)
+            # print(i)
             condition = (
                         (sd1_table.loc[:, "A"] == A_cond[a_indi]) &
                         (sd1_table.loc[:, "W"] == W_cond[w_indi])

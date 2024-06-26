@@ -221,60 +221,71 @@ import matplotlib.pyplot as plt
 import math
 import numpy as np
 
-max_width = max(sd3_data_format["task"]["W"])
-max_amplitude = max(sd3_data_format["task"]["A"])
-
-x_coords = sd3_data["{t_x_y}"]["x"][0]
-y_coords = sd3_data["{t_x_y}"]["y"][0]
-
-
-
-
+# 基本繪圖條件
 angle_step = math.radians(360 / 16)
-surrounding_circles = []
 # 繪製周圍圓圈及其條件 ------------------------------------------------------
-
 # 設置中心點
 center_x = 1920 // 2
 center_y = 1080 // 2
-
-# 設置包圍圓的半徑
-outer_radius = sd3_data_format["task"]["A"][0]
-# 設置每個小圓的半徑
-circle_radius = sd3_data_format["task"]["W"][0]
-
 # 計算每個小圓的中心位置
 num_circles = 16
 angles = np.linspace(0, 2 * np.pi, num_circles, endpoint=False)
 
-# 創建一個繪圖對象
-fig, ax = plt.subplots()
+for i in range(len(duplicate_info["Amplitudes"])):
+    for ii in range(len(duplicate_info["Width"])):
+        positions = []
+        for idx in range(len(sd3_data_format["task"]["W"])):
+# 找出目標物的圓心
+            target_cond = (
+                            (sd3_data_format["task"]["A"][idx] == amplitude_info[i]) &
+                            (sd3_data_format["task"]["W"][idx] == width_info[ii]) 
+                            )
+            if target_cond:
+                positions.append(idx)
 
-# 繪製中心點的圓，設置透明度
-# center_circle = plt.Circle((center_x, center_y), circle_radius, color='blue', alpha=0.5)
-# ax.add_patch(center_circle)
+        # 設置包圍圓的半徑
+        outer_radius = amplitude_info[i]
+        # 設置每個小圓的半徑
+        circle_radius = width_info[ii]
+        # 創建一個繪圖對象
+        fig, ax = plt.subplots()
 
-# 繪製包圍圓圈，只繪製框線
-for angle in angles:
-    circle_x = center_x + outer_radius * np.cos(angle)
-    circle_y = center_y + outer_radius * np.sin(angle)
-    print(circle_x, circle_y)
-    circle = plt.Circle((circle_x, circle_y), circle_radius, color='black', fill=False, linewidth=1)
-    ax.add_patch(circle)
+        # 繪製包圍圓圈，只繪製框線
+        for angle in angles:
+            circle_x = center_x + outer_radius * np.cos(angle)
+            circle_y = center_y + outer_radius * np.sin(angle)
+            # print(circle_x, circle_y)
+            circle = plt.Circle((circle_x, circle_y), circle_radius, color='black', fill=False, linewidth=1)
+            ax.add_patch(circle)
 
-# 繪製鼠標移動軌跡
-ax.plot(x_coords, y_coords, linestyle='-', color='green')
-# 設置圖的邊界
-ax.set_xlim(0, 1920)
-ax.set_ylim(1080, 0) # 反轉 Y 軸以匹配 Pygame 的座標系
-ax.set_aspect('equal', adjustable='box')
+        # 繪製鼠標移動軌跡
+        for trial in positions:
+            x_coords = sd3_data["{t_x_y}"]["x"][trial]
+            y_coords = sd3_data["{t_x_y}"]["y"][trial]
+            ax.plot(x_coords, y_coords, linestyle='-', color='green', linewidth=0.5)
+        # 設置圖的邊界
+        ax.set_xlim(0, 1920)
+        ax.set_ylim(1080, 0) # 反轉 Y 軸以匹配 Pygame 的座標系
+        ax.set_aspect('equal', adjustable='box')
 
-# 顯示圖形
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.title('Circles Surrounding a Central Circle')
-plt.grid(True)
-plt.show()
+        # 顯示圖形
+        plt.xlabel('X-axis')
+        plt.ylabel('Y-axis')
+        plt.title(f"(A = {amplitude_info[i]}, W = {width_info[ii]})")
+        plt.grid(True)
+        plt.show()
+
+
+
+# max_width = max(sd3_data_format["task"]["W"])
+# max_amplitude = max(sd3_data_format["task"]["A"])
+
+
+
+
+
+
+
 
 
 
