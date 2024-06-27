@@ -182,6 +182,9 @@ for idx in range(len(DargDropFile_list["path"])):
     # 將資料處理成 sd3 format
     sd3_data = func.sd3_formating(duplicate_info, raw_data, sd3_data_format,
                                   amplitude_info, width_info, trial_info)
+    # 繪製軌跡
+    func.draw_tracjectory(sd3_data, amplitude_info, width_info,
+                          params["folder_path"])
     # 計算 sd1 table 所需參數
     sd1_data = func.sd1_formating(sd1_table, sd3_data, select_cir_radius_ratio)
     # 計算 sd2 table 所需參數, 使用 sd1 table 做計算
@@ -204,96 +207,6 @@ for idx in range(len(DargDropFile_list["path"])):
     
 all_sd2_table.to_excel(str(params["folder_path"] + "\\table_sd2_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"),
                        index=False)
-
-
-
-
-# %% 資料繪圖
-"""
-以螢幕寬度為基準
-
-需要再加上難度說明
-圖表標題
-
-
-"""
-import matplotlib.pyplot as plt
-import math
-import numpy as np
-
-# 基本繪圖條件
-angle_step = math.radians(360 / 16)
-# 繪製周圍圓圈及其條件 ------------------------------------------------------
-# 設置中心點
-center_x = 1920 // 2
-center_y = 1080 // 2
-# 計算每個小圓的中心位置
-num_circles = 16
-angles = np.linspace(0, 2 * np.pi, num_circles, endpoint=False)
-
-for i in range(len(duplicate_info["Amplitudes"])):
-    for ii in range(len(duplicate_info["Width"])):
-        positions = []
-        for idx in range(len(sd3_data_format["task"]["W"])):
-# 找出目標物的圓心
-            target_cond = (
-                            (sd3_data_format["task"]["A"][idx] == amplitude_info[i]) &
-                            (sd3_data_format["task"]["W"][idx] == width_info[ii]) 
-                            )
-            if target_cond:
-                positions.append(idx)
-
-        # 設置包圍圓的半徑
-        outer_radius = amplitude_info[i]
-        # 設置每個小圓的半徑
-        circle_radius = width_info[ii]
-        # 創建一個繪圖對象
-        fig, ax = plt.subplots()
-
-        # 繪製包圍圓圈，只繪製框線
-        for angle in angles:
-            circle_x = center_x + outer_radius * np.cos(angle)
-            circle_y = center_y + outer_radius * np.sin(angle)
-            # print(circle_x, circle_y)
-            circle = plt.Circle((circle_x, circle_y), circle_radius, color='black', fill=False, linewidth=1)
-            ax.add_patch(circle)
-
-        # 繪製鼠標移動軌跡
-        for trial in positions:
-            x_coords = sd3_data["{t_x_y}"]["x"][trial]
-            y_coords = sd3_data["{t_x_y}"]["y"][trial]
-            ax.plot(x_coords, y_coords, linestyle='-', color='green', linewidth=0.5)
-        # 設置圖的邊界
-        ax.set_xlim(0, 1920)
-        ax.set_ylim(1080, 0) # 反轉 Y 軸以匹配 Pygame 的座標系
-        ax.set_aspect('equal', adjustable='box')
-
-        # 顯示圖形
-        plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
-        plt.title(f"(A = {amplitude_info[i]}, W = {width_info[ii]})")
-        plt.grid(True)
-        plt.show()
-
-
-
-# max_width = max(sd3_data_format["task"]["W"])
-# max_amplitude = max(sd3_data_format["task"]["A"])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

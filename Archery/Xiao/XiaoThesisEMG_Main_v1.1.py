@@ -35,13 +35,13 @@ now = datetime.now()
 formatted_date = datetime.now().strftime('%Y-%m-%d-%H%M')
 print("當前日期：", formatted_date)
 # %% parameter setting 
-staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
-data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405"
-shooting_staging_file = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\_algorithm_output_formatted_date.xlsx"
-
-# staging_path = r"D:\BenQ_Project\python\Archery\202405\Archery_stage_v5_input.xlsx"
-# data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+# staging_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\Archery_stage_v5_input.xlsx"
+# data_path = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405"
 # shooting_staging_file = r"E:\Hsin\NTSU_lab\Archery\Xiao\202406\202405\_algorithm_output_formatted_date.xlsx"
+
+staging_path = r"D:\BenQ_Project\python\Archery\202405\Archery_stage_v5_input.xlsx"
+data_path = r"D:\BenQ_Project\python\Archery\202405\202405\202405\\"
+shooting_staging_file = r"D:\BenQ_Project\python\Archery\202405\202405\202405\_algorithm_output_formatted_date.xlsx"
 
 # 測試組
 subject_list = ["R01"]
@@ -262,7 +262,10 @@ gc.collect(generation=2)
 ------------------------------------------------------------------------------
 '''
 
-add_emg_statics = pd.DataFrame({})
+max_emg_statics = pd.DataFrame({})
+min_emg_statics = pd.DataFrame({})
+mean_emg_statics = pd.DataFrame({})
+
 tic = time.process_time()
 
 # 開始處理 motion 資料
@@ -379,7 +382,9 @@ for subject in subject_list:
                             emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
                                                              MVC_value.values)*100
                         # 儲存結果的列表
-                        results = pd.DataFrame({})
+                        max_results = pd.DataFrame({})
+                        min_results = pd.DataFrame({})
+                        mean_results = pd.DataFrame({})
                                 
                         for start_idx, end_idx, task in segments:
                             segment_data = emg_iMVC.iloc[start_idx:end_idx, :]
@@ -397,11 +402,19 @@ for subject in subject_list:
                             min_values.insert(0, 'task', f'{task} min')
                             min_values.insert(1, 'trial', filename)
                                     
-                            results = pd.concat([results, mean_values, max_values, min_values],
+                            max_results = pd.concat([max_results, max_values],
+                                                ignore_index=True)
+                            min_results = pd.concat([min_results, min_values],
+                                                ignore_index=True)
+                            mean_results = pd.concat([mean_results, mean_values],
                                                 ignore_index=True)
 
                         # 合併計算資料
-                        add_emg_statics = pd.concat([add_emg_statics, results],
+                        max_emg_statics = pd.concat([max_emg_statics, max_results],
+                                                    ignore_index=True)
+                        min_emg_statics = pd.concat([min_emg_statics, min_results],
+                                                    ignore_index=True)
+                        mean_emg_statics = pd.concat([mean_emg_statics, mean_results],
                                                     ignore_index=True)
                         print(save_file)
                         # writting data in worksheet
@@ -413,11 +426,14 @@ for subject in subject_list:
                             emg_iMVC.iloc[moving_E3_1_idx:moving_E3_2_idx, :].to_excel(Writer, sheet_name="E3-1-E3-2", index=False)
                             emg_iMVC.iloc[moving_E3_2_idx:moving_E4_idx, :].to_excel(Writer, sheet_name="E3-2-E4", index=False)
                             emg_iMVC.iloc[moving_E4_idx:moving_E5_idx, :].to_excel(Writer, sheet_name="E4-E5", index=False)
-    
-        add_emg_statics.to_excel(str(all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data")\
-                                     + "\\" + subject + "_statistic.xlsx"),
-                                    sheet_name=subject)
-    
+        statisitc_name = str(all_rawdata_folder_path["EMG"][i].replace("Raw_Data", "Processing_Data")\
+                                             + "\\" + subject + "_statistic.xlsx")
+                
+        with pd.ExcelWriter(statisitc_name) as Writer:
+            max_emg_statics.to_excel(Writer, sheet_name="max", index=False)
+            min_emg_statics.to_excel(Writer, sheet_name="min", index=False)
+            mean_emg_statics.to_excel(Writer, sheet_name="mean", index=False)
+        
 toc = time.process_time()
 print("Motion Data Total Time Spent: ",toc-tic)
 gc.collect(generation=2)

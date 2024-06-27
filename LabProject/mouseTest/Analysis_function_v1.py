@@ -10,7 +10,7 @@ import pandas as pd
 import os
 import math
 from statsmodels.stats.diagnostic import lilliefors # 進行常態分佈檢定
-
+import matplotlib.pyplot as plt
 
 
 # %%define funciton
@@ -214,7 +214,9 @@ def initial_format():
                       "info": {
                           "participants":[],
                           "condition": [],
-                          "blocks": []
+                          "blocks": [],
+                          "monitor_width": [],
+                          "monitor_heigh": []
                           },
                       "task":{
                           "Sequence":[],
@@ -272,9 +274,8 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
     for i in range(len(duplicate_info["Amplitudes"])):
         for ii in range(len(duplicate_info["Width"])):
             for iii in range(len(duplicate_info['Trial'])-1):
-                print(amplitude_info[i], width_info[ii], trial_info[iii])
+                # print(amplitude_info[i], width_info[ii], trial_info[iii])
                 # 1. 找出索引 -----------------------------------------------------
-                
                 # 找出目標物的圓心
                 target_cond = (
                                 (raw_data['Event'] == 'EdgeCirclePos') &
@@ -298,6 +299,11 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
                             (raw_data['Width'] == width_info[ii]) &
                             (raw_data['Trial'] == trial_info[iii])
                             )
+                # 找出螢幕參數
+                monitor_cond = (
+                                (raw_data['Event'] == 'MONITOR_INFO')
+                                )
+                monitor_indices = raw_data.index[monitor_cond].tolist()
                 """
                 改到這裡
                 """
@@ -305,7 +311,7 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
                 buttomDown_time = raw_data['time'][buttomDown_indices[0]]
                 matched_start = (np.abs(raw_data['time'][matched_indices] - buttomDown_time)).idxmin()
                 
-                print(matched_indices[-1] - matched_start)
+                # print(matched_indices[-1] - matched_start)
                 filtered_numbers = [num for num in matched_indices if num >= matched_start]
                 
                 
@@ -332,6 +338,8 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
                 sd3_data_format["info"]["participants"].append(raw_data["Participant"][0])
                 sd3_data_format["info"]["condition"].append(raw_data["Condition"][0])
                 sd3_data_format["info"]["blocks"].append(raw_data["Block"][0])
+                sd3_data_format["info"]["monitor_width"].append(raw_data["Pos_x"][monitor_indices])
+                sd3_data_format["info"]["monitor_heigh"].append(raw_data["Pos_y"][monitor_indices])
     
                 # 更新task部分
                 sd3_data_format["task"]["A"].append(raw_data["Amplitudes"][matched_indices[0]])
@@ -357,7 +365,7 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
 def sd1_formating(sd1_table, sd3_data_format, select_cir_radius_ratio):
     # sd1_table = sd1_data
     for i in range(len(sd3_data_format["task"]["Trial"])):
-        print(i)
+        # print(i)
         # 1. 基本數據定義 ---------------------------------------------------------
         # 1.1. 目標圓心
         
@@ -593,7 +601,74 @@ def sd2_formating(sd1_table, sd2_table, duplicate_info):
             sd2_table.loc[i, "MO"] = MO
     return sd2_table
 
+# %%
 
+
+
+
+def draw_tracjectory(sd3_data_format, amplitude_info, width_info, 
+                     save_path):
+    # 基本繪圖條件
+    # angle_step = math.radians(360 / 16)
+    # 繪製周圍圓圈及其條件 ------------------------------------------------------
+    # 設置中心點
+    center_x = sd3_data_format["info"]["monitor_width"][0] // 2
+    center_y = sd3_data_format["info"]["monitor_heigh"][0] // 2
+    # 計算每個小圓的中心位置
+    num_circles = 16
+    angles = np.linspace(0, 2 * np.pi, num_circles, endpoint=False)
+    
+    for i in range(len(amplitude_info)):
+        for ii in range(len(width_info)):
+            positions = []
+            for idx in range(len(sd3_data_format["task"]["W"])):
+                # 找出特定長寬的 index
+                target_cond = (
+                                (sd3_data_format["task"]["A"][idx] == amplitude_info[i]) &
+                                (sd3_data_format["task"]["W"][idx] == width_info[ii]) 
+                                )
+                if target_cond:
+                    positions.append(idx)
+    
+            # 設置包圍圓的半徑
+            outer_radius = amplitude_info[i]
+            # 設置每個小圓的半徑
+            circle_radius = width_info[ii]
+            # 創建一個繪圖對象
+            fig, ax = plt.subplots()
+    
+            # 繪製包圍圓圈，只繪製框線
+            for angle in angles:
+                circle_x = center_x + outer_radius * np.cos(angle)
+                circle_y = center_y + outer_radius * np.sin(angle)
+                # print(circle_x, circle_y)
+                circle = plt.Circle((circle_x, circle_y), circle_radius, color='black', fill=False, linewidth=1)
+                ax.add_patch(circle)
+    
+            # 繪製鼠標移動軌跡
+            for trial in positions:
+                x_coords = sd3_data_format["{t_x_y}"]["x"][trial]
+                y_coords = sd3_data_format["{t_x_y}"]["y"][trial]
+                ax.plot(x_coords, y_coords, linestyle='-', color='green', linewidth=0.5)
+            # 設置圖的邊界
+            ax.set_xlim(0, 1920)
+            ax.set_ylim(1080, 0) # 反轉 Y 軸以匹配 Pygame 的座標系
+            ax.set_aspect('equal', adjustable='box')
+            
+            suptitle_name = sd3_data_format["info"]["participants"][idx] + "-" + \
+                sd3_data_format["info"]["condition"][idx] + "-" + \
+                    sd3_data_format["info"]["blocks"][idx]
+            save_fig_name = save_path + "\\" + suptitle_name + "-" + str(amplitude_info[i]) + \
+                "x" + str(width_info[ii]) + ".jpg"
+            # 顯示圖形
+            plt.xlabel('X-axis')
+            plt.ylabel('Y-axis')
+            plt.suptitle(suptitle_name, fontsize = 14)
+            plt.title(f"(A = {amplitude_info[i]}, W = {width_info[ii]})", fontsize = 12)
+            plt.grid(True)
+            plt.savefig(save_fig_name, dpi=100)
+            plt.show()
+    
 
 
 

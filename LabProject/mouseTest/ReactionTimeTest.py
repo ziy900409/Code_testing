@@ -3,8 +3,23 @@ from tkinter import messagebox, filedialog
 import pandas as pd
 import pygame
 import os
+import sys
 import random
 import time
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest")
+import Analysis_function_v1 as func
+import UI_func_v1 as ui
+from datetime import datetime
+# %%
+
+# 獲取當前程式所在的路徑
+current_path = os.path.dirname(os.path.abspath(__file__))
+
+org_info = ui.find_temp(task = "ReactionTimeTask")
+
+
+
+# %%
 
 # 初始化參數
 params = {}
@@ -65,7 +80,7 @@ def end_program():
     pygame.quit()
     exit()
 
-def show_input_dialog():
+def show_input_dialog(org_info):
     global root
     global selected_user_id
     global selected_condition
@@ -73,7 +88,7 @@ def show_input_dialog():
     global entry_folder_path
     
     root = tk.Tk()
-    root.title("參數輸入")
+    root.title("Reaction Time Task")
     
     # 設置窗口大小
     window_width = 480
@@ -96,7 +111,7 @@ def show_input_dialog():
     # 使用條件下拉選單選項
     user_ids = ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12"]
     selected_user_id = tk.StringVar(root)
-    selected_user_id.set(user_ids[0])
+    selected_user_id.set(org_info["user_id"]) # 設置預設值
     user_id_menu = tk.OptionMenu(root, selected_user_id, *user_ids)
     user_id_menu.config(font=font_label)
     user_id_menu.grid(row=0, column=1, pady=5)
@@ -106,7 +121,7 @@ def show_input_dialog():
     tk.Label(root, text="使用條件:", font=font_label).grid(row=1, column=0, pady=5)
     conditions = ["C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10", "C11", "C12"]
     selected_condition = tk.StringVar(root)
-    selected_condition.set(conditions[0])
+    selected_condition.set(org_info["condition"]) # 設置預設值
     condition_menu = tk.OptionMenu(root, selected_condition, *conditions)
     condition_menu.config(font=font_label)
     condition_menu.grid(row=1, column=1, pady=5)
@@ -116,11 +131,13 @@ def show_input_dialog():
     tk.Label(root, text="第幾次測試:", font=font_label).grid(row=2, column=0, pady=5)
     entry_test_number = tk.Entry(root, font=font_entry)
     entry_test_number.grid(row=2, column=1, pady=5)
+    entry_test_number.insert(0, org_info["block"])  # 設置預設文字
 
     # 增加文件夾選擇
     tk.Label(root, text="資料夾路徑:", font=font_label).grid(row=3, column=0, pady=5)
     entry_folder_path = tk.Entry(root, font=font_entry)
     entry_folder_path.grid(row=3, column=1, pady=5)
+    entry_folder_path.insert(0, org_info["folder_path"]) # 設置預設為當前路徑
     select_folder_button = tk.Button(root, text="選擇資料夾", command=select_folder, font=font_label)
     select_folder_button.grid(row=3, column=2, pady=5)
 
@@ -135,12 +152,12 @@ def show_input_dialog():
     # 開始主事件循環
     root.mainloop()
 
-def save_reaction_times_to_excel():
+def save_reaction_times_to_excel(save_path):
     if reaction_times:  # 檢查是否有反應時間記錄
         df = pd.DataFrame({'Test Number': range(1, len(reaction_times) + 1), 'Reaction Time (seconds)': reaction_times})
-        df.to_excel(os.path.join(params['folder_path'], 'reaction_times.xlsx'), index=False)
+        df.to_excel(save_path, index=False)
 
-def run_reaction_test():
+def run_reaction_test(save_path):
     global reaction_times
     global test_count
     global max_tests
@@ -227,13 +244,57 @@ def run_reaction_test():
             change_time = time.time()
 
     # 將反應時間輸出到Excel
-    save_reaction_times_to_excel()
+    save_reaction_times_to_excel(save_path)
 
     # 結束 Pygame
     pygame.quit()
 
-# 顯示輸入對話框，獲取初始參數
-show_input_dialog()
+# %% 顯示輸入對話框，獲取初始參數
+show_input_dialog(org_info)
 
+# %% 儲存一個 .txt 的暫存檔
+if "ReactionTimeTask_temp.txt" in os.listdir(current_path) and \
+    len(org_info) > 0:
+    print(0)
+    file_path = params["folder_path"]
+else:
+    file_path = current_path
+    
+txt_file_name =  os.path.join(file_path, "ReactionTimeTask_temp.txt")
+with open(txt_file_name, 'w') as file:
+    for key, value in params.items():
+        file.write(f'{key}: {value}\n')
+        
+# %%
+Participant = params["user_id"]
+Condition = params["condition"]
+Block = params["test_number"]
+file_name = params["user_id"] + "-" + params["condition"] + "-" + params["test_number"] \
+            + "-" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
+# 設定輸出檔案儲存路徑
+data_save_path = os.path.join(file_path, ("ReactionTimeTask-" + file_name))
+
+# %%
 # 運行反應時間測試
-run_reaction_test()
+running = True
+while running:
+    run_reaction_test(data_save_path)
+    org_info = ui.find_temp(task = "ReactionTimeTask")
+    show_input_dialog(org_info)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
