@@ -150,13 +150,18 @@ def select_folder():
         entry_folder_path.delete(0, tk.END)
         entry_folder_path.insert(0, folder_selected)
 
+def end_program():
+    global end_pressed  # 声明全局变量
+    save_reaction_times_to_excel()
+    end_pressed = True  # 更新变量状态
+    root.destroy()
+    pygame.quit()
+
 def show_input_dialog():
     global root
     global selected_user_id
     global selected_condition
     global entry_test_number
-    global entry_width_range
-    global entry_distance_range
     global entry_folder_path
     
     root = tk.Tk()
@@ -203,20 +208,21 @@ def show_input_dialog():
     tk.Label(root, text="第幾次測試:", font=font_label).grid(row=2, column=0, pady=5)
     entry_test_number = tk.Entry(root, font=font_entry)
     entry_test_number.grid(row=2, column=1, pady=5)
-    entry_test_number.insert(0, org_block)  # 設置預設文字
 
     # 增加文件夾選擇
     tk.Label(root, text="資料夾路徑:", font=font_label).grid(row=3, column=0, pady=5)
     entry_folder_path = tk.Entry(root, font=font_entry)
     entry_folder_path.grid(row=3, column=1, pady=5)
-    entry_folder_path.insert(0, org_folder_path) # 設置預設為當前路徑
     select_folder_button = tk.Button(root, text="選擇資料夾", command=select_folder, font=font_label)
     select_folder_button.grid(row=3, column=2, pady=5)
-
 
     # 創建並排列提交按鈕
     submit_button = tk.Button(root, text="提交", command=submit, font=font_label)
     submit_button.grid(row=4, columnspan=3, pady=20)
+
+    # 創建並排列結束按鈕
+    end_button = tk.Button(root, text="結束", command=end_program, font=font_label)
+    end_button.grid(row=5, columnspan=3, pady=20)
 
     # 開始主事件循環
     root.mainloop()

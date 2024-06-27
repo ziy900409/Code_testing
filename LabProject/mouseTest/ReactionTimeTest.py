@@ -28,6 +28,8 @@ test_count = 0
 max_tests = 3
 Condition = 0
 current_color = None
+end_pressed = False  # 添加全局變數以追蹤是否按下結束按鈕
+running = True
 
 def submit():
     global params
@@ -74,13 +76,14 @@ def select_folder():
         entry_folder_path.delete(0, tk.END)
         entry_folder_path.insert(0, folder_selected)
 
-def end_program():
-    save_reaction_times_to_excel()
+def end_program(data_save_path):
+    global end_pressed  # 声明全局变量
+    save_reaction_times_to_excel(data_save_path)
+    end_pressed = True  # 更新变量状态
     root.destroy()
     pygame.quit()
-    exit()
 
-def show_input_dialog(org_info):
+def show_input_dialog(org_info, data_save_path):
     global root
     global selected_user_id
     global selected_condition
@@ -146,7 +149,7 @@ def show_input_dialog(org_info):
     submit_button.grid(row=4, columnspan=3, pady=20)
 
     # 創建並排列結束按鈕
-    end_button = tk.Button(root, text="結束", command=end_program, font=font_label)
+    end_button = tk.Button(root, text="結束", command=end_program(data_save_path), font=font_label)
     end_button.grid(row=5, columnspan=3, pady=20)
 
     # 開始主事件循環
@@ -250,13 +253,16 @@ def run_reaction_test(save_path):
     pygame.quit()
 
 # %% 顯示輸入對話框，獲取初始參數
-show_input_dialog(org_info)
+show_input_dialog(org_info,
+                  str(org_info["folder_path"] + org_info["user_id"] + "-" + \
+                      org_info["condition"] + "-" + org_info["block"] \
+                          + "-" + datetime.now().strftime('%m%d%H%M') + ".xlsx"))
 
 # %% 儲存一個 .txt 的暫存檔
 if "ReactionTimeTask_temp.txt" in os.listdir(current_path) and \
     len(org_info) > 0:
     print(0)
-    file_path = params["folder_path"]
+    file_path = org_info["folder_path"]
 else:
     file_path = current_path
     
@@ -266,21 +272,25 @@ with open(txt_file_name, 'w') as file:
         file.write(f'{key}: {value}\n')
         
 # %%
-Participant = params["user_id"]
-Condition = params["condition"]
-Block = params["test_number"]
-file_name = params["user_id"] + "-" + params["condition"] + "-" + params["test_number"] \
+Participant = org_info["user_id"]
+Condition = org_info["condition"]
+Block = org_info["test_number"]
+file_name = org_info["user_id"] + "-" + org_info["condition"] + "-" + org_info["block"] \
             + "-" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
 # 設定輸出檔案儲存路徑
 data_save_path = os.path.join(file_path, ("ReactionTimeTask-" + file_name))
 
 # %%
 # 運行反應時間測試
-running = True
+# 顯示輸入對話框，獲取初始參數
+# show_input_dialog(org_info)
+
+# 運行反應時間測試
 while running:
     run_reaction_test(data_save_path)
-    org_info = ui.find_temp(task = "ReactionTimeTask")
-    show_input_dialog(org_info)
+    if not end_pressed:  # 確認測試未被終止
+        show_input_dialog(org_info, data_save_path)
+
 
 
 

@@ -603,9 +603,6 @@ def sd2_formating(sd1_table, sd2_table, duplicate_info):
 
 # %%
 
-
-
-
 def draw_tracjectory(sd3_data_format, amplitude_info, width_info, 
                      save_path):
     # 基本繪圖條件
