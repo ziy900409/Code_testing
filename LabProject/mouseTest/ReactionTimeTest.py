@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, filedialog
-import pandas as pd
+# import pandas as pd
+import csv
 import pygame
 import os
 import sys
@@ -40,8 +41,8 @@ def submit():
     global selected_user_id
     global selected_condition
     global entry_test_number
-    global entry_width_range
-    global entry_distance_range
+    # global entry_width_range
+    # global entry_distance_range
     global entry_folder_path
 
     # 獲取輸入的值
@@ -76,14 +77,14 @@ def select_folder():
         entry_folder_path.delete(0, tk.END)
         entry_folder_path.insert(0, folder_selected)
 
-def end_program(data_save_path):
+def end_program():
     global end_pressed  # 声明全局变量
-    save_reaction_times_to_excel(data_save_path)
+    
     end_pressed = True  # 更新变量状态
     root.destroy()
     pygame.quit()
 
-def show_input_dialog(org_info, data_save_path):
+def show_input_dialog(org_info):
     global root
     global selected_user_id
     global selected_condition
@@ -149,28 +150,34 @@ def show_input_dialog(org_info, data_save_path):
     submit_button.grid(row=4, columnspan=3, pady=20)
 
     # 創建並排列結束按鈕
-    end_button = tk.Button(root, text="結束", command=end_program(data_save_path), font=font_label)
+    end_button = tk.Button(root, text="結束", command=end_program, font=font_label)
     end_button.grid(row=5, columnspan=3, pady=20)
 
     # 開始主事件循環
     root.mainloop()
+    return end_pressed
 
-def save_reaction_times_to_excel(save_path):
-    if reaction_times:  # 檢查是否有反應時間記錄
-        df = pd.DataFrame({'Test Number': range(1, len(reaction_times) + 1), 'Reaction Time (seconds)': reaction_times})
-        df.to_excel(save_path, index=False)
+# def save_reaction_times_to_excel(save_path):
+#     if reaction_times:  # 檢查是否有反應時間記錄
+#         df = pd.DataFrame({'Test Number': range(1, len(reaction_times) + 1), 'Reaction Time (seconds)': reaction_times})
+#         df.to_excel(save_path, index=False)
 
-def run_reaction_test(save_path):
+def run_reaction_test(save_path, org_info):
     global reaction_times
     global test_count
     global max_tests
     global current_color
+    global running
     
     # 初始化 Pygame
     pygame.init()
+    infoObject = pygame.display.Info()
+
+    screen_width = infoObject.current_w
+    screen_height = infoObject.current_h
 
     # 設定畫面尺寸
-    screen = pygame.display.set_mode((800, 600))
+    screen = pygame.display.set_mode((screen_width, screen_height))
     pygame.display.set_caption("反應時間測試")
 
     # 設定顏色
@@ -196,8 +203,19 @@ def run_reaction_test(save_path):
     while running:
         screen.fill(WHITE)
         
+        tests_info = font.render(f"Subject ID: {org_info['user_id']}",
+                                 True, (0, 0, 0))
+        tests_para = font.render(f"Condition: {org_info['condition']}",
+                                 True, (0, 0, 0))
+        test_block = font.render(f"Block: {org_info['block']}",
+                                 True, (0, 0, 0))
+        screen.blit(tests_info, (20, 20))
+        screen.blit(tests_para, (20, 60))
+        screen.blit(test_block, (20, 100))
+        
         # 畫出圓形
-        pygame.draw.circle(screen, current_color, (400, 300), 100)
+        pygame.draw.circle(screen, current_color,
+                           (screen_width // 2, screen_height //2), 100)
         
         # 如果在倒數計時階段，顯示倒數計時
         if current_color == GRAY:
@@ -209,7 +227,7 @@ def run_reaction_test(save_path):
                 countdown_start = None
             else:
                 text = font.render(str(countdown), True, BLACK)
-                screen.blit(text, (380, 250))
+                screen.blit(text, (screen_width // 2 - 20, screen_height //2 - 23))
         
         pygame.display.flip()
         
@@ -217,10 +235,17 @@ def run_reaction_test(save_path):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.MOUSEBUTTONDOWN and (event.button == 6 or event.button == 7):
                 if current_color == GREEN:
                     reaction_time = time.time() - change_time
-                    reaction_times.append(reaction_time)
+                    if event.button == 7:
+                        reaction_times.append((org_info["user_id"], org_info["condition"],
+                                               org_info["block"], "forward",
+                                               reaction_time))
+                    elif event.button == 6:
+                        reaction_times.append((org_info["user_id"], org_info["condition"],
+                                               org_info["block"], "backward",
+                                               reaction_time))
                     test_count += 1
                     current_color = GRAY
                     change_time = None
@@ -229,9 +254,9 @@ def run_reaction_test(save_path):
                     # 顯示反應時間
                     screen.fill(WHITE)
                     text = font.render(f"Reaction time: {reaction_time:.3f} seconds", True, BLACK)
-                    screen.blit(text, (100, 250))
+                    screen.blit(text, (screen_width // 2 - 350, screen_height //2 - 150))
                     pygame.display.flip()
-                    pygame.time.wait(2000)
+                    pygame.time.wait(1500)
                     
                     if test_count >= max_tests:
                         running = False
@@ -247,38 +272,39 @@ def run_reaction_test(save_path):
             change_time = time.time()
 
     # 將反應時間輸出到Excel
-    save_reaction_times_to_excel(save_path)
+    # save_reaction_times_to_excel(save_path)
 
     # 結束 Pygame
     pygame.quit()
+    return reaction_times
+
+def temp_save(org_info, task = "ReactionTimeTask"):
+    if str(task + "_temp.txt") in os.listdir(current_path) and \
+        len(org_info) > 0:
+        print(0)
+        file_path = org_info["folder_path"]
+    else:
+        file_path = current_path
+        
+    txt_file_name =  os.path.join(file_path, str(task + "_temp.txt"))
+    with open(txt_file_name, 'w') as file:
+        for key, value in params.items():
+            file.write(f'{key}: {value}\n')
+    return file_path
 
 # %% 顯示輸入對話框，獲取初始參數
-show_input_dialog(org_info,
-                  str(org_info["folder_path"] + org_info["user_id"] + "-" + \
-                      org_info["condition"] + "-" + org_info["block"] \
-                          + "-" + datetime.now().strftime('%m%d%H%M') + ".xlsx"))
+# show_input_dialog(org_info)
 
 # %% 儲存一個 .txt 的暫存檔
-if "ReactionTimeTask_temp.txt" in os.listdir(current_path) and \
-    len(org_info) > 0:
-    print(0)
-    file_path = org_info["folder_path"]
-else:
-    file_path = current_path
-    
-txt_file_name =  os.path.join(file_path, "ReactionTimeTask_temp.txt")
-with open(txt_file_name, 'w') as file:
-    for key, value in params.items():
-        file.write(f'{key}: {value}\n')
+file_path = temp_save(org_info, task = "ReactionTimeTask")
         
 # %%
-Participant = org_info["user_id"]
-Condition = org_info["condition"]
-Block = org_info["test_number"]
-file_name = org_info["user_id"] + "-" + org_info["condition"] + "-" + org_info["block"] \
-            + "-" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
-# 設定輸出檔案儲存路徑
-data_save_path = os.path.join(file_path, ("ReactionTimeTask-" + file_name))
+# Participant = org_info["user_id"]
+# Condition = org_info["condition"]
+# Block = org_info["block"]
+# file_name = org_info["user_id"] + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
+# # 設定輸出檔案儲存路徑
+# data_save_path = os.path.join(file_path, ("ReactionTimeTask-" + file_name))
 
 # %%
 # 運行反應時間測試
@@ -286,13 +312,29 @@ data_save_path = os.path.join(file_path, ("ReactionTimeTask-" + file_name))
 # show_input_dialog(org_info)
 
 # 運行反應時間測試
-while running:
-    run_reaction_test(data_save_path)
-    if not end_pressed:  # 確認測試未被終止
-        show_input_dialog(org_info, data_save_path)
+all_reaction_time = []
+while not end_pressed:
+    # 找 temp 暫存檔
+    org_info = ui.find_temp(task = "ReactionTimeTask")
+    # 設定輸出檔案儲存路徑
+    file_name = org_info["user_id"] + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
+    data_save_path = os.path.join(org_info["folder_path"], ("ReactionTimeTask-" + file_name))
+    # 更新 temp 暫存檔
+    file_path = temp_save(org_info, task = "ReactionTimeTask")
+    show_input_dialog(org_info)
+    if end_pressed:
+        break
+    indi_reaction_time = run_reaction_test(data_save_path, org_info)
+    all_reaction_time.append(indi_reaction_time)
+# save_reaction_times_to_excel(data_save_path)
 
-
-
+# 將反應時間和受試者資料寫入 CSV 檔案
+with open(data_save_path, mode='w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['Participant', 'Condition', 'Block', 'event', 'time'])
+    for part, cond, blo, event, sec in all_reaction_time[0]:
+        # print([part, cond, blo, sec])
+        writer.writerow([part, cond, blo, event, sec])
 
 
 

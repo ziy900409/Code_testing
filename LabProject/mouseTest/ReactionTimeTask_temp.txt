@@ -1,4 +1,0 @@
-user_id: S01
-condition: C01
-test_number: B01
-folder_path: D:\BenQ_Project\git\Code_testing\LabProject\mouseTest

@@ -49,7 +49,7 @@ def find_temp(task = "DragDropTask"):
             else:
                 temp_file_exist = False
         if len(store_data) > 0 and temp_file_exist: # 這個要再確認
-            temp_path = str(temp_params["folder_path"] + "\\DragDropTask_temp.txt")
+            temp_path = str(temp_params["folder_path"] + "\\" + str(task + "_temp.txt"))
             temp_params = {}
             store_data = open_txt(temp_params, temp_path)
             # 2. 利用上次的 temp 路徑找上次測驗是第幾個 task

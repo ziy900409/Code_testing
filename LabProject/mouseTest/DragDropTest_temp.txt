@@ -1,6 +1,0 @@
-user_id: S01
-condition: C01
-test_number: B01
-width_range: [30, 40]
-distance_range: [200, 400]
-folder_path: C:/Users/Hsin.YH.Yang/Desktop/test

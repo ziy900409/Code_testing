@@ -1,5 +1,0 @@
-user_id: S01
-condition: C01
-test_number: B01
-target_y: [500, 1000, 3000]
-folder_path: C:/Users/Hsin.YH.Yang/Desktop/test
