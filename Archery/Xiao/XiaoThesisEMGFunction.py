@@ -553,6 +553,7 @@ def find_release_time(folder_path, save_path, save_fig=True):
         if os.path.splitext(file_list[ii])[1] == ".csv":
             filepath, tempfilename = os.path.split(file_list[ii])
             data = pd.read_csv(file_list[ii])
+            # data = pd.read_csv(r"C:\Users\h7058\Downloads\R11_SH1_Rep_1.5.csv")
             # to find R EXTENSOR CARPI RADIALIS: ACC X data [43]
             Extensor_ACC = data.iloc[:, release_acc]
             # acc sampling rate

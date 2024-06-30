@@ -11,8 +11,8 @@ import os
 import matplotlib.pyplot as plt
 import math
 import sys
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\baseball")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\baseball")
 # 將read_c3d function 加進現有的工作環境中
 import BaseballFunction_20230516 as af
 import spm1d
@@ -958,7 +958,8 @@ med_plam_vel_T2 = pd.DataFrame(np.zeros([150, 20]),
  
 for subject in range(len(staging_file["Subject"])):
     print(staging_file["Subject"][subject])
-    finger_data = pd.read_excel(r"D:\BenQ_Project\python\Lin\finger_motion_figure_T1.xlsx",
+    finger_data = pd.read_excel(#r"D:\BenQ_Project\python\Lin\finger_motion_figure_T1.xlsx",
+                                r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure_T1.xlsx",
                                 sheet_name = staging_file["Subject"][subject])
     # finger_data_T2 = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure_T2.xlsx",
     #                             sheet_name = staging_file["Subject"][subject])
@@ -1011,7 +1012,8 @@ for subject in range(len(staging_file["Subject"])):
 # ------------------------for T2-------------------------------------------
 for subject in range(len(staging_file_T2["Subject"])):
     print(staging_file_T2["Subject"][subject])
-    finger_data_T2 = pd.read_excel(r"D:\BenQ_Project\python\Lin\finger_motion_figure_T2.xlsx",
+    finger_data_T2 = pd.read_excel(#r"D:\BenQ_Project\python\Lin\finger_motion_figure_T2.xlsx",
+                                   r"E:\Hsin\NTSU_lab\Baseball\finger_motion_figure_T2.xlsx",
                                 sheet_name = staging_file_T2["Subject"][subject])
     # --------------------for T2------------------------------------
     SER = staging_file_T2.loc[subject, "shoulder external rotation"]
@@ -1207,6 +1209,12 @@ for i in range(np.shape(fast_dict)[0]):
     axs[x, y].xaxis.set_major_locator(x_major_locator)
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
+    if x == 0:
+        axs[x, y].set_ylim(140, 180)
+    elif x == 1:
+        axs[x, y].set_ylim(120, 180)
+    elif x == 2:
+        axs[x, y].set_ylim(100, 180)
     # 设置Y轴标题，只在最左边两列
     # if y == 0 and x == 0:
     #     axs[x, y].set_ylabel('deg', fontsize=14)
@@ -1269,6 +1277,12 @@ for i in range(np.shape(fast_dict)[0]):
     #     axs[x, y].set_ylabel('deg', fontsize=14)
     # elif y == 0 and x == 1:
     #     axs[x, y].set_ylabel('deg/s', fontsize=14)
+    if x == 0:
+        axs[x, y].set_ylim(-2000, 1600)
+    elif x == 1:
+        axs[x, y].set_ylim(-1500, 3500)
+    elif x == 2:
+        axs[x, y].set_ylim(-2000, 2500)
     
 plt.suptitle(str("手指關節角速度時序圖"), fontsize=18)
 plt.tight_layout()
@@ -1381,6 +1395,12 @@ for i in range(np.shape(fast_dict)[0]):
     #     axs[x, y].set_ylabel('deg', fontsize=14)
     # elif y == 0 and x == 1:
     #     axs[x, y].set_ylabel('deg/s', fontsize=14)
+    if x == 0:
+        axs[x, y].set_ylim(140, 180)
+    elif x == 1:
+        axs[x, y].set_ylim(120, 180)
+    elif x == 2:
+        axs[x, y].set_ylim(100, 180)
     
 plt.suptitle(str("手指關節角度時序圖"), fontsize=20)
 plt.tight_layout()
@@ -1438,6 +1458,12 @@ for i in range(np.shape(fast_dict)[0]):
     #     axs[x, y].set_ylabel('deg', fontsize=14)
     # elif y == 0 and x == 1:
     #     axs[x, y].set_ylabel('deg/s', fontsize=14)
+    if x == 0:
+        axs[x, y].set_ylim(-2000, 1600)
+    elif x == 1:
+        axs[x, y].set_ylim(-1500, 3500)
+    elif x == 2:
+        axs[x, y].set_ylim(-2000, 2500)
     
 plt.suptitle(str("手指關節角速度時序圖"), fontsize=18)
 plt.tight_layout()
