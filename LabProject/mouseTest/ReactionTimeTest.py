@@ -8,6 +8,7 @@ import sys
 import random
 import time
 sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest")
+sys.path.append("E:\Hsin\git\git\Code_testing\LabProject\mouseTest")
 import Analysis_function_v1 as func
 import UI_func_v1 as ui
 from datetime import datetime
@@ -16,7 +17,7 @@ from datetime import datetime
 # 獲取當前程式所在的路徑
 current_path = os.path.dirname(os.path.abspath(__file__))
 
-org_info = ui.find_temp(task = "ReactionTimeTask")
+
 
 
 
@@ -60,7 +61,7 @@ def submit():
     params = {
         "user_id": user_id,
         "condition": condition,
-        "test_number": test_number,
+        "block": test_number,
         "folder_path": folder_path
     }
 
@@ -162,7 +163,7 @@ def show_input_dialog(org_info):
 #         df = pd.DataFrame({'Test Number': range(1, len(reaction_times) + 1), 'Reaction Time (seconds)': reaction_times})
 #         df.to_excel(save_path, index=False)
 
-def run_reaction_test(save_path, org_info):
+def run_reaction_test(org_info):
     global reaction_times
     global test_count
     global max_tests
@@ -292,49 +293,51 @@ def temp_save(org_info, task = "ReactionTimeTask"):
             file.write(f'{key}: {value}\n')
     return file_path
 
-# %% 顯示輸入對話框，獲取初始參數
-# show_input_dialog(org_info)
-
-# %% 儲存一個 .txt 的暫存檔
-file_path = temp_save(org_info, task = "ReactionTimeTask")
-        
-# %%
-# Participant = org_info["user_id"]
-# Condition = org_info["condition"]
-# Block = org_info["block"]
-# file_name = org_info["user_id"] + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
-# # 設定輸出檔案儲存路徑
-# data_save_path = os.path.join(file_path, ("ReactionTimeTask-" + file_name))
 
 # %%
+"""
+執行順序應該是
+1. 獲得 temp file
+2. 顯示對話視窗
+3. 更新 temp file，並且更新受試者資訊
+4. 執行反應測試
+4.1. 紀錄反應時間
+5. 重複 1~4，直到按下結束按鈕
+
+"""
+
 # 運行反應時間測試
 # 顯示輸入對話框，獲取初始參數
 # show_input_dialog(org_info)
 
 # 運行反應時間測試
+org_info = ui.find_temp_v2(task = "ReactionTimeTask")
 all_reaction_time = []
+n = 0
 while not end_pressed:
-    # 找 temp 暫存檔
-    org_info = ui.find_temp(task = "ReactionTimeTask")
-    # 設定輸出檔案儲存路徑
+    if n == 0:
+        n = n + 1
+    elif n != 0:
+        # 找 temp 暫存檔
+        org_info = ui.find_temp_v2(task = "ReactionTimeTask")
+    show_input_dialog(org_info)
+    file_path = temp_save(org_info, task = "ReactionTimeTask")
+    # org_info = ui.find_temp_v2(task = "ReactionTimeTask")
     file_name = org_info["user_id"] + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
     data_save_path = os.path.join(org_info["folder_path"], ("ReactionTimeTask-" + file_name))
-    # 更新 temp 暫存檔
-    file_path = temp_save(org_info, task = "ReactionTimeTask")
-    show_input_dialog(org_info)
     if end_pressed:
         break
-    indi_reaction_time = run_reaction_test(data_save_path, org_info)
+    indi_reaction_time = run_reaction_test(org_info)
     all_reaction_time.append(indi_reaction_time)
-# save_reaction_times_to_excel(data_save_path)
-
-# 將反應時間和受試者資料寫入 CSV 檔案
-with open(data_save_path, mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(['Participant', 'Condition', 'Block', 'event', 'time'])
-    for part, cond, blo, event, sec in all_reaction_time[0]:
-        # print([part, cond, blo, sec])
-        writer.writerow([part, cond, blo, event, sec])
+        
+if len(all_reaction_time[0]) > 0:
+    # 將反應時間和受試者資料寫入 CSV 檔案
+    with open(data_save_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Participant', 'Condition', 'Block', 'event', 'time'])
+        for part, cond, blo, event, sec in all_reaction_time[0]:
+            # print([part, cond, blo, sec])
+            writer.writerow([part, cond, blo, event, sec])
 
 
 

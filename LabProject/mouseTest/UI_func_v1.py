@@ -49,9 +49,9 @@ def find_temp(task = "DragDropTask"):
             else:
                 temp_file_exist = False
         if len(store_data) > 0 and temp_file_exist: # 這個要再確認
-            temp_path = str(temp_params["folder_path"] + "\\" + str(task + "_temp.txt"))
-            temp_params = {}
-            store_data = open_txt(temp_params, temp_path)
+            # temp_path = str(temp_params["folder_path"] + "\\" + str(task + "_temp.txt"))
+            # temp_params = {}
+            # store_data = open_txt(temp_params, temp_path)
             # 2. 利用上次的 temp 路徑找上次測驗是第幾個 task
             judge_B01 = func.Read_File(store_data["folder_path"],
                                        ".csv",
@@ -59,7 +59,7 @@ def find_temp(task = "DragDropTask"):
             # 只記錄包含 DragDropTask 的檔案路徑
             DargDropFile_list = []
             for i in range(len(judge_B01)):
-                if "DragDropTask" in judge_B01[i]:
+                if task in judge_B01[i]:
                     filepath, tempfilename = os.path.split(judge_B01[i])
                     filename, extension = os.path.splitext(tempfilename)
                     DargDropFile_list.append(filename)
@@ -110,7 +110,59 @@ def find_temp(task = "DragDropTask"):
 # %%
 
 
+def find_temp_v2(task = "DragDropTask"):
+    
+    temp_params = {}
+    if str(task + "_temp.txt") in os.listdir(current_path):
+        temp_txt_path = current_path + "\\" + str(task + "_temp.txt")
+        
+        # 1. 如果當前路徑有 temp 檔案, 讀取檔案
 
+        store_data = open_txt(temp_params, temp_txt_path)
+        for key in temp_params:
+            if key =="folder_path":
+                temp_file_exist = os.path.exists(str(store_data["folder_path"] + \
+                                                     "\\" + str(task + "_temp.txt")))
+            else:
+                temp_file_exist = False
+        if len(store_data) > 0 and temp_file_exist: # 這個要再確認
+            # temp_path = str(temp_params["folder_path"] + "\\" + str(task + "_temp.txt"))
+            # temp_params = {}
+            # store_data = open_txt(temp_params, temp_path)
+            # 2. 利用上次的 temp 路徑找上次測驗是第幾個 task
+
+            # 設定預設值
+            org_user_id = store_data["user_id"]
+            org_condition = store_data["condition"]
+            org_folder_path = store_data["folder_path"]
+            if len(store_data) > 0:
+                # 將 Block 列轉換為數字（去掉 'B' 並轉換為整數）
+                block_condition = pd.Series(store_data['block']).str.extract('(\d+)').astype(int)
+                # 找出 Block 的最大值
+                if block_condition.iloc[0, 0] < 9:    
+                    max_block_numeric = "B0" + str(block_condition.iloc[0, 0] + 1)
+                else:
+                    max_block_numeric = "B" + str(block_condition.iloc[0, 0] + 1)
+                # 設定 UI 預設文字
+                org_block = max_block_numeric
+            else:
+                org_block = "B01"
+        else:
+            org_user_id = "S01"
+            org_condition = "C01"
+            org_block = "B01"
+            org_folder_path = current_path
+    else:
+        org_user_id = "S01"
+        org_condition = "C01"
+        org_block = "B01"
+        org_folder_path = current_path
+    # 輸出資料
+    org_info = {"user_id": org_user_id,
+                "condition": org_condition,
+                "block": org_block,
+                "folder_path": org_folder_path}
+    return org_info
 
 
 

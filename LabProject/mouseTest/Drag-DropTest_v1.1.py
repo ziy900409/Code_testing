@@ -353,8 +353,8 @@ while True:
     # 獲取滑鼠位置
     mouse_pos = pygame.mouse.get_pos()
     # 在視窗上顯示文字信息
-    mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
-    window.blit(mouse_info, (20, 100))
+    # mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
+    # window.blit(mouse_info, (20, 100))
     
 
     # 計算出所有周圍圓圈的所在位置
