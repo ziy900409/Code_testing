@@ -89,9 +89,10 @@ import os
 import random
 sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\mouseTest")
 import Analysis_function_v1 as func
+import UI_func_v1 as ui
 import tkinter as tk
 from tkinter import messagebox, filedialog
-import pandas as pd
+# import pandas as pd
 
 # from tkinter import messagebox
 from datetime import datetime
@@ -99,83 +100,7 @@ from datetime import datetime
 # 獲取當前程式所在的路徑
 current_path = os.path.dirname(os.path.abspath(__file__))
 
-temp_params = {}
-if "DragDropTest_temp.txt" in os.listdir(current_path):
-    print(0)
-    temp_txt_path = current_path + "\\" + "DragDropTest_temp.txt"
-    
-    # 1. 如果當前路徑有 temp 檔案, 讀取檔案
-    with open(temp_txt_path, 'r') as file:
-        for line in file:
-            key, value = line.strip().split(': ', 1)
-            # 處理數值範圍
-            if key in ['width_range', 'distance_range']:
-                value = value.strip('[]').split(', ')
-                value = [float(v) for v in value]
-            # 處理其他項目
-            else:
-                try:
-                    value = int(value)
-                except ValueError:
-                    pass
-            temp_params[key] = value
-    for key in temp_params:
-        if key =="folder_path":
-                temp_file_exist = os.path.exists(temp_params["folder_path"])
-        else:
-            temp_file_exist = False
-    if len(temp_params) > 0 and temp_file_exist: # 這個要再確認
-        print(1)
-        # 2. 利用上次的 temp 路徑找上次測驗是第幾個 task
-        judge_B01 = func.Read_File(temp_params["folder_path"],
-                                   ".csv",
-                                   subfolder=False)
-        # 只記錄包含 DragDropTask 的檔案路徑
-        DargDropFile_list = []
-        for i in range(len(judge_B01)):
-            if "DragDropTask" in judge_B01[i]:
-                filepath, tempfilename = os.path.split(judge_B01[i])
-                filename, extension = os.path.splitext(tempfilename)
-                DargDropFile_list.append(filename)
-        # 將 list 用 "-" 分開
-        split_list = pd.DataFrame([item.split('-') for item in DargDropFile_list],
-                                  columns=['Task', 'Subject', 'Condition', 'Block', 'time'])
-        # 找到現在在測試的受試者及條件
-        condition_set = (
-            (split_list['Subject'] == temp_params["user_id"]) &
-            (split_list['Condition'] == temp_params["condition"])
-            )
-        condition_indices = split_list.index[condition_set].tolist()
-        # 目標 table
-        target_list = split_list.iloc[condition_indices, :]
-        # 設定預設值
-        org_user_id = temp_params["user_id"]
-        org_condition = temp_params["condition"]
-        org_folder_path = temp_params["folder_path"]
-        if len(target_list) > 0:
-            print(2)
-            # 將 Block 列轉換為數字（去掉 'B' 並轉換為整數）
-            target_list['Block_numeric'] = target_list['Block'].str.extract('(\d+)').astype(int)
-            # 找出 Block 的最大值
-            if max(target_list["Block_numeric"]) < 9:    
-                max_block_numeric = "B0" + str(max(target_list["Block_numeric"]) + 1)
-            else:
-                max_block_numeric = "B" + str(max(target_list["Block_numeric"]) + 1)
-            # 設定 UI 預設文字
-            org_block = max_block_numeric
-        else:
-            org_block = "B01"
-    else:
-        org_user_id = "S01"
-        org_condition = "C01"
-        org_block = "B01"
-        org_folder_path = current_path
-else:
-    org_user_id = "S01"
-    org_condition = "C01"
-    org_block = "B01"
-    org_folder_path = current_path
-    
+org_info = ui.find_temp(task = "DragDropTask")
 
 # %% 設定 UI 介面來輸入受試者訊息
 
@@ -245,7 +170,7 @@ def select_folder():
 
 # 創建主窗口
 root = tk.Tk()
-root.title("參數輸入")
+root.title("Drag-Drop Test")
 
 # 設置窗口大小
 window_width = 480
@@ -269,7 +194,7 @@ tk.Label(root, text="使用者編號:", font=font_label).grid(row=0, column=0, p
 user_ids = ["S01", "S02", "S03", "S04", "S05", "S06",
             "S07", "S08", "S09", "S10", "S11", "S12"]
 selected_user_id = tk.StringVar(root)
-selected_user_id.set(org_user_id)  # 設置預設值
+selected_user_id.set(org_info["user_id"])  # 設置預設值
 user_id_menu = tk.OptionMenu(root, selected_user_id, *user_ids)
 user_id_menu.config(font=font_label)
 user_id_menu.grid(row=0, column=1, pady=5)
@@ -281,7 +206,7 @@ tk.Label(root, text="使用條件:", font=font_label).grid(row=1, column=0, pady
 conditions =  ["C01", "C02", "C03", "C04", "C05", "C06",
                "C07", "C08", "C09", "C10", "C11", "C12"]
 selected_condition = tk.StringVar(root)
-selected_condition.set(org_condition)  # 設置預設值
+selected_condition.set(org_info["condition"])  # 設置預設值
 condition_menu = tk.OptionMenu(root, selected_condition, *conditions)
 condition_menu.config(font=font_label)
 condition_menu.grid(row=1, column=1, pady=5)
@@ -291,7 +216,7 @@ condition_menu_widget.config(font=font_label)
 tk.Label(root, text="第幾次測試:", font=font_label).grid(row=2, column=0, pady=5)
 entry_test_number = tk.Entry(root, font=font_entry)
 entry_test_number.grid(row=2, column=1, pady=5)
-entry_test_number.insert(0, org_block)  # 設置預設文字
+entry_test_number.insert(0, org_info["block"])  # 設置預設文字
 
 tk.Label(root, text="目標寬度:", font=font_label).grid(row=3, column=0, pady=5)
 entry_width_range = tk.Entry(root, font=font_entry)
@@ -307,7 +232,7 @@ entry_distance_range.insert(0, "[200, 400]")  # 設置預設文字
 tk.Label(root, text="資料夾路徑:", font=font_label).grid(row=5, column=0, pady=5)
 entry_folder_path = tk.Entry(root, font=font_entry)
 entry_folder_path.grid(row=5, column=1, pady=5)
-entry_folder_path.insert(0, org_folder_path) # 設置預設為當前路徑
+entry_folder_path.insert(0, org_info["folder_path"]) # 設置預設為當前路徑
 select_folder_button = tk.Button(root, text="選擇資料夾", command=select_folder, font=font_label)
 select_folder_button.grid(row=5, column=2, pady=5)
 
@@ -318,16 +243,15 @@ submit_button.grid(row=6, columnspan=3, pady=20)
 # 開始主事件循環
 root.mainloop()
 
-
 # %% 儲存一個 .txt 的暫存檔
-if "DragDropTest_temp.txt" in os.listdir(current_path) and \
-    len(temp_params) > 0:
+if "DragDropTask_temp.txt" in os.listdir(current_path) and \
+    len(org_info) > 0:
     print(0)
     file_path = params["folder_path"]
 else:
     file_path = current_path
     
-txt_file_name =  os.path.join(current_path, "DragDropTest_temp.txt")
+txt_file_name =  os.path.join(file_path, "DragDropTask_temp.txt")
 with open(txt_file_name, 'w') as file:
     for key, value in params.items():
         file.write(f'{key}: {value}\n')
@@ -346,10 +270,11 @@ data_save_path = os.path.join(file_path, ("DragDropTask-" + file_name))
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
-CENTER_COLOR = (220, 190, 255)
-PURPLE = (220, 190, 255)  # 淡紫色
+PURPLE = (4, 175, 112)  # 淡紫色
 # 定义圆的初始位置和大小
 # circle_radius = 20
+# 設定圓圈透明度，0 表示完全透明，255 表示完全不透明
+circle_alpha = 128  # 透明度（0-255）
 # 记录已经拖拽到的位置数量
 completed_positions = 0
 record_edge = 1
@@ -360,6 +285,7 @@ circle_touched = False
 mouse_click_events = []
 mouse_positions = []
 edge_circle = []
+monitor_info = []
 
 # 設定採樣間隔（毫秒）
 sampling_interval = 10  # 每10毫秒採樣一次
@@ -409,7 +335,6 @@ for i in range(len(all_combinations)):
 circle_x = all_combinations[0]['circle_x'] 
 circle_y = all_combinations[0]['circle_y'] 
 
-
 # 游戏循环
 while True:
     window.fill(WHITE)
@@ -428,11 +353,14 @@ while True:
     # 獲取滑鼠位置
     mouse_pos = pygame.mouse.get_pos()
     # 在視窗上顯示文字信息
-    # mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
-    # window.blit(mouse_info, (20, 100))
+    mouse_info = font.render(f"Mouse Position: ({mouse_pos[0]}, {mouse_pos[1]})", True, (0, 0, 0))
+    window.blit(mouse_info, (20, 100))
+    
+
     # 計算出所有周圍圓圈的所在位置
     angle_step = math.radians(360 / num_surrounding_circles)
     surrounding_circles = []
+    # 繪製周圍圓圈及其條件 ------------------------------------------------------
     for i in range(num_surrounding_circles):
         if i % 2 == 0:
             angle_rad = int(i / 2) * angle_step
@@ -465,8 +393,16 @@ while True:
                             "EdgeCirclePos", surrounding_circles[completed_positions+1], # event, edge circle position 
                             pygame.time.get_ticks())) # time
     
-    # 繪製中心圓
-    pygame.draw.circle(window, BLACK, (circle_x, circle_y), circle_radius)
+    # 創建一個臨時表面支持透明度
+    circle_surface = pygame.Surface((circle_radius * 2, circle_radius * 2), pygame.SRCALPHA)
+    circle_surface = circle_surface.convert_alpha()
+
+    # 填充臨時表面為透明
+    circle_surface.fill((0, 0, 0, 0))
+    
+    # 在臨時表面上繪製具有透明度的圓圈
+    pygame.draw.circle(circle_surface, (BLACK[0], BLACK[1], BLACK[2], circle_alpha),
+                        (circle_radius, circle_radius), circle_radius)
 
     # 處理事件
     for event in pygame.event.get():
@@ -487,7 +423,7 @@ while True:
             if active_circle:
                 active_circle = False
             distance = math.sqrt((circle_x - event.pos[0]) ** 2 + (circle_y - event.pos[1]) ** 2)
-            # 如果按鍵釋放時，游標沒有碰到中心原，就不算事件的紀錄
+            # 如果按鍵釋放時，游標沒有碰到中心圓，就不算事件的紀錄
             if distance > circle_radius:
                 active_circle = False
                 break
@@ -534,7 +470,7 @@ while True:
                        circle_touched = True
                     else:
                         circle_touched = False
-    
+                        
     # 固定時間採樣一次滑鼠位置，檢查是否到達採樣時間
     if pygame.time.get_ticks() >= next_sample_time:
         # 保存滑鼠位置
@@ -544,9 +480,9 @@ while True:
         # 保存鼠标移动轨迹
         mouse_positions.append((Participant, Condition, Block, 
                                 (current_test_index + 1), (completed_positions+1), # sequemce, trial
-                                  current_test['target_amplitudes'], surrounding_circle_radius,
-                                  mouse_pos, current_time))
-
+                                current_test['target_amplitudes'], surrounding_circle_radius,
+                                mouse_pos, current_time))
+   
     # 如果完成了所有位置，切換到下一個測試
     if completed_positions+1 == num_surrounding_circles:
         # 重置完成的位置
@@ -560,6 +496,12 @@ while True:
             circle_x = all_combinations[current_test_index]['circle_x']
             circle_y = all_combinations[current_test_index]['circle_y']
         else:
+            # 新增螢幕資訊
+            monitor_info.append((Participant, Condition, Block, 
+                                1, 1, # sequemce, trial 隨意給編號
+                                current_test['target_amplitudes'], surrounding_circle_radius,
+                                WINDOW_WIDTH, WINDOW_HEIGHT, # 改成螢幕的寬度與高度
+                                current_time))
             # 將滑鼠軌跡和事件資料寫入 CSV 檔案
             with open(data_save_path, mode='w', newline='') as file:
                 writer = csv.writer(file)
@@ -567,8 +509,8 @@ while True:
                                   'Sequence', 'Trial',
                                   'Amplitudes', 'Width',
                                 'Event', 'time', 'Pos_x', 'Pos_y'])
-                # for part, cond, blo, sec, trial, amp, wid, pos, time in mouse_trajectory:
-                #     writer.writerow([part, cond, blo, sec, trial, amp, wid, 'MOUSEMOTION', time, pos[0], pos[1]])
+                for part, cond, blo, sec, trial, amp, wid, pos_x, pos_y, time in monitor_info:
+                    writer.writerow([part, cond, blo, sec, trial, amp, wid, 'MONITOR_INFO', time, pos_x, pos_y])
                 for part, cond, blo, sec, trial, amp, wid, pos, time in mouse_positions:
                     writer.writerow([part, cond, blo, sec, trial, amp, wid, 'MOUSEPOS', time, pos[0], pos[1]])
                 for part, cond, blo, sec, trial, amp, wid, event, pos, time in mouse_click_events:
@@ -582,6 +524,22 @@ while True:
     # 如果有活动圆圈，根据鼠标位置更新圆圈位置
     if active_circle:
         circle_x, circle_y = pygame.mouse.get_pos()
+    
+    # 將臨時表面上的圓圈繪製到主屏幕上
+    window.blit(circle_surface, (circle_x - circle_radius, circle_y - circle_radius))
+    pygame.display.flip()
 
-    pygame.display.update()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
