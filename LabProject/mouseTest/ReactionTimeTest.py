@@ -18,9 +18,6 @@ from datetime import datetime
 current_path = os.path.dirname(os.path.abspath(__file__))
 
 
-
-
-
 # %%
 
 # 初始化參數
