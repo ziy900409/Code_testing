@@ -332,9 +332,10 @@ if len(all_reaction_time[0]) > 0:
     with open(data_save_path, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Participant', 'Condition', 'Block', 'event', 'time'])
-        for part, cond, blo, event, sec in all_reaction_time[0]:
-            # print([part, cond, blo, sec])
-            writer.writerow([part, cond, blo, event, sec])
+        for idx in range(len(all_reaction_time)):
+            for part, cond, blo, event, sec in all_reaction_time[idx]:
+                # print([part, cond, blo, sec])
+                writer.writerow([part, cond, blo, event, sec])
 
 
 
