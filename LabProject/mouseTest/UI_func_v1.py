@@ -110,14 +110,22 @@ def find_temp(task = "DragDropTask"):
 # %%
 
 
-def find_temp_v2(task = "DragDropTask"):
+def find_temp_v2(params, task = "DragDropTask"):
     
     temp_params = {}
-    if str(task + "_temp.txt") in os.listdir(current_path):
-        temp_txt_path = current_path + "\\" + str(task + "_temp.txt")
+    if len(params) > 0 and str(task + "_temp.txt") in os.listdir(params["folder_path"]):
+        temp_txt_path = params["folder_path"] + "\\" + str(task + "_temp.txt")
         
+    elif str(task + "_temp.txt") in os.listdir(current_path):
+        temp_txt_path = current_path + "\\" + str(task + "_temp.txt")
+    else:
+        org_user_id = "S01"
+        org_condition = "C01"
+        org_block = "B01"
+        org_folder_path = current_path
+        
+    if len(temp_txt_path) > 0:
         # 1. 如果當前路徑有 temp 檔案, 讀取檔案
-
         store_data = open_txt(temp_params, temp_txt_path)
         for key in temp_params:
             if key =="folder_path":
@@ -152,11 +160,7 @@ def find_temp_v2(task = "DragDropTask"):
             org_condition = "C01"
             org_block = "B01"
             org_folder_path = current_path
-    else:
-        org_user_id = "S01"
-        org_condition = "C01"
-        org_block = "B01"
-        org_folder_path = current_path
+
     # 輸出資料
     org_info = {"user_id": org_user_id,
                 "condition": org_condition,

@@ -308,7 +308,7 @@ def temp_save(org_info, task = "ReactionTimeTask"):
 # show_input_dialog(org_info)
 
 # 運行反應時間測試
-org_info = ui.find_temp_v2(task = "ReactionTimeTask")
+org_info = ui.find_temp_v2(params, task = "ReactionTimeTask")
 all_reaction_time = []
 n = 0
 while not end_pressed:
@@ -316,15 +316,15 @@ while not end_pressed:
         n = n + 1
     elif n != 0:
         # 找 temp 暫存檔
-        org_info = ui.find_temp_v2(task = "ReactionTimeTask")
+        org_info = ui.find_temp_v2(params, task = "ReactionTimeTask")
     show_input_dialog(org_info)
-    file_path = temp_save(org_info, task = "ReactionTimeTask")
+    file_path = temp_save(params, task = "ReactionTimeTask")
     # org_info = ui.find_temp_v2(task = "ReactionTimeTask")
-    file_name = org_info["user_id"] + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
-    data_save_path = os.path.join(org_info["folder_path"], ("ReactionTimeTask-" + file_name))
+    file_name = params["user_id"] + "-" + datetime.now().strftime('%m%d%H%M') + ".csv"
+    data_save_path = os.path.join(params["folder_path"], ("ReactionTimeTask-" + file_name))
     if end_pressed:
         break
-    indi_reaction_time = run_reaction_test(org_info)
+    indi_reaction_time = run_reaction_test(params)
     all_reaction_time.append(indi_reaction_time)
         
 if len(all_reaction_time[0]) > 0:
