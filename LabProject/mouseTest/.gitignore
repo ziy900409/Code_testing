@@ -1,0 +1,20 @@
+# 忽略所有 .log 文件
+*.log
+
+# 忽略暫存文件
+*.tmp
+
+# 忽略 node_modules/ 目錄及其下所有內容
+node_modules/
+
+# 忽略特定配置文件
+config.json
+
+# 忽略所有 .DS_Store 文件（macOS 系統產生）
+.DS_Store
+
+# 忽略所有 .txt 文件
+*.txt
+
+# 忽略所有 .csv 文件
+*.csv
