@@ -269,7 +269,8 @@ def sd3_formating(duplicate_info, raw_data, sd3_data_format,
         DESCRIPTION.
 
     """
-
+    # raw_data
+    
     # 找出每筆 trial, 數量為 Amplitudes * Width * Trial, 並依照 time 作排列
     for i in range(len(duplicate_info["Amplitudes"])):
         for ii in range(len(duplicate_info["Width"])):

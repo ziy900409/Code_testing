@@ -119,91 +119,113 @@ submit_button.grid(row=6, columnspan=3, pady=20)
 # 開始主事件循環
 root.mainloop()
 
+
+# %%
+def get_all_directories(path):
+    directories = []
+    for root, dirs, files in os.walk(path):
+        for dir_name in dirs:
+            directories.append(os.path.join(root, dir_name))
+    return directories
+
+# 使用範例
+folder_path = params["folder_path"]
+all_directories = get_all_directories(folder_path)
+
+# 列印所有資料夾路徑
+# for directory in all_directories:
+#     print(directory)
+
 # %% 獲得所有資料夾下的檔案路徑
-file_list = func.Read_File(params["folder_path"],
-                           ".csv")
 
-# raw_data = pd.read_csv(r"C:\Users\Hsin.YH.Yang\Desktop\test\DragDropTask-S01-C01-B01-06251017.csv")
-select_cir_radius_ratio = float(params["width_range"])
-
-# 找到路徑下方所有檔案
-# 只記錄包含 DragDropTask 的檔案路徑
-DargDropFile_list = {"path": [],
-                     "filename": [],
-                     'Task': [],
-                     'Subject': [],
-                     'Condition': [],
-                     'Block': [],
-                     'time': []}
-split_list = pd.DataFrame(columns = ['Task', 'Subject', 'Condition', 'Block', 'time'])
-for i in range(len(file_list)):
-    if "DragDropTask" in file_list[i]:
-        print(file_list[i])
-        filepath, tempfilename = os.path.split(file_list[i])
-        filename, extension = os.path.splitext(tempfilename)
-        split_list = pd.DataFrame([filename.split('-') ],
-                                  columns=['Task', 'Subject', 'Condition', 'Block', 'time'])
-        # 將資料儲存到表格
-        DargDropFile_list["path"].append(file_list[i])
-        DargDropFile_list["filename"].append(filename)
-        DargDropFile_list["Task"].append(split_list['Task'][0])
-        DargDropFile_list["Subject"].append(split_list['Subject'][0])
-        DargDropFile_list["Condition"].append(split_list['Condition'][0])
-        DargDropFile_list["Block"].append(split_list['Block'][0])
-        DargDropFile_list["time"].append(split_list['time'][0])
-        
-# %% 批次處理資料 s1d、s3d
 all_sd2_table = pd.DataFrame({},
-                         columns = ["Participant", "Condition", "Block",
-                                    "Trial", "A", "W", "Ae", "We", "IDe(bits)", "PT(ms)",
-                                    "ST(ms)", "MT(ms)", "ER(%)", "TP(bps)", "TRE", "TAC", "MDC",
-                                    "ODC", "MV", "ME", "MO"]
-                         )
+                             columns = ["Participant", "Condition", "Block",
+                                        "Trial", "A", "W", "Ae", "We", "IDe(bits)", "PT(ms)",
+                                        "ST(ms)", "MT(ms)", "ER(%)", "TP(bps)", "TRE", "TAC", "MDC",
+                                        "ODC", "MV", "ME", "MO"]
+                             )
 
-for idx in range(len(DargDropFile_list["path"])):
-    print(DargDropFile_list["path"][idx])
-    raw_data = pd.read_csv(DargDropFile_list["path"][idx])
-    duplicate_info = {}
+for pathpath in all_directories:
+    file_list = func.Read_File(pathpath,
+                               ".csv")
+    
+    # raw_data = pd.read_csv(r"C:\Users\Hsin.YH.Yang\Desktop\test\DragDropTask-S01-C01-B01-06251017.csv")
+    select_cir_radius_ratio = float(params["width_range"])
+    
+    # 找到路徑下方所有檔案
+    # 只記錄包含 DragDropTask 的檔案路徑
+    DargDropFile_list = {"path": [],
+                         "filename": [],
+                         'Task': [],
+                         'Subject': [],
+                         'Condition': [],
+                         'Block': [],
+                         'time': []}
+    split_list = pd.DataFrame(columns = ['Task', 'Subject', 'Condition', 'Block', 'time'])
+    for i in range(len(file_list)):
+        if "DragDropTask" in file_list[i]:
+            print(file_list[i])
+            filepath, tempfilename = os.path.split(file_list[i])
+            filename, extension = os.path.splitext(tempfilename)
+            split_list = pd.DataFrame([filename.split('-') ],
+                                      columns=['Task', 'Subject', 'Condition', 'Block', 'time'])
+            # 將資料儲存到表格
+            DargDropFile_list["path"].append(file_list[i])
+            DargDropFile_list["filename"].append(filename)
+            DargDropFile_list["Task"].append(split_list['Task'][0])
+            DargDropFile_list["Subject"].append(split_list['Subject'][0])
+            DargDropFile_list["Condition"].append(split_list['Condition'][0])
+            DargDropFile_list["Block"].append(split_list['Block'][0])
+            DargDropFile_list["time"].append(split_list['time'][0])
+            
+    # %% 批次處理資料 s1d、s3d
 
-    # 找出每個欄位的重複值及其數量
-    for column in raw_data.columns:
-        duplicated_values = raw_data[column][raw_data[column].duplicated()]
-        if not duplicated_values.empty:
-            duplicate_counts = duplicated_values.value_counts().to_dict()
-            duplicate_info[column] = duplicate_counts
-    # 填入任務參數
-    # 將info.keys轉成list的數值，並依照數值大小作排列
-    trial_info = sorted([int(key) for key in duplicate_info['Trial'].keys()])
-    trial_info.remove(16)
-    amplitude_info = sorted([int(key) for key in duplicate_info["Amplitudes"].keys()])
-    width_info = sorted([int(key) for key in duplicate_info["Width"].keys()])
-    # 初始化資料格式
-    sd1_table, sd2_table, sd3_data_format = func.initial_format()
-    # 將資料處理成 sd3 format
-    sd3_data = func.sd3_formating(duplicate_info, raw_data, sd3_data_format,
-                                  amplitude_info, width_info, trial_info)
-    # 繪製軌跡
-    func.draw_tracjectory(sd3_data, amplitude_info, width_info,
-                          params["folder_path"])
-    # 計算 sd1 table 所需參數
-    sd1_data = func.sd1_formating(sd1_table, sd3_data, select_cir_radius_ratio)
-    # 計算 sd2 table 所需參數, 使用 sd1 table 做計算
-    sd2_data = func.sd2_formating(sd1_table, sd2_table, duplicate_info)
-    # # 將Pandas Series轉換為可序列化的列表
-    func.convert_series_to_list(sd3_data_format)
-    # 將資料結構轉換為 JSON 字串
-    json_str = jsonpickle.encode(sd3_data_format)
-    # 設定 JSON 資料儲存路徑
-    json_path = DargDropFile_list["path"][idx].replace('.csv', '.json')
-    # 將 JSON 字串寫入文件
-    with open(json_path, 'w') as jsonfile:
-        jsonfile.write(json_str)
-    # 將資料寫入 EXCEL
-    sd1_path = DargDropFile_list["path"][idx].replace('.csv', '_sd1.xlsx')
-    sd1_data.to_excel(sd1_path, index=False)
-    # 合併 sd2 table
-    all_sd2_table = pd.concat([all_sd2_table, sd2_data],
-                              ignore_index=True)
+    
+    for idx in range(len(DargDropFile_list["path"])):
+        print(DargDropFile_list["path"][idx])
+        raw_data = pd.read_csv(DargDropFile_list["path"][idx])
+        filepath, _ = os.path.split(DargDropFile_list["path"][idx])
+        duplicate_info = {}
+    
+        # 找出每個欄位的重複值及其數量
+        for column in raw_data.columns:
+            duplicated_values = raw_data[column][raw_data[column].duplicated()]
+            if not duplicated_values.empty:
+                duplicate_counts = duplicated_values.value_counts().to_dict()
+                duplicate_info[column] = duplicate_counts
+        # 填入任務參數
+        # 將info.keys轉成list的數值，並依照數值大小作排列
+        trial_info = sorted([int(key) for key in duplicate_info['Trial'].keys()])
+        trial_info.remove(16)
+        amplitude_info = sorted([int(key) for key in duplicate_info["Amplitudes"].keys()])
+        width_info = sorted([int(key) for key in duplicate_info["Width"].keys()])
+        # 初始化資料格式
+        sd1_table, sd2_table, sd3_data_format = func.initial_format()
+        # 將資料處理成 sd3 format
+        sd3_data = func.sd3_formating(duplicate_info, raw_data, sd3_data_format,
+                                      amplitude_info, width_info, trial_info)
+        # 繪製軌跡
+        func.draw_tracjectory(sd3_data, amplitude_info, width_info,
+                              filepath)
+        # 計算 sd1 table 所需參數
+        sd1_data = func.sd1_formating(sd1_table, sd3_data, select_cir_radius_ratio)
+        # 計算 sd2 table 所需參數, 使用 sd1 table 做計算
+        sd2_data = func.sd2_formating(sd1_table, sd2_table, duplicate_info)
+        # # 將Pandas Series轉換為可序列化的列表
+        func.convert_series_to_list(sd3_data_format)
+        # 將資料結構轉換為 JSON 字串
+        json_str = jsonpickle.encode(sd3_data_format)
+        # 設定 JSON 資料儲存路徑
+        json_path = DargDropFile_list["path"][idx].replace('.csv', '.json')
+        # 將 JSON 字串寫入文件
+        with open(json_path, 'w') as jsonfile:
+            jsonfile.write(json_str)
+        # 將資料寫入 EXCEL
+        sd1_path = DargDropFile_list["path"][idx].replace('.csv', '_sd1.xlsx')
+        sd1_data.to_excel(sd1_path, index=False)
+        # 合併 sd2 table
+        all_sd2_table = pd.concat([all_sd2_table, sd2_data],
+                                  ignore_index=True)
     
 all_sd2_table.to_excel(str(params["folder_path"] + "\\table_sd2_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"),
                        index=False)
