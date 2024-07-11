@@ -13,10 +13,10 @@ matplotlib.use('TkAgg')  # 或者使用 'TkAgg' Qt5Agg
 # %matplotlib qt
 
 # 读取数据
-raw_data = pd.read_csv(r"C:\Users\Hsin.YH.Yang\Downloads\d_1.csv")
+raw_data = pd.read_csv(r"C:\Users\h7058\Downloads\d_1.csv")
 
 # 数据参数
-num_points = 62
+num_points = 63
 num_frames = 1520
 
 # 创建一个空的数据数组
@@ -35,6 +35,9 @@ ax = fig.add_subplot(111, projection='3d')
 # 初始化一个空的散点图
 scatter = ax.scatter([], [], [], c='r', marker='o')
 
+# 初始化不同颜色的点
+highlight_point = ax.scatter([], [], [], c='b', marker='x')
+
 # 设置轴的范围，根据你的数据实际范围调整
 ax.set_xlim(np.min(data[:, :, 0]), np.max(data[:, :, 0]))
 ax.set_ylim(np.min(data[:, :, 1]), np.max(data[:, :, 1]))
@@ -44,10 +47,17 @@ ax.set_zlim(np.min(data[:, :, 2]), np.max(data[:, :, 2]))
 def update(frame):
     # 更新散点图的数据
     scatter._offsets3d = (data[:, frame, 0], data[:, frame, 1], data[:, frame, 2])
-    return scatter,
+    # 设置高亮点的坐标（例如在每一帧中的第一个点）
+    highlight_x = data[-1, frame, 0]
+    highlight_y = data[-1, frame, 1]
+    highlight_z = data[-1, frame, 2]
+    highlight_point._offsets3d = ([highlight_x], [highlight_y], [highlight_z])
+    
+    return scatter, highlight_point
 
 # 创建动画
 ani = FuncAnimation(fig, update, frames=num_frames, interval=50, blit=False)
+
 
 # 显示图形
 plt.show()
