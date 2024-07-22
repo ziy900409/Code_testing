@@ -40,3 +40,35 @@ lowpass_filtered_data = np.zeros(np.shape(abs_data))
 for i in range(np.shape(abs_data)[1]):
     lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data[:,i])
     lowpass_filtered_data[:, i] = lowpass_filtered
+    
+    
+def StoG(sta_frame, dynamic_frame, p, sta_local_o, dy_local_o):
+
+    z_first = np.matmul(sta_frame, (p - sta_local_o).T)
+    a = time_dynamic.shape[0]
+    dy_point_global = np.zeros([a, 3])  # 初始化 z_third
+    for i in range(a):
+        
+        z_second = np.matmul(dynamic_frame[i, :, :].T, z_first)
+        dy_point_global[i, :] = z_second.T + dy_local_o[i, :]
+    return dy_point_global
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

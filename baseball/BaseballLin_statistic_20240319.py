@@ -22,7 +22,7 @@ data_sheet = ["Stage2", "Stage3"]
 
 # %% 1. read staging file
 staging_file = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\motion分期肌電用_20240420.xlsx",
-                             sheet_name='T2_memo3') # 改變要找stage2 or stage3
+                             sheet_name='T1_memo2') # 改變要找stage2 or stage3
 staging_file = staging_file.dropna(axis=0, thresh=14)
 folder_file_list = os.listdir(folder_path)
 all_file_list = []
@@ -78,7 +78,7 @@ for i in range(np.shape(arr_muscle_data)[0]):
         arr_muscle_data[i, :, ii] = muscle_data[ii, :, i]
 
 # 修改儲存檔名
-save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240528.xlsx"
+save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240722.xlsx"
 # save_file_name = r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx"
 # save_file_name = r"D:\BenQ_Project\python\Lin\EMGdata_processing_T1_20240522.xlsx"
 
@@ -120,7 +120,7 @@ plt.rcParams.update(parameters)
 
 # 讀資料
 # data = arr_muscle_data
-excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx")
+excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240722.xlsx")
 
 # 获取所有分页（sheet）的名称
 sheet_names = excel_file.sheet_names
@@ -151,7 +151,7 @@ for i in range(np.shape(data)[0]):
     std1 = np.std(data1, axis=1) # 計算標準差
     r1 = list(map(lambda x: x[0]-x[1], zip(avg1, std1))) # 畫一個標準差以內的線
     r2 = list(map(lambda x: x[0]+x[1], zip(avg1, std1)))
-    axs[x, y].plot(iters, avg1, color=color, label='快轉組', linewidth=3)
+    axs[x, y].plot(iters, avg1, color=color, label='fast', linewidth=3)
     axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2)
     
     # 畫第二條線
@@ -160,7 +160,7 @@ for i in range(np.shape(data)[0]):
     std2 = np.std(data2, axis=1) # 計算標準差
     r1 = list(map(lambda x: x[0]-x[1], zip(avg2, std2))) # 畫一個標準差以內的線
     r2 = list(map(lambda x: x[0]+x[1], zip(avg2, std2)))
-    axs[x, y].plot(iters, avg2, color=color, label='慢轉組', linewidth=3) # 畫平均線
+    axs[x, y].plot(iters, avg2, color=color, label='slow', linewidth=3) # 畫平均線
     axs[x, y].fill_between(iters, r1, r2, color=color, alpha=0.2) # 塗滿一個正負標準差以內的區塊
     # 圖片的格式設定
     axs[x, y].set_title(columns_name[i], fontsize=16)
@@ -172,7 +172,7 @@ for i in range(np.shape(data)[0]):
     axs[x, y].set_xlim(0, 150)
     axs[x, y].axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
     axs[x, y].grid(False)
-plt.suptitle(str("mean std cloud: T1 快轉 VS 慢轉"), fontsize=20)
+plt.suptitle(str("mean std cloud: T1 fast VS slow"), fontsize=20)
 plt.tight_layout()
 fig.add_subplot(111, frameon=False)
 # hide tick and tick label of the big axes
@@ -184,14 +184,14 @@ plt.ylabel("muscle activation (%)", fontsize = 14)
 plt.show()
 # %% spm T1 快轉 VS 慢轉
 import spm1d
-dataset    = spm1d.data.uv1d.t1.Random()
-Y,mu       = dataset.get_data()
-t  = spm1d.stats.ttest(Y, mu)  #mu is 0 by default
-ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
-ti.plot()
+# dataset    = spm1d.data.uv1d.t1.Random()
+# Y,mu       = dataset.get_data()
+# t  = spm1d.stats.ttest(Y, mu)  #mu is 0 by default
+# ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
+# ti.plot()
 
 for name in range(len(sheet_names)):
-  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx",
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240722.xlsx",
                                       sheet_name = sheet_names[name])
 
 for i in range(np.shape(data)[0]):
@@ -208,12 +208,12 @@ for i in range(np.shape(data)[0]):
                             linecolor='r',
                             facecolor=(1,0.7,0.7),
                             edgecolor='r',
-                            label='快轉組')
+                            label='fast')
     spm1d.plot.plot_mean_sd(data2,
                             linecolor='b',
                             facecolor=(0.7,0.7,1),
                             edgecolor='b',
-                            label='慢轉組')
+                            label='slow')
     plt.xlim(0, 150)  # 设置 x 轴范围
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(25))
     plt.legend(loc = "upper left")
@@ -226,6 +226,7 @@ for i in range(np.shape(data)[0]):
     ti.plot()
     plt.suptitle(str(columns_name[i]), fontsize=16)
     x_major_locator = plt.MultipleLocator(25)
+    plt.xlabel("time", fontsize = 14)
     # plt.xaxis.set_major_locator(x_major_locator)
     plt.xlim(0, 150)  # 设置 x 轴范围
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(25))  # 设置 x 轴刻度间隔
@@ -243,7 +244,7 @@ import math
 # read data
 # read sheet name
 # 读取 Excel 文件
-excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx")
+excel_file = pd.ExcelFile(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240722.xlsx")
 
 # 获取所有分页（sheet）的名称
 sheet_names = excel_file.sheet_names
@@ -252,9 +253,9 @@ t1_data = np.zeros([6, 150, len(ture_file_path)])
 t2_data = np.zeros([6, 150, len(ture_file_path)])
 
 for name in range(len(sheet_names)):
-  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240528.xlsx",
+  t1_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T1_20240722.xlsx",
                                       sheet_name = sheet_names[name])
-  t2_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240528.xlsx",
+  t2_data[name, :, :] = pd.read_excel(r"E:\Hsin\NTSU_lab\Baseball\EMGdata_processing_T2_20240722.xlsx",
                                       sheet_name = sheet_names[name])
 # 設定繪圖格式與字體
 plt.style.use('seaborn-white')
@@ -376,6 +377,7 @@ for i in range(np.shape(data)[0]):
     ti = t.inference(alpha=0.05, two_tailed=False, interp=True)
     ti.plot()
     plt.suptitle(str(columns_name[i]), fontsize=16)
+    plt.xlabel("time", fontsize = 14)
     plt.xlim(0, 150)  # 设置 x 轴范围
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(25))  # 设置 x 轴刻度间隔
     plt.tight_layout()

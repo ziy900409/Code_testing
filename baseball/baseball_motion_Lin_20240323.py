@@ -1323,10 +1323,10 @@ ax.set_xlim(0, 150)
 
 
 # ax.plot(x, x**3, label='cubic')  
-plt.xlabel('time')  # Add an x-label to the Axes.
+plt.xlabel('time (%)')  # Add an x-label to the Axes.
 plt.ylabel('deg')  # Add a y-label to the Axes.
 ax.set_title("手指關節角度比較圖")  # Add a title to the Axes.
-plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.6), ncol=2)  # Add a legend.
+plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.7), ncol=2)  # Add a legend.
 
 # %%
 fig, ax = plt.subplots(figsize=(6, 4), layout='constrained')
@@ -1346,10 +1346,10 @@ ax.axvline(x=100, color = 'darkslategray', linewidth=1, linestyle = '--')
 
 
 # ax.plot(x, x**3, label='cubic')  
-plt.xlabel('time')  # Add an x-label to the Axes.
+plt.xlabel('time (%)')  # Add an x-label to the Axes.
 plt.ylabel('deg/s')  # Add a y-label to the Axes.
 ax.set_title("指關節角速度比較圖")  # Add a title to the Axes.
-plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.6), ncol=2)  # Add a legend.
+plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.7), ncol=2)  # Add a legend.
 
 # %% 手指關節角度 T1 VS T2
 # fig, axs = plt.subplots(3, 2, figsize = (10,12), sharex='col')

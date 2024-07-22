@@ -56,7 +56,7 @@ def update(frame):
     return scatter, highlight_point
 
 # 创建动画
-ani = FuncAnimation(fig, update, frames=num_frames, interval=50, blit=False)
+ani = FuncAnimation(fig, update, frames=num_frames, interval=20, blit=False)
 
 
 # 显示图形
