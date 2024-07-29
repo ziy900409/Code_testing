@@ -24,15 +24,19 @@ from datetime import datetime
 # 方向設定
 subject_info = ["受試者", "耳機"]
 direct_columns = ["前","右前","右","右後",
-                  "後","左後","左","左前"]
+                  "後","左後","左","左前",
+                  "L", "M", "R"]
 floor_columns = ["前_2F","前_1F","前_B","右前_2F","右前_1F","右前_B","右_2F","右_1F","右_B",
                   "右後_2F","右後_1F","右後_B","後_2F","後_1F","後_B","左後_2F","左後_1F","左後_B",
-                  "左_2F","左_1F","左_B","左前_2F","左前_1F","左前_B"]
-headset_name = ["耳罩式耳機A", "耳罩式耳機B", "耳罩式耳機C", "耳罩式耳機D", # "耳罩式耳機A_I1",
-                # "入耳式耳機1", "入耳式耳機2", "入耳式耳機3"
+                  "左_2F","左_1F","左_B","左前_2F","左前_1F","左前_B",
+                  "L", "M", "R"]
+headset_name = ["耳罩式耳機A", "耳罩式耳機B", "耳罩式耳機C", # "耳罩式耳機D", # "耳罩式耳機A_I1",
+                "入耳式耳機1", "入耳式耳機2", #"入耳式耳機3",
+                "音效盒1", "音效盒2", "音效盒3", "音效盒4"
                 ]
 # data_path = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\S01_答案.xlsx"
-subject_answer_folder = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\subject_answer\\"
+# subject_answer_folder = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\subject_answer\\"
+subject_answer_folder = r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\subject_answer"
 
 # %%
 def Read_File(file_path, file_type, subfolder=None):
@@ -79,7 +83,12 @@ def Read_File(file_path, file_type, subfolder=None):
         
     return csv_file_list
 # %% read data
-answer_sheet = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案_0506.xlsx")
+# answer_sheet = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案_0506.xlsx")
+
+
+answer_sheet = pd.read_excel(r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\答案_0722.xlsx")
+
+row_num = 20
 
 # read data path
 all_data_path = Read_File(subject_answer_folder,
@@ -178,10 +187,12 @@ for subject in range(len(all_data_path)):
 # 依照欄位編號、方向對答案
 # 再加上受試者編號以及耳機
 for subject in range(len(all_data_path)):
+    print(all_data_path[subject])
     for headset in range(len(headset_name)):
         data_sheet = pd.read_excel(all_data_path[subject],
                                    sheet_name=headset_name[headset])
-        columns_number = subject*6 + headset
+        print(headset_name[headset])
+        columns_number = subject*9 + headset
         print(columns_number)
         direction_answer.loc[columns_number, "受試者"] = data_sheet["受試者"][0]
         direction_answer.loc[columns_number, "耳機"] = headset_name[headset]
@@ -195,16 +206,16 @@ for subject in range(len(all_data_path)):
         direction_answer_noOO.loc[columns_number, "耳機"] = headset_name[headset]
         answer_direction_noOO.loc[columns_number, "受試者"] = data_sheet["受試者"][0]
         answer_direction_noOO.loc[columns_number, "耳機"] = headset_name[headset]
-        for row in range(len(data_sheet)):
+        for row in range(row_num):
             for i in range(len(answer_sheet)):
                 # 對欄位
                 if data_sheet.loc[row, "編號"] == answer_sheet.loc[i, "編號"]:
-                    print(data_sheet.loc[row, "編號"])
+                    # print(data_sheet.loc[row, "編號"])
                     # 對方位
                     for direct in direct_columns:
                         if pd.isna(data_sheet.loc[row, direct]) != pd.isna(answer_sheet.loc[i, direct]):
                             direction_answer.loc[columns_number, direct] = direction_answer.loc[columns_number, direct].values + 1
-                            print(direct)
+                            # print(direct)
                         # 計算正確的欄位數，並除以出現方位數
                         if pd.isna(answer_sheet.loc[i, direct]) == False and\
                             pd.isna(data_sheet.loc[row, direct]) != pd.isna(answer_sheet.loc[i, direct]):
@@ -232,11 +243,11 @@ for subject in range(len(all_data_path)):
     for headset in range(len(headset_name)):
         data_sheet = pd.read_excel(all_data_path[subject],
                                    sheet_name=headset_name[headset])
-        columns_number = subject*6 + headset
+        columns_number = subject*9 + headset
         print(columns_number)
         number_answer.loc[columns_number, "受試者"] = data_sheet["受試者"][0]
         number_answer.loc[columns_number, "耳機"] = headset_name[headset]
-        for row in range(len(data_sheet)):
+        for row in range(row_num):
             for i in range(len(answer_sheet)):
                 # 對欄位
                 if data_sheet.loc[row, "編號"] == answer_sheet.loc[i, "編號"]:
@@ -253,18 +264,21 @@ for subject in range(len(all_data_path)):
     for headset in range(len(headset_name)):
         data_sheet = pd.read_excel(all_data_path[subject],
                                    sheet_name=headset_name[headset])
+        
         print(all_data_path[subject])
-        columns_number = subject*6 + headset
+        print(headset_name[headset])
+        columns_number = subject*9 + headset
         print(columns_number)
         floor_answer.loc[columns_number, "受試者"] = data_sheet["受試者"][0]
         floor_answer.loc[columns_number, "耳機"] = headset_name[headset]
-        for row in range(len(data_sheet)):
+        for row in range(row_num):
             for i in range(len(answer_sheet)):
                 # 對欄位
                 if data_sheet.loc[row, "編號"] == answer_sheet.loc[i, "編號"]:
                     print(data_sheet.loc[row, "編號"])
                     # 對方位
                     for floor in floor_columns:
+                        print(floor)
                         if data_sheet.loc[row, floor] != answer_sheet.loc[i, floor]:
                             # 排除兩個答案都是NAN的問題，如果兩個都是NAN，也算對
                             if pd.notna(data_sheet.loc[row, floor]) and pd.notna(answer_sheet.loc[i, floor]):
@@ -272,7 +286,9 @@ for subject in range(len(all_data_path)):
                                 print(direct)    
 
 # %% 將檔案輸出成 EXCEL
-save_file = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
+# save_file = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
+
+save_file = r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
 
 with pd.ExcelWriter(save_file) as Writer:
     sam_direction_answer.to_excel(Writer, sheet_name="方向對-簡易", index=True)
