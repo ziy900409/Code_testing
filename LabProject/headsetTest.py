@@ -35,8 +35,8 @@ headset_name = ["耳罩式耳機A", "耳罩式耳機B", "耳罩式耳機C", # "�
                 "音效盒1", "音效盒2", "音效盒3", "音效盒4"
                 ]
 # data_path = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\S01_答案.xlsx"
-# subject_answer_folder = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\subject_answer\\"
-subject_answer_folder = r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\subject_answer"
+subject_answer_folder = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\BQC test\answer\\"
+# subject_answer_folder = r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\subject_answer"
 
 # %%
 def Read_File(file_path, file_type, subfolder=None):
@@ -83,12 +83,12 @@ def Read_File(file_path, file_type, subfolder=None):
         
     return csv_file_list
 # %% read data
-# answer_sheet = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案_0506.xlsx")
+answer_sheet = pd.read_excel(r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\BQC test\答案_0722.xlsx")
 
 
-answer_sheet = pd.read_excel(r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\答案_0722.xlsx")
+# answer_sheet = pd.read_excel(r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\答案_0722.xlsx")
 
-row_num = 20
+row_num = 30
 
 # read data path
 all_data_path = Read_File(subject_answer_folder,
@@ -286,9 +286,9 @@ for subject in range(len(all_data_path)):
                                 print(direct)    
 
 # %% 將檔案輸出成 EXCEL
-# save_file = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
+save_file = r"D:\BenQ_Project\01_UR_lab\2024_05 耳機\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
 
-save_file = r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
+# save_file = r"E:\Hsin\BenQ\BQC電競耳機測試答案S1-S5\答案統計_" + datetime.now().strftime('%m%d%H%M') + ".xlsx"
 
 with pd.ExcelWriter(save_file) as Writer:
     sam_direction_answer.to_excel(Writer, sheet_name="方向對-簡易", index=True)
