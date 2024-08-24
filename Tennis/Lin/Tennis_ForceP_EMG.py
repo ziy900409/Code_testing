@@ -127,7 +127,7 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-1] + '_MVC_2.xlsx'
     pd.DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
 
-## code start
+# %% Main code start
 # MVC path
 MVC_path = r'D:\NTSU\TenLab\LinData\tennis EMG+force plate\All in\MVC'
 MVC_folder_list = os.listdir(MVC_path)
