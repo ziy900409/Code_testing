@@ -8,7 +8,7 @@ Created on Fri Aug  9 15:26:06 2024
 # %% import package
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"C:\Users\Public\BenQ\myPyCode\U3")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\U3")
 import U3_Kinematic_function as func
 import U3_Kinematic_calculate as cal
 import U3_Kinematic_PlotFigure as FigPlot
@@ -17,6 +17,7 @@ import U3_Kinematic_processing as pro
 import os
 import numpy as np
 import pandas as pd
+from scipy import signal
 
 from detecta import detect_onset
 import gc
@@ -45,6 +46,175 @@ processing_folder_list = [f for f in os.listdir(processing_folder_path) if not f
 
 # %% 計算 spider
 
+def find_local_minima_with_overlap(data, interval, min_gap, overlap_ratio=0.5):
+    """
+    找到時間序列中的局部最小值，使用有重疊的時間窗口。
+    
+    參數：
+    data - 時間序列資料，應該是列表或numpy陣列。
+    interval - 固定的時間間隔，在這個間隔下搜索局部最小值。
+    min_gap - 兩個局部最小值之間的最小時間間隔（索引差距）。
+    overlap_ratio - 窗口移動的重疊比例，範圍在0到1之間，0表示無重疊，1表示完全重疊。
+    
+    返回：
+    local_minima - 局部最小值的索引列表。
+    """
+    local_minima = []
+    step_size = int(interval * (1 - overlap_ratio))
+    i = 0
+    
+    while i < len(data) - interval:
+        # 在當前區間內找最小值
+        window = data[i:i+interval]
+        local_min_index = np.argmin(window) + i
+        
+        # 檢查最小值間隔
+        if len(local_minima) == 0 or (local_min_index - local_minima[-1]) >= min_gap:
+            local_minima.append(local_min_index)
+        
+        # 更新索引，前進到下一個區間
+        i += step_size
+    
+    return local_minima
+
+# %%
+
+def find_local_minima_with_overlap_latest(data, interval, min_gap, overlap_ratio=0.5):
+    """
+    找到時間序列中的局部最小值，使用有重疊的時間窗口，並保留最新的局部最小值。
+    
+    參數：
+    data - 時間序列資料，應該是列表或numpy陣列。
+    interval - 固定的時間間隔，在這個間隔下搜索局部最小值。
+    min_gap - 兩個局部最小值之間的最小時間間隔（索引差距）。
+    overlap_ratio - 窗口移動的重疊比例，範圍在0到1之間，0表示無重疊，1表示完全重疊。
+    
+    返回：
+    local_minima - 局部最小值的索引列表。
+    """
+    local_minima = []
+    step_size = int(interval * (1 - overlap_ratio))
+    i = 0
+    last_min_index = None
+    
+    while i < len(data) - interval:
+        # 在當前區間內找最小值
+        window = data[i:i+interval]
+        local_min_index = np.argmin(window) + i
+        
+        # 如果已經有上一個最小值且在可接受的間隔內，保留最新的最小值
+        if last_min_index is not None and (local_min_index - last_min_index) < min_gap:
+            if local_min_index > last_min_index:
+                local_minima[-1] = local_min_index
+            # 跳過當前步驟，直接移動到下一個窗口
+            i += step_size
+            continue
+        
+        # 否則，直接添加這個最小值
+        local_minima.append(local_min_index)
+        last_min_index = local_min_index
+        
+        # 更新索引，前進到下一個區間
+        i += step_size
+    
+    return local_minima
+
+# %%
+
+def detrend_time_series(data, method='linear'):
+    """
+    对时间序列数据进行去趋势化，抵消趋势线。
+    
+    参数：
+    data - 时间序列数据，应该是列表或numpy数组。
+    method - 去趋势化方法，可以是 'linear'（线性去趋势化）或 'constant'（去掉平均值）。
+    
+    返回：
+    detrended_data - 去趋势化后的数据。
+    trend - 拟合的趋势线。
+    """
+    if method == 'linear':
+        trend = np.polyfit(np.arange(len(data)), data, 1)  # 线性拟合
+        trend_line = np.polyval(trend, np.arange(len(data)))
+        detrended_data = data - trend_line
+    elif method == 'constant':
+        trend_line = np.mean(data)
+        detrended_data = data - trend_line
+    else:
+        raise ValueError("不支持的方法，请使用 'linear' 或 'constant'")
+    
+    return detrended_data, trend_line
+
+
+# %%
+motion_info, motion_data, analog_info, analog_data, np_motion_data = func.read_c3d(r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\S00\S00_LargeFlick_DAV3_3.c3d")
+
+bandpass_filtered = np.empty(shape=np.shape(np_motion_data))
+bandpass_sos = signal.butter(2, 20/0.802,  btype='lowpass', fs=motion_info["frame_rate"], output='sos')
+for iii in range(np.shape(np_motion_data)[0]):
+    for iiii in range(np.shape(np_motion_data)[2]):
+        bandpass_filtered[iii, :, iiii] = signal.sosfiltfilt(bandpass_sos,
+                                                             np_motion_data[iii, :, iiii])
+
+for i in range(len(motion_info['LABELS'])):
+    if motion_info['LABELS'][i] == 'R.I.Finger3':
+        target_cond = i
+        print(motion_info['LABELS'][i])
+# target_indices = raw_data.index[target_cond].tolist()
+
+# 判斷食指點擊
+
+R_I_Finger3 = np_motion_data[target_cond, 1000:2000, :]
+
+local_minima = find_local_minima_with_overlap_latest(R_I_Finger3[:, 2], 175, 50, overlap_ratio=0.9)
+local_minima_v1 = find_local_minima_with_overlap(R_I_Finger3[:, 2], 175, 50, overlap_ratio=0.9)
+plt.figure()
+plt.plot(range(len(R_I_Finger3[:, 2])), R_I_Finger3[:, 2])
+plt.plot(local_minima, R_I_Finger3[local_minima, 2],
+         'o', ms = 10, mec='r', mfc='none')
+plt.plot(local_minima_v1, R_I_Finger3[local_minima_v1, 2],
+         'o', ms = 15, mec='orange', mfc='none')
+
+
+# %%
+
+# 使用线性去趋势化
+detrended_data, trend_line = detrend_time_series(np_motion_data[target_cond, 1000:-600, 1], method='linear')
+
+# 画出原始数据和去趋势化后的数据
+plt.figure(figsize=(10, 6))
+plt.plot(np_motion_data[target_cond, 1000:-600, 1], label='Original Data')
+plt.plot(trend_line, label='Fitted Trend Line', linestyle='--')
+plt.plot(detrended_data, label='Detrended Data')
+# plt.legend()
+plt.show()
+
+# %%
+
+def vel_cal(data_x, data_y):
+    x = data_x
+    y = data_y
+    out_put = np.zeros(len(x)-1)
+    for i in range(len(out_put)):
+        out_put[i] = np.sqrt((x[i+1] - x[i])**2 + \
+                             (y[i+1] - y[i])**2)
+        
+    return out_put
+
+detect_onset(detrended_data, np.mean(detrended_data), n_above=10, n_below=0, show=True)
+detect_onset(-detrended_data, np.mean(-detrended_data), n_above=10, n_below=0, show=True)
+
+xy_velocity = np.zeros(np.shape(np_motion_data[target_cond, :-1, 0]))
+a = np_motion_data[target_cond, :-1, [0, 1]]
+xy_velocity = vel_cal(bandpass_filtered[target_cond, :-1, 0],
+                      bandpass_filtered[target_cond, :-1, 1])
+
+plt.figure()
+plt.plot(xy_velocity)
+
+detect_onset(xy_velocity[:1500], np.mean(xy_velocity), n_above=10, n_below=0, show=True)
+
+# %%
 '''
 Spider
 1. 找肘與腕關節角度的峰值，無論方向，都找出該峰值點位對應EMG的前後55ms，並計算平均數與最大值
