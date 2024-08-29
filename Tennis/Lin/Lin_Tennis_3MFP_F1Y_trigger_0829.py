@@ -10,6 +10,7 @@ import numpy as np
 from scipy import signal
 import time
 import math
+from datetime import datetime
 
 def Read_File(x, y, subfolder='None'):
     
@@ -124,16 +125,26 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     # writting data to EXCEl file
     find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-2] + '_FindMVC.xlsx'
     pd.DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
+    
+# %% path setting
+# MVC path
+MVC_path = r'E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in'
+Save_motion_path = r'E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\2.Processing_Data'
+motion_folder = r"E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\1.Raw_Data"
+# staging data
+staging_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Lin\pick up\pick up\Tennis_Staging_3m_Lin_20221017.xlsx")
+excel_save = r'E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\3.Statistic\\'
 
-#%% code start
-# # MVC path
-# MVC_path = r'E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in'
-MVC_path = r'D:\BenQ_Project\python\LinLin\All in'
-MVC_folder_list = os.listdir(MVC_path + '\\Raw_Data\\')
+# %% code start
+# 1. MVC processing
+
+
+# MVC_path = r'D:\BenQ_Project\python\LinLin\All in'
+MVC_folder_list = os.listdir(MVC_path + '\\1.Raw_Data\\')
 
 # 處理MVC
 for MVC_folder in MVC_folder_list:
-    path = MVC_path + '\\Raw_Data\\' + MVC_folder + '\\MVC'
+    path = MVC_path + '\\1.Raw_Data\\' + MVC_folder + '\\MVC'
     MVC_list = Read_File(path, '.csv', subfolder=False)
     for data_path in MVC_list:
         print(data_path)
@@ -143,32 +154,30 @@ for MVC_folder in MVC_folder_list:
         filepath, tempfilename = os.path.split(data_path)
         filename, extension = os.path.splitext(tempfilename)
         # rewrite file name
-        file_name = MVC_path + '\\Processing_Data\\' + MVC_folder + '\\MVC\\AfterFiltered\\' + filename + '_lowpass' + '.xlsx'
+        file_name = MVC_path + '\\2.Processing_Data\\' + MVC_folder + '\\MVC\\AfterFiltered\\' + filename + '_lowpass' + '.xlsx'
         # writting data in worksheet
         pd.DataFrame(lowpass_filtered_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
         toc = time.process_time()
         print("Total Time:",toc-tic)
-    Find_path = MVC_path + '\\Processing_Data\\' + MVC_folder + '\\MVC\\AfterFiltered'
-    MVC_save_path = MVC_path + '\\Processing_Data\\' + MVC_folder + "\\MVC"
+    Find_path = MVC_path + '\\2.Processing_Data\\' + MVC_folder + '\\MVC\\AfterFiltered'
+    MVC_save_path = MVC_path + '\\2.Processing_Data\\' + MVC_folder + "\\MVC"
     Find_MVC_max(Find_path, MVC_save_path)
     
-# %%
+# %% 2. motion processing
 # 濾波EMG of motion，並擷取特定區段
-# Save_motion_path = r'E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\Processing_Data'
-# motion_folder = r"E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\Raw_Data"
 
-Save_motion_path = r'D:\BenQ_Project\python\LinLin\All in\2.Processing_Data'
-motion_folder = r"D:\BenQ_Project\python\LinLin\All in\1.Raw_Data"
+
+# Save_motion_path = r'D:\BenQ_Project\python\LinLin\All in\2.Processing_Data'
+# motion_folder = r"D:\BenQ_Project\python\LinLin\All in\1.Raw_Data"
 
 
 motion_folder_list = os.listdir(motion_folder)
-# staging data
-# staging_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Lin\pick up\pick up\Tennis_Staging_3m_Lin_20221017.xlsx")
-staging_data = pd.read_excel("D:\BenQ_Project\python\LinLin\Tennis_Staging_3m_Lin_20221017.xlsx")
+
+# staging_data = pd.read_excel("D:\BenQ_Project\python\LinLin\Tennis_Staging_3m_Lin_20221017.xlsx")
 
 for folder in motion_folder_list:
-    motion_folder_path = motion_folder + '\\' + folder + "\\motion"
-    motion_file_list = Read_File(motion_folder_path, '.csv', subfolder=False)
+    Save_motion_path = motion_folder + '\\' + folder + "\\motion"
+    motion_file_list = Read_File(Save_motion_path, '.csv', subfolder=False)
     # 讀取MVC數據
     MVC_path = Save_motion_path + '\\' + folder + '\\MVC\\' + folder + '_FindMVC.xlsx'
             
@@ -220,17 +229,17 @@ for folder in motion_folder_list:
                 # toc2 = time.process_time()
                 # print("Total Time:",toc2-tic2)
 
-# %%
+# %% 3. data truckcut
 # 設定資料夾位置
-# MVC_max_path = r'D:\2022Tennis data\3MEMG+FP\All in\MVC'                    
-# motion_folder_path = r'E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\2.Processing_Data'
+               
+
 # save_file_path = r'D:\2022Tennis data\3MEMG+FP\All in\processing_motion'
 
-motion_folder_path = r'D:\BenQ_Project\python\LinLin\All in\2.Processing_Data'
-save_file_path = r'D:\BenQ_Project\python\LinLin\All in\3.Statistic'
+# Save_motion_path = r'D:\BenQ_Project\python\LinLin\All in\2.Processing_Data'
+# save_file_path = r'D:\BenQ_Project\python\LinLin\All in\3.Statistic'
 # 資料夾清單
 # MVC_max_folder_list = os.listdir(MVC_max_path)
-motion_folder_list = os.listdir(motion_folder_path)
+motion_folder_list = os.listdir(Save_motion_path)
 
 
 period1_mean_ForcePlate_data = pd.DataFrame({
@@ -242,9 +251,12 @@ period3_mean_ForcePlate_data = pd.DataFrame({
 period4_mean_ForcePlate_data = pd.DataFrame({
                                     })
 
+all_add_emg_statics = pd.DataFrame({
+                                    })
+
 for i in range(len(motion_folder_list)):
     print(motion_folder_list[i])
-    motion_path = motion_folder_path + '\\' + motion_folder_list[i] + '\\motion\\iMVC'
+    motion_path = Save_motion_path + '\\' + motion_folder_list[i] + '\\motion\\iMVC'
     motion_list = Read_File(motion_path,
                             '.xlsx', subfolder=False)
     for iii in motion_list:
@@ -281,8 +293,6 @@ for i in range(len(motion_folder_list)):
                             })
                         # add_max_motion = pd.concat([file_name, max_motion], ignore_index=True, axis= 1)
                         # 找平均值
-                        
-                        
                         # period 1
                         period11_mean_motion = pd.DataFrame([motion_data.iloc[start_time1:int(end_time1/2), :].mean()],
                                                            columns = motion_data.columns)
@@ -324,19 +334,21 @@ for i in range(len(motion_folder_list)):
                         # 合併計算資料
                         add_emg_statics = pd.concat([period11_mean_motion, period12_mean_motion,
                                                      period21_mean_motion, period22_mean_motion
-                                                     ])
+                                                     ], ignore_index=True)
                     
                         
             # 合併資料
+            all_add_emg_statics = pd.concat([all_add_emg_statics, add_emg_statics],
+                                            ignore_index=True)
             # all_max_ForcePlate_data = pd.concat([all_max_ForcePlate_data, add_max_motion], ignore_index=True, axis= 0)
-            period1_mean_ForcePlate_data = pd.concat([period1_mean_ForcePlate_data, Period1_add_mean_motion], ignore_index=True, axis= 0)
-            period2_mean_ForcePlate_data = pd.concat([period2_mean_ForcePlate_data, Period2_add_mean_motion], ignore_index=True, axis= 0)
-            period3_mean_ForcePlate_data = pd.concat([period3_mean_ForcePlate_data, Period3_add_mean_motion], ignore_index=True, axis= 0)
-            period4_mean_ForcePlate_data = pd.concat([period4_mean_ForcePlate_data, Period4_add_mean_motion], ignore_index=True, axis= 0)
+            # period1_mean_ForcePlate_data = pd.concat([period1_mean_ForcePlate_data, Period1_add_mean_motion], ignore_index=True, axis= 0)
+            # period2_mean_ForcePlate_data = pd.concat([period2_mean_ForcePlate_data, Period2_add_mean_motion], ignore_index=True, axis= 0)
+            # period3_mean_ForcePlate_data = pd.concat([period3_mean_ForcePlate_data, Period3_add_mean_motion], ignore_index=True, axis= 0)
+            # period4_mean_ForcePlate_data = pd.concat([period4_mean_ForcePlate_data, Period4_add_mean_motion], ignore_index=True, axis= 0)
 
-# excel_save = r'D:\2022Tennis data\3MEMG+FP\\'
-# with pd.ExcelWriter((excel_save + '3m_EMG.xlsx')) as writer:
-#     pd.DataFrame(period1_mean_ForcePlate_data).to_excel(writer, sheet_name='time1', index=False, header=True) 
+
+with pd.ExcelWriter(str(excel_save + '3m_EMG_' + datetime.now().strftime('%m%d%H%M') + '.xlsx')) as writer:
+    pd.DataFrame(all_add_emg_statics).to_excel(writer, sheet_name='time1', index=False, header=True) 
 #     pd.DataFrame(period2_mean_ForcePlate_data).to_excel(writer, sheet_name='time2', index=False, header=True) 
 #     pd.DataFrame(period3_mean_ForcePlate_data).to_excel(writer, sheet_name='time3', index=False, header=True)
 #     pd.DataFrame(period4_mean_ForcePlate_data).to_excel(writer, sheet_name='time4', index=False, header=True)    
