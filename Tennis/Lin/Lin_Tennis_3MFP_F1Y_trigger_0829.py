@@ -176,8 +176,8 @@ motion_folder_list = os.listdir(motion_folder)
 # staging_data = pd.read_excel("D:\BenQ_Project\python\LinLin\Tennis_Staging_3m_Lin_20221017.xlsx")
 
 for folder in motion_folder_list:
-    Save_motion_path = motion_folder + '\\' + folder + "\\motion"
-    motion_file_list = Read_File(Save_motion_path, '.csv', subfolder=False)
+    motion_path = motion_folder + '\\' + folder + "\\motion"
+    motion_file_list = Read_File(motion_path, '.csv', subfolder=False)
     # 讀取MVC數據
     MVC_path = Save_motion_path + '\\' + folder + '\\MVC\\' + folder + '_FindMVC.xlsx'
             
@@ -262,14 +262,16 @@ for i in range(len(motion_folder_list)):
     for iii in motion_list:
         filepath, tempfilename = os.path.split(iii)
         filename, _ = os.path.splitext(tempfilename)
-        Period1_add_mean_motion = pd.DataFrame({
-            })
-        Period2_add_mean_motion = pd.DataFrame({
-            })
-        Period3_add_mean_motion = pd.DataFrame({
-            })
-        Period4_add_mean_motion = pd.DataFrame({
-            })
+        # Period1_add_mean_motion = pd.DataFrame({
+        #     })
+        # Period2_add_mean_motion = pd.DataFrame({
+        #     })
+        # Period3_add_mean_motion = pd.DataFrame({
+        #     })
+        # Period4_add_mean_motion = pd.DataFrame({
+        #     })
+        # add_emg_statics = pd.DataFrame({
+        #                                     })
         for num in range(len(staging_data['low_file_EMG'])):
             if type(staging_data['EMG_file_name'][num]) == str:
                 stage_file, _ = os.path.splitext(staging_data['EMG_file_name'][num].split('\\')[-1])
@@ -337,9 +339,9 @@ for i in range(len(motion_folder_list)):
                                                      ], ignore_index=True)
                     
                         
-            # 合併資料
-            all_add_emg_statics = pd.concat([all_add_emg_statics, add_emg_statics],
-                                            ignore_index=True)
+                        # 合併資料
+                        all_add_emg_statics = pd.concat([all_add_emg_statics, add_emg_statics],
+                                                        ignore_index=True)
             # all_max_ForcePlate_data = pd.concat([all_max_ForcePlate_data, add_max_motion], ignore_index=True, axis= 0)
             # period1_mean_ForcePlate_data = pd.concat([period1_mean_ForcePlate_data, Period1_add_mean_motion], ignore_index=True, axis= 0)
             # period2_mean_ForcePlate_data = pd.concat([period2_mean_ForcePlate_data, Period2_add_mean_motion], ignore_index=True, axis= 0)
