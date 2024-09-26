@@ -157,6 +157,9 @@ for MVC_folder in MVC_folder_list:
 # Save_motion_path = r'E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\Processing_Data'
 # motion_folder = r"E:\Hsin\NTSU_lab\Lin\pick up\pick up\All in\Raw_Data"
 
+motion_file_list = Read_File(r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\S13",
+                             '.cap', subfolder=False)
+
 Save_motion_path = r'D:\BenQ_Project\python\LinLin\All in\2.Processing_Data'
 motion_folder = r"D:\BenQ_Project\python\LinLin\All in\1.Raw_Data"
 

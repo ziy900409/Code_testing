@@ -530,7 +530,7 @@ def Fourier_plot(raw_data, savepath, filename):
         axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
         axs[x, y].set_ylim(0, 500)
     # 設定整張圖片之參數
-    plt.suptitle(str("FFT Analysis " + filename), fontsize = 16)
+    # plt.suptitle(str("FFT Analysis " + filename), fontsize = 16)
     plt.tight_layout()
     fig.add_subplot(111, frameon=False)
     # hide tick and tick label of the big axes
@@ -538,7 +538,7 @@ def Fourier_plot(raw_data, savepath, filename):
     plt.grid(False)
     plt.xlabel("Frequency (Hz)", fontsize = 14)
     plt.ylabel("Power", fontsize = 14)
-    plt.savefig(save, dpi=200, bbox_inches = "tight")
+    # plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
     
 

@@ -43,6 +43,10 @@ motion_folder_list  = [f for f in os.listdir(motion_folder_path) if not f.starts
 processing_folder_path = motion_path + "\\" + processingData_folder + "\\"
 processing_folder_list = [f for f in os.listdir(processing_folder_path) if not f.startswith('.') \
                           and os.path.isdir(os.path.join(processing_folder_path, f))]
+    
+# %%
+
+x = func.Read_File()
 
 # %% 計算 spider
 
