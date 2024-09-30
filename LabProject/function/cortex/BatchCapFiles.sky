@@ -1,0 +1,66 @@
+' 
+'
+' BatchCapFiles
+'
+' Blank script for processing all captures in the current folder.  This might be to
+' do operations on TRB files, or perhaps generate the HTR files.
+'
+' Files are saved automatically when the capture is saved.  Files go where the 
+' Settings->File Structure panel indicates.
+'
+' Drag operations into the middle section below 
+  
+Sub SkyMain
+
+strInputFolder = swCurDir()
+strInputFilePattern = "*.cap"
+
+strInputFolder = strInputFolder + "\"
+
+strOutputFolder = strInputFolder
+
+strInputQuery = strInputFolder  + strInputFilePattern
+listFiles = Directory(strInputQuery)
+
+For each strFile in listFiles
+
+	' Load CAP
+	strFullFile = strInputFolder + strFile
+	Message ("CAP " + strFullFile)
+	iSuccess = swCapture_Load( strFullFile, False)
+
+	'
+	' Run through each markerset
+	'
+	iMars = swCapture_GetNumberOfMarkersets()
+	for i = 0 to iMars-1 
+		strMars = swCapture_GetMarkersetName(i)
+		Message("    " + cstr(i+1) + "  " + strMars)
+
+		swCapture_SetMainMarkerset(i)
+		
+		'
+		' Place your operations below
+		'
+
+		'
+		' Place your operations above
+		'
+	next
+
+
+	' Save CAP
+	'
+	' Saves everything.  Files are saved where the file structure indicates
+	'
+	swCapture_Save()
+
+	if swCancelled() then
+		Message("Cancelled by user")
+		Exit for
+	end if
+Next
+
+
+
+End Sub

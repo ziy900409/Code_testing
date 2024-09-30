@@ -1,0 +1,43 @@
+Sub SkyMain
+
+	
+	'print current folder path
+	szPath = swCurDir()
+	Message("Current application location is " + szPath)
+	
+	'Displays a folder chooser dialog for the user and returns the users selection
+	strInputFolder = BrowseForFolderByPath(swCurDir())
+	If res <> "" Then
+		Message("Result is " + CStr(res))
+	Else
+		Message("no folder chosen")
+	End If
+	strInputFilePattern = "*.cap"
+
+	strInputFolder = strInputFolder + "\"
+
+	strOutputFolder = strInputFolder
+
+	strInputQuery = strInputFolder  + strInputFilePattern
+	listFiles = Directory(strInputQuery)
+	For each strFile in listFiles
+
+		' Load Capture
+		Message ("Processing " + strFile)
+		iSuccess = swCapture_Load(strFile, 1)
+		If(iSuccess<> 0) Then
+			Message("Error loading: " + strFile)
+		Else
+			' Export forces
+			Dim forcesFile As String = _
+				Left(CStr(strFile), Len(CStr(strFile))-3) + "forces"
+			iSuccess = swExport_Forces_File(forcesFile)
+			If (iSuccess = 0) Then
+		      		Message ("Exported " + forcesFile)
+			Else
+				Message ("Error Exporting " + forceFile)
+			End If
+		End If
+	Next
+	WriteToStatusBarLog("Test Message")
+End Sub

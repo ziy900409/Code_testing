@@ -1,0 +1,73 @@
+Sub SkyMain
+
+	
+	'print current folder path
+	szPath = swCurDir()
+	Message("Current application location is " + szPath)
+	
+	'Displays a folder chooser dialog for the user and returns the users selection
+	strInputFolder = BrowseForFolderByPath(swCurDir())
+	If res <> "" Then
+		Message("Result is " + CStr(res))
+	Else
+		Message("no folder chosen")
+	End If
+	strInputFilePattern = "*.cap"
+
+	strInputFolder = strInputFolder + "\"
+
+	strOutputFolder = strInputFolder
+
+	strInputQuery = strInputFolder  + strInputFilePattern
+	listFiles = Directory(strInputQuery)
+	For each strFile in listFiles
+
+		' Load CAP
+		strFullFile = strInputFolder + strFile
+		Message ("CAP " + strFullFile)
+		iSuccess = swCapture_Load( strFullFile, False)
+		
+		'----Converting .cap to c3d---------------
+		'Couple temp variables
+		Dim iRet As Integer
+		Dim c3dFile As String
+		'Dim captureName As String = swCapture_GetName()
+		
+		'Export a C3D file for the whole capture
+		swExport_C3D_SetExportLabelPrefixOption(0)
+		swExport_C3D_SetExportDescriptionPrefixOption(0)
+		swExport_C3D_SetExportUnnamedOption(0)
+		swExport_C3D_SetExportTimecodeOption(0)
+		swExport_C3D_SetExportAllMarkerSets(1)
+
+		c3dFile = strFullFile.Replace(".cap", ".c3d")
+		iRet = swExport_C3D_File(c3dFile)
+		If (iRet = 0) Then
+			Message("Exported " & c3dFile)
+		Else
+			Message("ERROR Exporting " & c3dFile)
+		End If
+		
+			'Now export one c3d file per markerset
+	    swExport_C3D_SetExportLabelPrefixOption(0)
+		swExport_C3D_SetExportDescriptionPrefixOption(0)
+		swExport_C3D_SetExportUnnamedOption(0)
+		swExport_C3D_SetExportTimecodeOption(0)
+	
+		Dim nMarkerSets As Integer = swCapture_GetNumberOfMarkerSets()
+		For iMarkerSet As Integer = 0 To nMarkerSets - 1
+			Dim markerSetName As String = swCapture_GetMarkerSetName(iMarkerSet)
+			swExport_C3D_SetExportAllMarkerSets(0)            'Reset all to off
+			swExport_C3D_SetExportMarkerSet(markerSetName, 1) 'turn this one back on
+			c3dFile = markerSetName & ".c3d"
+			iRet = swExport_C3D_File(c3dFile)
+			If (iRet = 0) Then
+				Message("Exported " & c3dFile)
+			Else
+				Message("ERROR Exporting " & c3dFile)
+			End If
+
+		Next
+	Next
+	WriteToStatusBarLog("Test Message")
+End Sub
