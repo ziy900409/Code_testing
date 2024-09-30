@@ -9,7 +9,8 @@ Created on Thu Sep 26 13:48:56 2024
 # %% import package
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 import plotFig_function as FigPlot
@@ -102,7 +103,7 @@ for folder_name in cortex_folder:
                     for frame in ind_frame:
                         p1_all.iloc[frame :] = (kincal.transformation_matrix(R_Elbow_Lat.iloc[frame, :].values, UA1.iloc[frame, :].values, UA3.iloc[frame, :].values,
                                                                             R_Elbow_Med.iloc[frame, :].values, np.array([0, 0, 0]),
-                                                                        rotation='GCStoLCS'))
+                                                                            rotation='GCStoLCS'))
                     # 4. 清除不需要的變數
                     del motion_info, motion_data, analog_info, FP_data, R_Elbow_Med, UA1, UA3, np_motion_data
                     gc.collect()

@@ -208,3 +208,45 @@ def open_trc(data_path):
         columns_name = ["Frame", "Time"] + markersxyz
 
     return columns_name
+
+
+def conf95_ellipse(COPxy):
+    """
+    Conf95 Ellipse
+    The Conf95 ellipse can be computed using the assumption that the
+    coordinates of the COP-points will be approximately Gaussian distributed
+    around their mean.
+    
+    Input: COPxy [n frame x 2 (COPx COPy)]
+    Output: Area95 [1x1]. Area of the ellipse
+    """
+    d = np.array(COPxy)
+    m, n = d.shape          # Returns m=rows, n=columns of d
+    mean_d = np.mean(d, axis=0)  # Mean of each column
+    cov_mtx = np.cov(d, rowvar=False)  # Covariance matrix for d
+    eigvals, eigvecs = np.linalg.eig(cov_mtx)  # Eigenvectors and eigenvalues
+    
+    # Semimajor and semiminor axes
+    semimaj = np.array([mean_d, mean_d + 2.45 * np.sqrt(eigvals[0]) * eigvecs[:, 0]])
+    semimin = np.array([mean_d, mean_d + 2.45 * np.sqrt(eigvals[1]) * eigvecs[:, 1]])
+    
+    # Ellipse generation
+    theta = np.linspace(0, 2 * np.pi, 41)
+    ellipse = (2.45 * np.sqrt(eigvals[0]) * np.cos(theta)[:, None] * eigvecs[:, 0] +
+               2.45 * np.sqrt(eigvals[1]) * np.sin(theta)[:, None] * eigvecs[:, 1] +
+               mean_d)
+    
+    # Area of the 95% confidence ellipse
+    Area95 = 5.99 * np.pi * np.sqrt(eigvals[0] * eigvals[1])
+    
+    # Plotting
+    fig, ax = plt.subplots()
+    ax.plot(d[:, 0], d[:, 1], 'k.', label='COP points')  # Scatter plot of COP points
+    ax.plot(semimaj[:, 0], semimaj[:, 1], 'r', linewidth=2, label='Semimajor axis')
+    ax.plot(semimin[:, 0], semimin[:, 1], 'r', linewidth=2, label='Semiminor axis')
+    ax.plot(ellipse[:, 0], ellipse[:, 1], 'g', linewidth=2, label='95% Confidence Ellipse')
+    ax.set_title(f'Area: {Area95:.2f}')
+    ax.legend()
+    plt.show()
+    
+    return Area95, fig

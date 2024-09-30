@@ -391,7 +391,7 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
         data_len = (np.shape(raw_data)[0] - (raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))
         # convert sampling rate to period
         # 計算取樣週期
-        T = 1/freq;
+        T = 1/freq
 
         # ---------------------開始計算 FFT -----------------------------------
         # 1. 先計算 bandpass filter
@@ -461,7 +461,7 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
         N2 = 2**(N.bit_length()-1) #last power of 2
         # convert sampling rate to period 
         # 計算取樣週期
-        T = 1.0/freq;
+        T = 1.0/freq
         N = N2 #truncate array to the last power of 2
         xf = np.linspace(0.0, np.ceil(1.0/(2.0*T)), N//2)
         # print("# caculate Fast Fourier transform")
