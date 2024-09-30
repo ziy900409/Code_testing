@@ -34,8 +34,10 @@ csv_notch_cutoff_4 = [179, 180]
 c3d_notch_cutoff_1 = [49.5, 50.5]
 c3d_notch_cutoff_2 = [99.5, 100.5]
 c3d_notch_cutoff_3 = [149.5, 150.5]
-c3d_notch_cutoff_4 = [249.5, 250.5]
-c3d_notch_cutoff_5 = [349.5, 350.5]
+c3d_notch_cutoff_4 = [199.5, 200.5]
+c3d_notch_cutoff_5 = [249.5, 250.5]
+c3d_notch_cutoff_6 = [299.5, 300.5]
+c3d_notch_cutoff_7 = [349.5, 350.5]
 
 csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
                      'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
@@ -49,26 +51,29 @@ csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
 c3d_recolumns_name = {'ExtRad.IM EMG1': 'Extensor Carpi Radialis',
                      'FleRad.IM EMG2': 'Flexor Carpi Radialis',
                      'Triceps.IM EMG3': 'Triceps Brachii',
-                     'ExtUlnar.IM EMG4': 'Extensor Carpi Ulnaris', 
+                     'Triceps.IM EMG9': 'Triceps Brachii',
+                     'ExtUlnar.IM EMG4': 'Extensor Carpi Ulnaris',
+                     'ExtUlnar A.IM EMG4': 'Extensor Carpi Ulnaris',
                      'DorInter_1st.IM EMG5': '1st Dorsal Interosseous', 
                      'AbdDigMin.IM EMG6': 'Abductor Digiti Quinti', 
                      'ExtInd.IM EMG7': 'Extensor Indicis',
                      'Biceps.IM EMG8': 'Biceps Brachii'}
 
-c3d_analog_cha = ['ExtRad.IM EMG1', 'FleRad.IM EMG2', 'Triceps.IM EMG3', 'ExtUlnar.IM EMG4',
-                  'DorInter_1st.IM EMG5', 'AbdDigMin.IM EMG6',  'ExtInd.IM EMG7', 'Biceps.IM EMG8']
+c3d_analog_cha = ['ExtRad.IM EMG1', 'FleRad.IM EMG2', 'ExtUlnar.IM EMG4', 'ExtUlnar A.IM EMG4'
+                  'DorInter_1st.IM EMG5', 'AbdDigMin.IM EMG6',  'ExtInd.IM EMG7', 'Biceps.IM EMG8',
+                  'Triceps.IM EMG9']
 
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
                'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
 
-csv_recolumns_name = {}
+# csv_recolumns_name = {}
 
-c3d_recolumns_name = {}
+# c3d_recolumns_name = {}
 
-c3d_analog_cha = []
+# c3d_analog_cha = []
 
-c3d_analog_idx = []
+# c3d_analog_idx = []
 
 # %% EMG data processing
 def EMG_processing(raw_data_path, smoothing="lowpass"):
@@ -108,20 +113,31 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
     # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\raw_data\S5\MVC\S5_AbdDigMin_MVC.c3d"
     # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\S01\MVC\S01_MVC_Rep_2.1.csv"
     # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_07 non-symmetry\\\\2.EMG\\S21\\S21_Triceps_MVC_Rep_2.129.csv'
+    raw_data_path = r'D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\1.motion\Vicon\S10\S10_AbdDigMin_MVC.c3d'
     if '.csv' in raw_data_path:
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:
         c = ezc3d.c3d(raw_data_path)
         # 3. convert c3d analog data to DataFrame format
-        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, c3d_analog_idx, :]),
-                                   columns=c3d_analog_cha)
+        raw_data_header = c['parameters']['ANALOG']['LABELS']
+        raw_header_index = []
+        c3d_header_all = []
+        for c3d_header in c3d_recolumns_name:
+            for i in range(len(raw_data_header['value'])):
+                if c3d_header in raw_data_header['value'][i]:
+                    raw_header_index.append(i)
+                    c3d_header_all.append(raw_data_header['value'][i])
+                    
+        # 3. convert c3d analog data to DataFrame format
+        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, raw_header_index, :]),
+                                columns=c3d_header_all)
         ## 3.3 insert time frame
         ### 3.3.1 create time frame
         analog_time = np.linspace(
             0, # start
             ((c['header']['analogs']['last_frame'])/c['header']['analogs']['frame_rate']), # stop = last_frame/frame_rate
             num = (np.shape(c['data']['analogs'])[-1]) # num = last_frame
-            )
+                                    )
         raw_data.insert(0, 'Frame', analog_time)
     
     # 1.  -------------前處理---------------------------
@@ -173,6 +189,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
         Fs = c['header']['analogs']['frame_rate']
         data_len = np.shape(raw_data)[0]
         min_stop_time = c['header']['analogs']['last_frame']/Fs
+        downsample_len = data_len / Fs * down_freq
     # 計算各採樣頻率與計算downsample所需的位點數，並取最小的位點數
     # 1.3.-------------創建儲存EMG data的矩陣------------
     # bandpass filter used in signal
@@ -263,8 +280,15 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
                                                 notch_filtered_3)
             notch_sos_5 = signal.butter(2, c3d_notch_cutoff_5, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_5,
+            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
                                                 notch_filtered_4)
+            notch_sos_6 = signal.butter(2, c3d_notch_cutoff_6, btype='bandstop', fs=Fs, output='sos')
+            notch_filtered_6 = signal.sosfiltfilt(notch_sos_6,
+                                                notch_filtered_5)
+            notch_sos_7 = signal.butter(2, c3d_notch_cutoff_7, btype='bandstop', fs=Fs, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_7,
+                                                notch_filtered_6)
+  
             # 取絕對值，將訊號翻正
             abs_data = abs(notch_filtered)
             # ------linear envelop analysis-----------                          
@@ -276,12 +300,14 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
         
         # 2.3.------resample data to 1000Hz-----------
         # 降採樣資料，並將資料儲存在矩陣當中
-        notch_filtered = signal.resample(notch_filtered, int(data_len[col]/decimation_factor))
+        if type(data_len) != int:
+            data_len = data_len[col]
+        notch_filtered = signal.resample(notch_filtered, int(data_len/decimation_factor))
         notch_filtered_data.iloc[:, col] = notch_filtered[:int(downsample_len)]
-        bandpass_filtered = signal.resample(bandpass_filtered, int(data_len[col]//decimation_factor))
+        bandpass_filtered = signal.resample(bandpass_filtered, int(data_len//decimation_factor))
         bandpass_filtered_data.iloc[:, col] = bandpass_filtered[:int(downsample_len)]
-        abs_data = signal.resample(abs_data, int(data_len[col]//decimation_factor))
-        lowpass_filtered = signal.resample(lowpass_filtered, int(data_len[col]//decimation_factor))
+        abs_data = signal.resample(abs_data, int(data_len//decimation_factor))
+        lowpass_filtered = signal.resample(lowpass_filtered, int(data_len//decimation_factor))
         lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:int(downsample_len)]
         # -------Data smoothing. Compute Moving mean
         # window width = window length(second)*sampling rate
@@ -333,14 +359,15 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
 def Find_MVC_max(MVC_folder, MVC_save_path):
     # MVC_folder = r'D:\\BenQ_Project\\python\\Archery\\202405\\202405\\202405\\\\\\EMG\\\\Processing_Data\\Method_1\\R01\\data\\\\MVC\\'
     
-    # MVC_save_path = r'D:\\BenQ_Project\\python\\Archery\\202405\\202405\\202405\\\\\\EMG\\\\Processing_Data\\Method_2\\R08\\'
+    # MVC_folder = r'D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\4.process_data\S11\2.emg\2.MVC\\'
     MVC_file_list = os.listdir(MVC_folder)
-    MVC_data = pd.read_excel(MVC_folder + '\\' + MVC_file_list[0], engine='openpyxl')
+    filted_file_list = [file for file in MVC_file_list if '.xlsx' in file]
+    MVC_data = pd.read_excel(MVC_folder + '\\' + filted_file_list[0], engine='openpyxl')
     find_max_all = []
     Columns_name = MVC_data.columns
     Columns_name = Columns_name.insert(0, 'FileName')
     find_max_all = pd.DataFrame(find_max_all, columns=Columns_name)
-    for i in MVC_file_list:
+    for i in filted_file_list:
         MVC_file_path = MVC_folder + '\\' + i
         MVC_data = pd.read_excel(MVC_file_path)
         find_max = MVC_data.max(axis=0)
@@ -357,7 +384,7 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     # find_max_all = find_max_all.append(MVC_max)
     find_max_all = pd.concat([find_max_all, MVC_max], axis=0, ignore_index=True)
     # writting data to EXCEl file
-    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-2] + '_all_MVC.xlsx'
+    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-3] + '_all_MVC.xlsx'
     pd.DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
 
 # %% 傅立葉轉換與畫圖
@@ -381,15 +408,24 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
 
     1. 新增可以處理 c3d 的方法
     '''
-    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\raw_data\S01\S01_GridShot_Rep_2.1.csv"
+    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\1.motion\Vicon\S08\S08_AbdDigMin_MVC.c3d"
     
     if '.csv' in raw_data_path:
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:
         c = ezc3d.c3d(raw_data_path)
+        raw_data_header = c['parameters']['ANALOG']['LABELS']
+        raw_header_index = []
+        c3d_header_all = []
+        for c3d_header in c3d_recolumns_name:
+            for i in range(len(raw_data_header['value'])):
+                if c3d_header in raw_data_header['value'][i]:
+                    raw_header_index.append(i)
+                    c3d_header_all.append(raw_data_header['value'][i])
+                    
         # 3. convert c3d analog data to DataFrame format
-        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, c3d_analog_idx, :]),
-                                columns=c3d_analog_cha)
+        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, raw_header_index, :]),
+                                columns=c3d_header_all)
         ## 3.3 insert time frame
         ### 3.3.1 create time frame
         analog_time = np.linspace(
@@ -480,7 +516,7 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
                 notch_filtered = signal.sosfiltfilt(notch_sos_4,
                                                     notch_filtered_3)
             elif '.c3d' in raw_data_path:
-                print(0)
+                # print(0)
                 notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
                 notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
                                                     bandpass_filtered)
@@ -507,7 +543,7 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
         N2 = 2**(N.bit_length()-1) #last power of 2
         # convert sampling rate to period 
         # 計算取樣週期
-        T = 1.0/freq
+        T = 1.0/freq;
         N = N2 #truncate array to the last power of 2
         xf = np.linspace(0.0, np.ceil(1.0/(2.0*T)), N//2)
         # print("# caculate Fast Fourier transform")
@@ -595,9 +631,18 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:
         c = ezc3d.c3d(raw_data_path)
+        raw_data_header = c['parameters']['ANALOG']['LABELS']
+        raw_header_index = []
+        c3d_header_all = []
+        for c3d_header in c3d_recolumns_name:
+            for i in range(len(raw_data_header['value'])):
+                if c3d_header in raw_data_header['value'][i]:
+                    raw_header_index.append(i)
+                    c3d_header_all.append(raw_data_header['value'][i])
+                    
         # 3. convert c3d analog data to DataFrame format
-        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, c3d_analog_idx, :]),
-                                   columns=c3d_analog_cha)
+        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, raw_header_index, :]),
+                                columns=c3d_header_all)
         ## 3.3 insert time frame
         ### 3.3.1 create time frame
         analog_time = np.linspace(
@@ -801,7 +846,7 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
 
 # %%EMG 資料繪圖
 def plot_plot(data, savepath, filename, filter_type):
-    save = savepath + '\\' + filter_type + filename + ".jpg"
+    save = savepath + '\\' + filename + filter_type + ".jpg"
     n = int(math.ceil((np.shape(data)[1] - 1) /2))
     plt.figure(figsize=(2*n+1,10))
     fig, axs = plt.subplots(n, 2, figsize = (10,12), sharex='col')

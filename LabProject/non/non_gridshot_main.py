@@ -34,13 +34,13 @@ subfolder = "2.LargeFlick\\"
 motion_type = ["Cortex\\", "Vicon\\"]
 
 cortex_folder = ["S11", "S12", "S13", "S14", "S15",
-                 "S16", "S17", "S18", "S19", #"S20",
+                 "S16", "S17", "S18", "S19", "S20",
                  "S21"]
 
 vicon_folder = ["S03", " S04"]
 
 RawData_folder = ""
-processingData_folder = "4.process_data"
+processingData_folder = "4.process_data\\"
 save_place = "4.GridShot\\"
 
 motion_folder_path = folder_path + motion_folder
@@ -102,6 +102,7 @@ joint_threshold = 0.5
 
 # %% cortex version
 all_dis_data = pd.DataFrame({}, columns = ['mouse'])
+all_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse']+ muscle_name)
 # 在不同的受試者資料夾下執行
 for folder_name in cortex_folder:
     # 讀資料夾下的 c3d file
@@ -142,13 +143,19 @@ for folder_name in cortex_folder:
                     print(c3d_list[num])
                     index = 1
                     static_ArmCoord, static_ForearmCoord, static_HandCoord = kincal.arm_natural_pos(c3d_list[num], p1_all, index)
-    # 第二次loop先計算Gridshot的問題
+    
+    # 讀取all MVC data
+    MVC_value = pd.read_excel(processing_folder_path + '\\' + folder_name + '\\2.emg\\' + folder_name + '_all_MVC.xlsx')
+    MVC_value = MVC_value.iloc[-1, 2:]
+    # 讀取分期檔
+    stage_file = pd.read_excel(stage_file_path, sheet_name=folder_name)
+    # 第二次loop計算Gridshot的問題
     grid_shot_file_list = [file for file in c3d_list if 'GridShot' in file]
     for num in range(len(grid_shot_file_list)):
         print(grid_shot_file_list[num])
         # 0. 處理檔名問題------------------------------------------------------
         save_name, extension = os.path.splitext(grid_shot_file_list[num].split('\\', -1)[-1])
-        fig_svae_path = folder_path + processingData_folder + folder_name + "\\" + \
+        fig_save_path = folder_path + processingData_folder + folder_name + "\\" + \
             "motion\\" + save_place
         data_svae_path = folder_path + processingData_folder + folder_name + "\\" + \
             "motion\\" + save_place
@@ -158,6 +165,12 @@ for folder_name in cortex_folder:
         filename, extension = os.path.splitext(tempfilename)
         # 定義受試者編號以及滑鼠名稱
         trial_info = filename.split("_")
+        
+        trial_info = {"file_name": filename,
+                      "subject": trial_info[0],
+                      "task": trial_info[1],
+                      "mouse": trial_info[2],
+                      "trial_num": trial_info[3]}
         # 1. 讀取資料與初步處理-------------------------------------------------
         # 讀取 c3d data
         motion_info, motion_data, analog_info, analog_data, np_motion_data = func.read_c3d(grid_shot_file_list[num])
@@ -187,7 +200,8 @@ for folder_name in cortex_folder:
                     filted_motion.loc[oneset_idx:, ['R.M.Finger1_x', 'R.M.Finger1_y', 'R.M.Finger1_z']].values
             
         COPxy = mouse_mean[:, :2] - mouse_mean[0, :2]
-        Area95, fig = func.conf95_ellipse(COPxy)                    
+        Area95, fig = func.conf95_ellipse(COPxy)
+        fig.savefig()                 
 
         # # 計算 mouse_mean 與 R.M.Finger1 的距離
         # dis_mouse_MFinger = np.sqrt((mouse_mean[:, 0] - filted_motion.loc[oneset_idx:, 'R.M.Finger1_x'])**2 + \
@@ -196,18 +210,74 @@ for folder_name in cortex_folder:
         
         # 3. 儲存資料-----------------------------------------------------------
         # 將資料儲存至矩陣
-        add_data = pd.DataFrame({"file_name": filename,
-                                 "subject": trial_info[0],
-                                 "task": trial_info[1],
-                                 "mouse": trial_info[2],
-                                 "min_dis": np.min(dis_mouse_MFinger),
-                                 "max_dis": np.max(dis_mouse_MFinger),
-                                 'std_dis': np.std(dis_mouse_MFinger),
-                                 "mean_dis": np.mean(dis_mouse_MFinger)
-                                 },
-                                index=[0])
-        all_dis_data = pd.concat([add_data, all_dis_data],
-                                 ignore_index=True)
+        # add_data = pd.DataFrame({"file_name": filename,
+        #                          "subject": trial_info[0],
+        #                          "task": trial_info[1],
+        #                          "mouse": trial_info[2],
+        #                          "min_dis": np.min(dis_mouse_MFinger),
+        #                          "max_dis": np.max(dis_mouse_MFinger),
+        #                          'std_dis': np.std(dis_mouse_MFinger),
+        #                          "mean_dis": np.mean(dis_mouse_MFinger)
+        #                          },
+        #                         index=[0])
+        # all_dis_data = pd.concat([add_data, all_dis_data],
+        #                          ignore_index=True)
+        
+        # 疲勞分析
+        # 處理 .csv 檔案
+        if ".csv" in grid_shot_file_list[ii]:
+            print(data_svae_path + save_name + "_MedFreq.xlsx")
+            # 處理檔名及定義路徑
+            
+            
+            # 找分期檔中的檔名
+            for iii in range(np.shape(stage_file)[0]):
+                if save_name in str(stage_file.loc[iii, 'EMG_File']):
+                    # print(stage_file.loc[iii, 'EMG_File'])
+                    mouse_name = stage_file.loc[iii, 'Mouse']
+                    break
+            # 將檔名加上滑鼠名稱
+            save_name = save_name + "_" + mouse_name
+        elif ".c3d" in grid_shot_file_list[ii]:
+            save_name = save_name
+        # 前處理EMG data
+        processing_data, bandpass_filtered_data = emg.EMG_processing(grid_shot_file_list[ii], smoothing=smoothing)
+        # 畫 bandpass 後之資料圖
+        emg.plot_plot(bandpass_filtered_data, str(fig_svae_path),
+                      filename, "_Bandpass")
+        # 畫smoothing 後之資料圖
+        emg.plot_plot(processing_data, str(fig_svae_path),
+                      filename, str(smoothing + "_"))
+        # writting data in worksheet
+        file_name = processing_folder_path + '\\' + rowdata_folder_list[i] + '\\' + MVC_folder + "\\data\\" + filename + end_name + ".xlsx"
+        pd.DataFrame(processing_data).to_excel(data_svae_path + save_name + "_lowpass.xlsx",
+                                               sheet_name='Sheet1', index=False, header=True)
+        # 計算 iMVC
+        emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
+                                columns=processing_data.columns)
+        emg_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
+        emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
+                                         MVC_value.values)*100
+        
+        pd.DataFrame(emg_iMVC).to_excel(data_svae_path + save_name + "_iMVC.xlsx",
+                                        sheet_name='Sheet1', index=False, header=True)
+        # 進行中頻率分析
+        med_freq_data, slope_data = emg.median_frquency(grid_shot_file_list[ii],
+                                                        duration, fig_svae_path, save_name)
+        # 儲存斜率的資料，並合併成一個資料表
+        slope_data['mouse'] = [mouse_name]
+        slope_data['data_name'] = [save_name]
+        all_slope_data = pd.concat([all_slope_data, slope_data])
+        
+        
+        
+        
+        
+        
+        
+all_slope_data.to_excel(static_folder + "MedFreq_Static.xlsx")
+        
+        
         
 path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\5. Statistics\\"
 file_name = "GridShot_distance_statistic_" + formatted_date + ".xlsx"

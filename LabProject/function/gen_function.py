@@ -9,7 +9,7 @@ import math
 import logging
 import csv
 
-
+import matplotlib.pyplot as plt
 # %% read c3d
 def read_c3d(path):
     """
@@ -250,3 +250,15 @@ def conf95_ellipse(COPxy):
     plt.show()
     
     return Area95, fig
+
+
+
+
+
+
+
+
+
+
+
+
