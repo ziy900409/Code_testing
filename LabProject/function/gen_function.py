@@ -210,7 +210,7 @@ def open_trc(data_path):
     return columns_name
 
 
-def conf95_ellipse(COPxy):
+def conf95_ellipse(COPxy, filename):
     """
     Conf95 Ellipse
     The Conf95 ellipse can be computed using the assumption that the
@@ -245,7 +245,7 @@ def conf95_ellipse(COPxy):
     ax.plot(semimaj[:, 0], semimaj[:, 1], 'r', linewidth=2, label='Semimajor axis')
     ax.plot(semimin[:, 0], semimin[:, 1], 'r', linewidth=2, label='Semiminor axis')
     ax.plot(ellipse[:, 0], ellipse[:, 1], 'g', linewidth=2, label='95% Confidence Ellipse')
-    ax.set_title(f'Area: {Area95:.2f}')
+    ax.set_title(str(filename + f' Area: {Area95:.2f}'))
     ax.legend()
     plt.show()
     

@@ -29,7 +29,9 @@ overlap_len = 0.5 # 百分比 (%)
 csv_notch_cutoff_1 = [59, 61]
 csv_notch_cutoff_2 = [295.5, 296.5]
 csv_notch_cutoff_3 = [369.5, 370.5]
-csv_notch_cutoff_4 = [179, 180]
+csv_notch_cutoff_4 = [179, 181]
+csv_notch_cutoff_5 = [299, 301]
+csv_notch_cutoff_6 = [419, 421]
 
 c3d_notch_cutoff_1 = [49.5, 50.5]
 c3d_notch_cutoff_2 = [99.5, 100.5]
@@ -113,7 +115,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
     # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\raw_data\S5\MVC\S5_AbdDigMin_MVC.c3d"
     # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\S01\MVC\S01_MVC_Rep_2.1.csv"
     # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_07 non-symmetry\\\\2.EMG\\S21\\S21_Triceps_MVC_Rep_2.129.csv'
-    raw_data_path = r'D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\1.motion\Vicon\S10\S10_AbdDigMin_MVC.c3d'
+    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\2.EMG\S12\S12_GridShot_Rep_2.1.csv"
     if '.csv' in raw_data_path:
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:
@@ -184,7 +186,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             min_stop_time = np.min([x for x in all_stop_time if math.isnan(x) == False])
         # data_len = min(data_len)
         Fs = min(Fs)
-        downsample_len = min(downsample_len)
+        downsample_len = math.floor(min(downsample_len))
     elif '.c3d' in raw_data_path:
         Fs = c['header']['analogs']['frame_rate']
         data_len = np.shape(raw_data)[0]
@@ -193,11 +195,11 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
     # 計算各採樣頻率與計算downsample所需的位點數，並取最小的位點數
     # 1.3.-------------創建儲存EMG data的矩陣------------
     # bandpass filter used in signal
-    bandpass_filtered_data = pd.DataFrame(np.zeros([int(downsample_len), len(num_columns)]),
+    bandpass_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
                             columns=raw_data.iloc[:, num_columns].columns)
-    notch_filtered_data = pd.DataFrame(np.zeros([int(downsample_len), len(num_columns)]),
+    notch_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
                             columns=raw_data.iloc[:, num_columns].columns)
-    lowpass_filtered_data = pd.DataFrame(np.zeros([int(downsample_len), len(num_columns)]),
+    lowpass_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
                             columns=raw_data.iloc[:, num_columns].columns)
     # 設定 moving mean 的矩陣大小、欄位名稱
     '''
@@ -218,21 +220,23 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
                                         - np.array(raw_data.iloc[1:10, (num_columns[col] - 1)]))
             decimation_factor = sample_freq / down_freq
             # 在raw data中以最短的數據長短為標準，只取最短數據的資料找其中是否包含NAN
-            isnan = np.where(np.isnan(raw_data.iloc[:(np.shape(raw_data)[0] - min(data_len)), num_columns[col]]))
+            if type(data_len) != int:
+                indi_data_len = data_len[col]
+            isnan = np.where(np.isnan(raw_data.iloc[:(np.shape(raw_data)[0] - (indi_data_len)), num_columns[col]]))
             # 預處理資料,判斷資料中是否有 nan, 並將 nan 取代為 0 
             if isnan[0].size == 0:
             # 計算Bandpass filter
-                # data = raw_data.iloc[:(np.shape(raw_data)[0] - data_len), num_columns[col]].values
+                # data = raw_data.iloc[:(np.shape(raw_data)[0] - indi_data_len), num_columns[col]].values
                 data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].values
             # 設定給斷訊超過 0.1 秒的 sensor 警告
             elif isnan[0].size > 0.1*sample_freq:
                 logging.warning(str(raw_data.columns[num_columns[col]] + "sensor 總訊號斷訊超過 0.1 秒，"))
-                # data = raw_data.iloc[:(np.shape(raw_data)[0] - data_len), num_columns[col]].values
+                # data = raw_data.iloc[:(np.shape(raw_data)[0] - indi_data_len), num_columns[col]].values
                 data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].values
             else:
                 logging.warning(str("共發現 " + str(isnan[0].size) + " 個缺值,位置為 " + str(isnan[0])))
                 logging.warning("已將 NAN 換為 0")
-                # data = raw_data.iloc[:(np.shape(raw_data)[0] - data_len), num_columns[col]].fillna(0)
+                # data = raw_data.iloc[:(np.shape(raw_data)[0] - indi_data_len), num_columns[col]].fillna(0)
                 data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].fillna(0)
             # 由於各截止時間不同，所以找出最小的截止時間，並將其他較長時間的 sensor，都截成短的
             # 找出最小的時間，並且找出所有欄位數據中最接近的索引值
@@ -252,8 +256,14 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
                                                 notch_filtered_2)
             notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_4,
+            notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
                                                 notch_filtered_3)
+            notch_sos_5 = signal.butter(2, csv_notch_cutoff_5, btype='bandstop', fs=sample_freq, output='sos')
+            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
+                                                notch_filtered_4)
+            notch_sos_6 = signal.butter(2, csv_notch_cutoff_6, btype='bandstop', fs=sample_freq, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_6,
+                                                notch_filtered_5)
             # 取絕對值，將訊號翻正
             abs_data = abs(notch_filtered)
             # ------linear envelop analysis-----------                          
@@ -300,15 +310,14 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
         
         # 2.3.------resample data to 1000Hz-----------
         # 降採樣資料，並將資料儲存在矩陣當中
-        if type(data_len) != int:
-            data_len = data_len[col]
-        notch_filtered = signal.resample(notch_filtered, int(data_len/decimation_factor))
-        notch_filtered_data.iloc[:, col] = notch_filtered[:int(downsample_len)]
-        bandpass_filtered = signal.resample(bandpass_filtered, int(data_len//decimation_factor))
-        bandpass_filtered_data.iloc[:, col] = bandpass_filtered[:int(downsample_len)]
-        abs_data = signal.resample(abs_data, int(data_len//decimation_factor))
-        lowpass_filtered = signal.resample(lowpass_filtered, int(data_len//decimation_factor))
-        lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:int(downsample_len)]
+        
+        notch_filtered = signal.resample(notch_filtered, downsample_len)
+        notch_filtered_data.iloc[:, col] = notch_filtered[:downsample_len]
+        bandpass_filtered = signal.resample(bandpass_filtered, downsample_len)
+        bandpass_filtered_data.iloc[:, col] = bandpass_filtered[:downsample_len]
+        abs_data = signal.resample(abs_data, downsample_len)
+        lowpass_filtered = signal.resample(lowpass_filtered, downsample_len)
+        lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:downsample_len]
         # -------Data smoothing. Compute Moving mean
         # window width = window length(second)*sampling rate
         '''
@@ -482,21 +491,21 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
         # 計算Bandpass filter
             # b, a = signal.butter(2, 20,  btype='high', fs=freq)
             # bandpass_filtered = signal.filtfilt(b, a, raw_data.iloc[:data_len, num_columns[col]].values)
-            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            bandpass_sos = signal.butter(4, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
                                                     raw_data.iloc[:data_len, num_columns[col]].values)
 
         # 設定給斷訊超過 0.1 秒的 sensor 警告
         elif isnan[0].size > 0.1*freq:
             logging.warning(str(raw_data.columns[num_columns[col]] + "sensor 總訊號斷訊超過 0.1 秒，"))
-            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            bandpass_sos = signal.butter(4, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
                                                    raw_data.iloc[:(np.shape(raw_data)[0] - data_len[col]), num_columns[col]].values)
 
         else:
             logging.warning(str("共發現 " + str(isnan[0].size) + " 個缺值,位置為 " + str(isnan[0])))
             logging.warning("已將 NAN 換為 0")
-            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
+            bandpass_sos = signal.butter(4, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos,
                                                    raw_data.iloc[:data_len, num_columns[col]].fillna(0))
         # -----------------是否需要 notch data----------------------------------
@@ -513,8 +522,14 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
                 notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
                                                     notch_filtered_2)
                 notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
-                notch_filtered = signal.sosfiltfilt(notch_sos_4,
+                notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
                                                     notch_filtered_3)
+                notch_sos_5 = signal.butter(2, csv_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
+                                                    notch_filtered_4)
+                notch_sos_6 = signal.butter(2, csv_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos_6,
+                                                    notch_filtered_5)
             elif '.c3d' in raw_data_path:
                 # print(0)
                 notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
@@ -530,8 +545,14 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
                 notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
                                                     notch_filtered_3)
                 notch_sos_5 = signal.butter(2, c3d_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
-                notch_filtered = signal.sosfiltfilt(notch_sos_5,
+                notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
                                                     notch_filtered_4)
+                notch_sos_6 = signal.butter(2, c3d_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
+                notch_filtered_6 = signal.sosfiltfilt(notch_sos_6,
+                                                    notch_filtered_5)
+                notch_sos_7 = signal.butter(2, c3d_notch_cutoff_7, btype='bandstop', fs=freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos_7,
+                                                    notch_filtered_6)
             fft_data = notch_filtered
         else:
             # print(1)
@@ -623,7 +644,7 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
     參考資料 :
         1. https://dsp.stackexchange.com/questions/85683/how-to-find-median-frequency-of-binned-signal-fft
     """
-    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\raw_data\S01\S01_GridShot_Rep_2.1.csv"
+    # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_07 non-symmetry\\\\2.EMG\\S11\\S11_GridShot_Rep_5.109.csv'
     # 創建資料處存位置
     slope_data = pd.DataFrame({}, columns = muscle_name)
     # 判斷檔名
@@ -691,12 +712,12 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
             all_stop_time.remove(min_stop_time)
             data_len.remove(min(data_len))
             min_stop_time = np.min([x for x in all_stop_time if math.isnan(x) == False])
-        data_len = min(data_len)
+        # data_len = min(data_len)
         Fs = min(Fs)
     elif '.c3d' in raw_data_path:
         Fs = c['header']['analogs']['frame_rate']
         data_len = np.shape(raw_data)[0]
-    median_freq_table = pd.DataFrame(np.zeros([int(np.ceil((data_len)/((Fs)*duration))), len(num_columns)]),
+    median_freq_table = pd.DataFrame(np.zeros([int(np.ceil((min(data_len))/((Fs)*duration))), len(num_columns)]),
                                      columns=raw_data.columns[num_columns])
     # 1.3.-------------創建儲存EMG FFT data的矩陣------------
     # bandpass filter used in signal
@@ -712,11 +733,12 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
         elif '.c3d' in raw_data_path:
             freq = c['header']['analogs']['frame_rate']
         # 計算降採樣的因子
+        # print(freq)
         decimation_factor = freq / down_freq
         # 1. 先計算 bandpass filter
         bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
         # 計算資料長度，從後面數來，直到欄位裡面第一個"非0值"出現
-        bandpass_filtered = signal.sosfiltfilt(bandpass_sos, raw_data.iloc[:int((data_len)), num_columns[col]])
+        bandpass_filtered = signal.sosfiltfilt(bandpass_sos, raw_data.iloc[:int((data_len[col])), num_columns[col]])
         # 1.2. 
         if '.csv' in raw_data_path:
             notch_sos_1 = signal.butter(2, csv_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
@@ -749,7 +771,7 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
                                                 notch_filtered_4)
         
         # 降採樣
-        resam_bandpass = signal.resample(notch_filtered, int((data_len)//decimation_factor))
+        resam_bandpass = signal.resample(notch_filtered, int((data_len[col])//decimation_factor))
         # 2. 資料前處理
         # 計算資料長度
         N = int(np.prod(resam_bandpass.shape[0]))#length of the array

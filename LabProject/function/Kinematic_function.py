@@ -39,7 +39,7 @@ import gen_function as gen
 # from scipy.interpolate import CubicSpline
 from scipy.interpolate import UnivariateSpline
 import math
-import signal
+from scipy import signal
 import gc
 
 # %% 定義支段座標系之旋轉矩陣
@@ -84,12 +84,14 @@ def DefCoordArm(R_Shoulder, R_Elbow_Lat, R_Elbow_Med):
     RotMatrix = np.array([i_axis, j_axis, k_axis])
     return RotMatrix
 ## 定義小臂座標系
-def DefCoordForearm(R_Elbow_Lat, R_Elbow_Med, R_Wrist_Una, R_Wrist_Rad):
+def DefCoordForearm(R_Elbow_Lat, R_Elbow_Med, R_Wrist_Una, R_Wrist_Rad, side='R'):
     """
     針對右手
-    i-axis : (R_Elbow_Lat + R_Elbow_Med)/2 - (R_Wrist_Una + R_Wrist_Rad)/2
-    j-axis : x cross z
-    k-axis : R_Wrist_Rad - R_Wrist_Una
+    x-axis : R_Wrist_Rad - R_Wrist_Una
+    y-axis : (R_Elbow_Lat + R_Elbow_Med)/2 - (R_Wrist_Una + R_Wrist_Rad)/2
+    z-axis : x cross y
+    
+    左手定義需再更改
     
     R = [[ix, iy, iz],
          [jx, jy, jz],
@@ -117,25 +119,39 @@ def DefCoordForearm(R_Elbow_Lat, R_Elbow_Med, R_Wrist_Una, R_Wrist_Rad):
     R_Elbow_Med = np.array(R_Elbow_Med)
     R_Wrist_Una = np.array(R_Wrist_Una)
     R_Wrist_Rad = np.array(R_Wrist_Rad)
-    # 定義座標軸方向
-    # j_vector = (R_Elbow_Lat + R_Elbow_Med)/2 - (R_Wrist_Una + R_Wrist_Rad)/2
-    j_vector = (R_Elbow_Lat + R_Elbow_Med)/2 - R_Wrist_Una 
-    i_vector = np.cross(j_vector, (R_Wrist_Rad - R_Wrist_Una))
-    k_vector = np.cross(i_vector, j_vector)
-    
-    j_axis = j_vector / np.linalg.norm(j_vector)
-    i_axis = i_vector / np.linalg.norm(i_vector)
-    k_axis = k_vector / np.linalg.norm(k_vector)
-    
-    RotMatrix = np.array([i_axis, j_axis, k_axis])
+   
+    if side == 'R':
+ 
+        # 定義座標軸方向
+        # j_vector = (R_Elbow_Lat + R_Elbow_Med)/2 - (R_Wrist_Una + R_Wrist_Rad)/2
+        y_vector = (R_Elbow_Lat + R_Elbow_Med)/2 - R_Wrist_Una 
+        x_vector = np.cross(y_vector, (R_Wrist_Rad - R_Wrist_Una))
+        z_vector = np.cross(x_vector, y_vector)
+        
+        y_axis = y_vector / np.linalg.norm(y_vector)
+        x_axis = x_vector / np.linalg.norm(x_vector)
+        z_axis = z_vector / np.linalg.norm(z_vector)
+        
+        RotMatrix = np.array([x_axis, y_axis, z_axis])
+    elif side == 'L':
+        y_vector = R_Wrist_Una - (R_Elbow_Lat + R_Elbow_Med)/2
+        x_vector = np.cross((R_Wrist_Rad - R_Wrist_Una), y_vector)
+        z_vector = np.cross(x_vector, y_vector)
+        
+        y_axis = y_vector / np.linalg.norm(y_vector)
+        x_axis = x_vector / np.linalg.norm(x_vector)
+        z_axis = z_vector / np.linalg.norm(z_vector)
+        
+        RotMatrix = np.array([x_axis, y_axis, z_axis])
+        
     return RotMatrix
 
 ## 定義手掌座標系
 def DefCoordHand(R_Wrist_Una, R_Wrist_Rad, R_M_Finger1):
     """
-    i-axis : (R_Wrist_Una + R_Wrist_Rad)/2 - R_M_Finger1
-    j-axis : x cross z
-    k-axis : R_Wrist_Rad - R_Wrist_Una
+    x-axis : (R_Wrist_Una + R_Wrist_Rad)/2 - R_M_Finger1
+    y-axis : x cross z
+    z-axis : R_Wrist_Rad - R_Wrist_Una
     
     R = [[ix, iy, iz],
          [jx, jy, jz],
@@ -730,18 +746,21 @@ def Rot2LocalAngularEP(Rot, smprate, place = "joint", unit="degree"):
     return AngVel, AngAcc
 
 # %%
-def included_angle(x0, x1, x2):
+def included_angle(x0, x1, x2, x3=None):
     """
     計算由三個點所形成的夾角，以角度表示。
 
     Parameters
     ----------
     x0 : array-like
-        第一個點的坐標。
+        第一個點的坐標。(四個點：向量1起始)
     x1 : array-like
-        第二個點的坐標（頂點）。
+        第二個點的坐標（三個點：頂點）。
     x2 : array-like
-        第三個點的坐標。
+        第三個點的坐標。(四個點：向量2起始)
+    if x3 == true
+    x3 : array-like
+        第四個點的坐標。
 
     Returns
     -------
@@ -754,6 +773,15 @@ def included_angle(x0, x1, x2):
     x0 = np.array(x0)
     x1 = np.array(x1)
     x2 = np.array(x2)
+    if x3 is None:
+        # 三個點的情況：以中間點為頂點計算夾角
+        vector_A = x0 - x1  # 向量A從p2指向p1
+        vector_B = x2 - x1  # 向量B從p2指向p3
+    else:
+        # 四個點的情況：計算兩個向量的夾角
+        x3 = np.array(x3)
+        vector_A = x1 - x0  # 向量A從p1指向p2
+        vector_B = x3 - x2  # 向量B從p3指向p4
     
     # 計算向量A（從點x1到點x0的向量）
     vector_A = x0 - x1
@@ -923,12 +951,12 @@ def UpperExtremty_coord(trun_motion, motion_info, p1_all):
                                             bandpass_filtered[indices[0], i, :], # R.Elbow.Lat
                                             bandpass_filtered[-1, i, :]) # R.Elbow.Med
         ForearmCoord[:, :, i] = DefCoordForearm(bandpass_filtered[indices[0], i, :], # R.Elbow.Lat
-                                                    bandpass_filtered[-1, i, :], # R.Elbow.Med
-                                                    bandpass_filtered[indices[4], i, :], # R.Wrist.Uln
-                                                    bandpass_filtered[indices[5], i, :]) # R.Wrist.Rad
+                                                bandpass_filtered[-1, i, :], # R.Elbow.Med
+                                                bandpass_filtered[indices[4], i, :], # R.Wrist.Uln
+                                                bandpass_filtered[indices[5], i, :]) # R.Wrist.Rad
         HandCoord[:, :, i] = DefCoordHand(bandpass_filtered[indices[4], i, :], # R.Wrist.Uln
-                                              bandpass_filtered[indices[5], i, :], # R.Wrist.Rad
-                                              bandpass_filtered[indices[6], i, :]) # R.M.Finger1
+                                            bandpass_filtered[indices[5], i, :], # R.Wrist.Rad
+                                            bandpass_filtered[indices[6], i, :]) # R.M.Finger1
     return ArmCoord, ForearmCoord, HandCoord, motion_info, bandpass_filtered
 # %% 計算手指關節角度
 def finger_angle_cal(file_name, motion_data, motion_info):
