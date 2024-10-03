@@ -812,8 +812,11 @@ def included_angle(x0, x1, x2, x3=None):
 
 
 # %% 計算內上髁在LCS的位置
-def V_Elbow_cal(c3d_path):
-    motion_info, motion_data, analog_info, FP_data, np_motion_data = gen.read_c3d(c3d_path)
+def V_Elbow_cal(c3d_path, method=None, replace=None):
+    # c3d_path = r'E:\Hsin\BenQ\ZOWIE non-sym\\1.motion\Vicon\S03\S03_Tpose_hand.c3d'
+    motion_info, motion_data, analog_info, FP_data, np_motion_data = gen.read_c3d(c3d_path, method=method)
+    if replace:
+        motion_data.rename(columns=lambda x: x.replace(str(replace + ':'), ''), inplace=True)
     # 1. 設定輸入計算 Virtual marker 參數 : 手肘內上髁, 外上髁, UA1, UA3
     R_Elbow_Med = motion_data.loc[:, "R.Elbow.Med_x":"R.Elbow.Med_z"].dropna(axis=0)
     R_Elbow_Lat = motion_data.loc[:, "R.Elbow.Lat_x":"R.Elbow.Lat_z"].dropna(axis=0)
@@ -836,8 +839,10 @@ def V_Elbow_cal(c3d_path):
     gc.collect()
     return p1_all
 # %% 計算橈側內髁之位置
-def V_Elbow_cal_1(c3d_path):
-    motion_info, motion_data, analog_info, FP_data, np_motion_data = gen.read_c3d(c3d_path)
+def V_Elbow_cal_1(c3d_path, method=None, replace=None):
+    motion_info, motion_data, analog_info, FP_data, np_motion_data = gen.read_c3d(c3d_path, method=method)
+    if replace:
+        motion_data.rename(columns=lambda x: x.replace(str(replace + ':'), ''), inplace=True)
     # 1. 設定輸入計算 Virtual marker 參數 : 手肘內上髁, 外上髁, UA1, UA3
     R_Elbow_Med = motion_data.loc[:, "R.Elbow.Med_x":"R.Elbow.Med_z"].dropna(axis=0)
     R_Elbow_Lat = motion_data.loc[:, "R.Elbow.Lat_x":"R.Elbow.Lat_z"].dropna(axis=0)
@@ -861,15 +866,18 @@ def V_Elbow_cal_1(c3d_path):
     return p1_all
 
 # %% 使用tpose計算手部的自然關節角度
-def arm_natural_pos(c3d_path, p1_all, index):
-    motion_info, motion_data, analog_info, FP_data, np_motion_data = gen.read_c3d(c3d_path)
+def arm_natural_pos(c3d_path, p1_all, index, method=None, replace=None):
+    # c3d_path = r'E:\Hsin\BenQ\ZOWIE non-sym\\1.motion\Vicon\S03\S03_Tpose_hand.c3d'
+    motion_info, motion_data, analog_info, FP_data, np_motion_data = gen.read_c3d(c3d_path, method=method)
+    if replace:
+        motion_data.rename(columns=lambda x: x.replace(str(replace + ':'), ''), inplace=True)
     V_R_Elbow_Med = np.zeros(shape=(3))
     # 計算虛擬手肘內上髁位置
     V_R_Elbow_Med[:] = transformation_matrix(motion_data.loc[index, "R.Elbow.Lat_x":"R.Elbow.Lat_z"].values, # R.Elbow.Lat
-                                                  motion_data.loc[index, "UA1_x":"UA1_z"].values, # UA1
-                                                  motion_data.loc[index, "UA3_x":"UA3_z"].values, # UA3
-                                                  p1_all.iloc[5, :].values, np.array([0, 0, 0]),
-                                                  rotation='LCStoGCS')
+                                             motion_data.loc[index, "UA1_x":"UA1_z"].values, # UA1
+                                             motion_data.loc[index, "UA3_x":"UA3_z"].values, # UA3
+                                             p1_all.iloc[5, :].values, np.array([0, 0, 0]),
+                                             rotation='LCStoGCS')
     # 定義手部支段坐標系
     static_ArmCoord = np.empty(shape=(3, 3))
     static_ForearmCoord = np.empty(shape=(3, 3))
@@ -892,6 +900,8 @@ def arm_natural_pos(c3d_path, p1_all, index):
 # %% 計算大臂, 小臂, 手掌隨時間變化的坐標系
 
 def UpperExtremty_coord(trun_motion, motion_info, p1_all):
+    
+    # trun_motion = trun_motion_np#, motion_info, p1_all
     # 1.2.5. ---------計算手肘內上髁之位置----------------------------------
     # 建立手肘內上髁的資料貯存位置
     V_R_Elbow_Med = np.zeros(shape=(1, np.shape(trun_motion)[1], np.shape(trun_motion)[2]))
@@ -910,10 +920,10 @@ def UpperExtremty_coord(trun_motion, motion_info, p1_all):
     # 回算手肘內上髁在 GCS 之位置
     for frame in range(np.shape(trun_motion)[1]):
         V_R_Elbow_Med[0, frame, :] = transformation_matrix(trun_motion[indices[0], frame, :], # R.Elbow.Lat
-                                                                trun_motion[indices[1], frame, :], # UA1
-                                                                trun_motion[indices[2], frame, :], # UA3
-                                                                p1_all.iloc[5, :].values, np.array([0, 0, 0]),
-                                                                rotation='LCStoGCS')
+                                                           trun_motion[indices[1], frame, :], # UA1
+                                                           trun_motion[indices[2], frame, :], # UA3
+                                                           p1_all.iloc[5, :].values, np.array([0, 0, 0]),
+                                                           rotation='LCStoGCS')
     # 合併 motion data and virtual R.Elbow.Med data
     new_trun_motion = np.concatenate((trun_motion, V_R_Elbow_Med), axis=0)
     # motion_info 新增 R.Elbow.Med 的標籤

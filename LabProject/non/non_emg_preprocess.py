@@ -10,8 +10,8 @@ import time
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 import plotFig_function as FigPlot
@@ -19,15 +19,15 @@ import EMG_function as emg
 
 import gc
 # %%
-# folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
-folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
+folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
+# folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
 motion_folder = "1.motion\\"
 emg_folder = "2.EMG\\"
 subfolder = "2.LargeFlick\\"
 motion_type = ["Cortex\\", "Vicon\\"]
 
-cortex_folder = [#"S11", "S12", "S13", "S14", "S15",
-                 #"S16", "S17", "S18", "S19", 
+cortex_folder = ["S11", "S12", "S13", "S14", "S15",
+                 "S16", "S17", "S18", "S19", 
                 "S20", "S21"]
 
 vicon_folder = ["S03", "S04", "S05", "S06", "S07", "S08", "S09",
@@ -42,7 +42,8 @@ save_place = "4.GridShot\\"
 motion_folder_path = folder_path + motion_folder
 emg_folder_path = folder_path + emg_folder
 
-stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240929.xlsx"
+# stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240929.xlsx"
+stage_file_path = r"E:/Hsin/BenQ/ZOWIE non-sym/ZowieNonSymmetry_StagingFile_20240929.xlsx"
 all_mouse_name = ['_EC2_', '_ECN1_', '_ECN2_', '_ECO_', '_HS_']
 muscle_name = ['Extensor carpi radialis', 'Flexor Carpi Radialis', 'Triceps',
                'Extensor carpi ulnaris', '1st. dorsal interosseous', 

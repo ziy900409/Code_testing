@@ -57,9 +57,11 @@ c3d_recolumns_name = {'ExtRad.IM EMG1': 'Extensor Carpi Radialis',
                      'ExtUlnar.IM EMG4': 'Extensor Carpi Ulnaris',
                      'ExtUlnar A.IM EMG4': 'Extensor Carpi Ulnaris',
                      'DorInter_1st.IM EMG5': '1st Dorsal Interosseous', 
-                     'AbdDigMin.IM EMG6': 'Abductor Digiti Quinti', 
+                     'AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
+                     #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
                      'ExtInd.IM EMG7': 'Extensor Indicis',
-                     'Biceps.IM EMG8': 'Biceps Brachii'}
+                     'Biceps.IM EMG8': 'Biceps Brachii',
+                     }
 
 c3d_analog_cha = ['ExtRad.IM EMG1', 'FleRad.IM EMG2', 'ExtUlnar.IM EMG4', 'ExtUlnar A.IM EMG4'
                   'DorInter_1st.IM EMG5', 'AbdDigMin.IM EMG6',  'ExtInd.IM EMG7', 'Biceps.IM EMG8',
@@ -115,7 +117,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
     # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\raw_data\S5\MVC\S5_AbdDigMin_MVC.c3d"
     # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\S01\MVC\S01_MVC_Rep_2.1.csv"
     # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_07 non-symmetry\\\\2.EMG\\S21\\S21_Triceps_MVC_Rep_2.129.csv'
-    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\2.EMG\S12\S12_GridShot_Rep_2.1.csv"
+    # raw_data_path = r"E:\Hsin\BenQ\ZOWIE non-sym\1.motion\Vicon\S03\S03_ExtInd_MVC.c3d"
     if '.csv' in raw_data_path:
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:
@@ -311,13 +313,13 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
         # 2.3.------resample data to 1000Hz-----------
         # 降採樣資料，並將資料儲存在矩陣當中
         
-        notch_filtered = signal.resample(notch_filtered, downsample_len)
-        notch_filtered_data.iloc[:, col] = notch_filtered[:downsample_len]
-        bandpass_filtered = signal.resample(bandpass_filtered, downsample_len)
-        bandpass_filtered_data.iloc[:, col] = bandpass_filtered[:downsample_len]
-        abs_data = signal.resample(abs_data, downsample_len)
-        lowpass_filtered = signal.resample(lowpass_filtered, downsample_len)
-        lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:downsample_len]
+        notch_filtered = signal.resample(notch_filtered, int(downsample_len))
+        notch_filtered_data.iloc[:, col] = notch_filtered[:int(downsample_len)]
+        bandpass_filtered = signal.resample(bandpass_filtered, int(downsample_len))
+        bandpass_filtered_data.iloc[:, col] = bandpass_filtered[:int(downsample_len)]
+        abs_data = signal.resample(abs_data, int(downsample_len))
+        lowpass_filtered = signal.resample(lowpass_filtered, int(downsample_len))
+        lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:int(downsample_len)]
         # -------Data smoothing. Compute Moving mean
         # window width = window length(second)*sampling rate
         '''
@@ -619,7 +621,7 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
     plt.show()
 
 # %% 中頻率分析
-def median_frquency(raw_data_path, duration, fig_svae_path, filename):
+def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None):
     """
     最終修訂時間: 20240329
     
@@ -644,7 +646,8 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
     參考資料 :
         1. https://dsp.stackexchange.com/questions/85683/how-to-find-median-frequency-of-binned-signal-fft
     """
-    # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_07 non-symmetry\\\\2.EMG\\S11\\S11_GridShot_Rep_5.109.csv'
+    # raw_data_path = r'E:\Hsin\BenQ\ZOWIE non-sym\\1.motion\Vicon\S03\S03_SmallFlick_EC2_1.c3d'
+    # fig_svae_path, filename = emg_save_path, save_name
     # 創建資料處存位置
     slope_data = pd.DataFrame({}, columns = muscle_name)
     # 判斷檔名
@@ -714,10 +717,12 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
             min_stop_time = np.min([x for x in all_stop_time if math.isnan(x) == False])
         # data_len = min(data_len)
         Fs = min(Fs)
+        ind_data_len = min(data_len)
     elif '.c3d' in raw_data_path:
         Fs = c['header']['analogs']['frame_rate']
         data_len = np.shape(raw_data)[0]
-    median_freq_table = pd.DataFrame(np.zeros([int(np.ceil((min(data_len))/((Fs)*duration))), len(num_columns)]),
+        ind_data_len = data_len
+    median_freq_table = pd.DataFrame(np.zeros([int(np.floor((ind_data_len)/((Fs)*duration))), len(num_columns)]),
                                      columns=raw_data.columns[num_columns])
     # 1.3.-------------創建儲存EMG FFT data的矩陣------------
     # bandpass filter used in signal
@@ -730,15 +735,17 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
         # 因為新增 c3d 故採樣頻率依 ['analogs']['frame_rate']
         if '.csv' in raw_data_path:
             freq = int(1/np.mean(np.array(raw_data.iloc[2:11, num_columns[col]-1])-np.array(raw_data.iloc[1:10, num_columns[col]-1])))
+            data_len_cal = int((data_len[col]))
         elif '.c3d' in raw_data_path:
             freq = c['header']['analogs']['frame_rate']
+            data_len_cal = data_len
         # 計算降採樣的因子
         # print(freq)
         decimation_factor = freq / down_freq
         # 1. 先計算 bandpass filter
         bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=freq, output='sos')
         # 計算資料長度，從後面數來，直到欄位裡面第一個"非0值"出現
-        bandpass_filtered = signal.sosfiltfilt(bandpass_sos, raw_data.iloc[:int((data_len[col])), num_columns[col]])
+        bandpass_filtered = signal.sosfiltfilt(bandpass_sos, raw_data.iloc[:data_len_cal, num_columns[col]])
         # 1.2. 
         if '.csv' in raw_data_path:
             notch_sos_1 = signal.butter(2, csv_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
@@ -771,7 +778,7 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
                                                 notch_filtered_4)
         
         # 降採樣
-        resam_bandpass = signal.resample(notch_filtered, int((data_len[col])//decimation_factor))
+        resam_bandpass = signal.resample(notch_filtered, int((data_len_cal)//decimation_factor))
         # 2. 資料前處理
         # 計算資料長度
         N = int(np.prod(resam_bandpass.shape[0]))#length of the array
@@ -817,7 +824,13 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename):
         # 將資料輸進矩陣
         median_freq_table.iloc[:, col] = med_freq_list[:median_freq_table.shape[0]]
     # 去掉中頻率的前五秒、後三秒的時間
-    median_freq_table = median_freq_table.iloc[int(10/duration):-int(5/duration), :]
+    if begin is None:
+        median_freq_table = median_freq_table.iloc[int(10/duration):-int(5/duration), :]
+    else:
+        begin_trans = int(np.ceil(begin[0] / (down_freq*duration)))
+        end_trans = int(np.floor(begin[1] / (down_freq*duration)))
+        median_freq_table = median_freq_table.iloc[begin_trans:end_trans, :]
+    
     # 輸出資料
     # -------------------繪圖---------------------------------------------------
     # 處理貯存檔名問題

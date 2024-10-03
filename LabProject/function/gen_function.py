@@ -10,8 +10,63 @@ import logging
 import csv
 
 import matplotlib.pyplot as plt
+
+
+vicon2cortex = {'MOS1': 'M1',
+                'MOS2': 'M2',
+                'MOS3': 'M3',
+                'MOS4': 'M4',
+                'RSHO': 'R.Shoulder',
+                'RUEL': 'R.Elbow.Lat',
+                'RUEM': 'R.Elbow.Med',
+                'RUS': 'R.Wrist.Uln',
+                'RRS': 'R.Wrist.Rad',
+                'RTB1': 'R.Thumb1',
+                'RTB2': 'R.Thumb2',
+                'RID1': 'R.I.Finger1',
+                'RID2': 'R.I.Finger2',
+                'RID3': 'R.I.Finger3',
+                'RMD1': 'R.M.Finger1',
+                'RMD2': 'R.M.Finger2',
+                'RMD3': 'R.M.Finger3',
+                'RRG1': 'R.R.Finger1',                
+                'RRG2': 'R.R.Finger2',
+                'RLT1': 'R.P.Finger2',
+                'RLT2': 'R.P.Finger1',                
+                }
+ 
+c3d_recolumns_vicon = {'RMD1_x': 'R.M.Finger1_x', # 中指掌指關節
+                       'RMD1_y': 'R.M.Finger1_y',
+                       'RMD1_z': 'R.M.Finger1_z',
+                       'RUS_x': 'R.Wrist.Uln_x', # 手腕尺側莖狀突
+                       'RUS_y': 'R.Wrist.Uln_y',
+                       'RUS_z': 'R.Wrist.Uln_z',
+                       'RRS_x': 'R.Wrist.Rad_x', # 手腕橈側莖狀突
+                       'RRS_y': 'R.Wrist.Rad_y',
+                       'RRS_z': 'R.Wrist.Rad_z',
+                       'RTB1_x': 'R.Thumb1_x', # 拇指掌指關節
+                       'RTB1_y': 'R.Thumb1_y',
+                       'RTB1_z': 'R.Thumb1_z',
+                       'RTB2_x': 'R.Thumb2_x', # 拇指第一指關節
+                       'RTB2_y': 'R.Thumb2_y',
+                       'RTB2_z': 'R.Thumb2_z',
+                       'RRG1_x': 'R.R.Finger1_x', # 無名指掌指關節
+                       'RRG1_y': 'R.R.Finger1_y',
+                       'RRG1_z': 'R.R.Finger1_z',
+                       'RRG2_x': 'R.R.Finger2_x', # 無名指第一指關節
+                       'RRG2_y': 'R.R.Finger2_y',
+                       'RRG2_z': 'R.R.Finger2_z',
+                       'RLT1_x': 'R.P.Finger1_x', #小指掌指關節
+                       'RLT1_y': 'R.P.Finger1_y',
+                       'RLT1_z': 'R.P.Finger1_z',
+                       'RLT2_x': 'R.P.Finger2_x', # 小指第一指關節
+                       'RLT2_y': 'R.P.Finger2_y',
+                       'RLT2_z': 'R.P.Finger2_z',
+                       'RUEL_x': 'R.Elbow.Lat_x', # 手肘外上髁
+                       'RUEL_y': 'R.Elbow.Lat_y',
+                       'RUEL_z': 'R.Elbow.Lat_z'}
 # %% read c3d
-def read_c3d(path):
+def read_c3d(path, method='cortex'):
     """
     Parameters
     ----------
@@ -36,8 +91,10 @@ def read_c3d(path):
 
     Author: Hsin Yang. 2023.01.20
     """
-    # 1. read c3d file
-    # path = r"E:\Motion Analysis\U3 Research\S01\S01_1VS1_1.c3d"
+    # # 1. read c3d file
+    # path = r'E:\\Hsin\\BenQ\\ZOWIE non-sym\\\\1.motion\\Vicon\\S04\\S04_Tpose_elbow.c3d'
+    # method = 'vicon'
+    # path = r"E:/Hsin/BenQ/ZOWIE non-sym/1.motion/Cortex/S11/S11_LargeTrack_ECO_3.c3d"
     c = ezc3d.c3d(path)
 
     # 數據的基本資訊，使用dict儲存
@@ -50,26 +107,35 @@ def read_c3d(path):
             "LABELS": c["parameters"]["POINT"]["LABELS"]["value"],
         }
     )
+    # 新增功能: 替換掉Vicon中的欄位名稱
+    if method == 'vicon':
+        new_strings_list = [s for s in motion_info["LABELS"]]
+        for key, value in vicon2cortex.items():
+            new_strings_list = [s.replace(key, value) for s in new_strings_list]
+        motion_info["LABELS"] = new_strings_list
     # 1.2 information of analog data
     analog_info = c["header"]["analogs"]
     # 2. convert c3d motion data to DataFrame format
     ## 2.1 create column's name of motion data
     motion_axis = ["x", "y", "z"]
     motion_markers = []
-    for marker_name in c["parameters"]["POINT"]["LABELS"]["value"]:
+    for marker_name in motion_info["LABELS"]:
         for axis in motion_axis:
             name = marker_name + "_" + axis
             motion_markers.append(name)
+            
     # 2.2 create x, y, z matrix to store motion data
+    # 修改: 資料長度用last frame - first frame
     motion_data = pd.DataFrame(
         np.zeros(
             [
-                c["header"]["points"]["last_frame"] + 1,  # last frame + 1
+                (motion_info['last_frame'] - motion_info['first_frame'] + 1),  # last frame + 1
                 len(c["parameters"]["POINT"]["LABELS"]["value"]) * 3,
             ]
         ),  # marker * 3
         columns=motion_markers,
     )
+
     # 使用numpy.array來貯存資料
     np_motion_data = np.empty(
         shape=(
