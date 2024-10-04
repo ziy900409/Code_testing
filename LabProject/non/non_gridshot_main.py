@@ -7,8 +7,8 @@ Created on Mon Sep 30 08:45:10 2024
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 import plotFig_function as FigPlot
@@ -32,8 +32,8 @@ now = datetime.now()
 # 将日期转换为指定格式
 formatted_date = now.strftime("%Y-%m-%d")
 # %% 路徑設置
-folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
-# folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
+# folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
+folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
 motion_folder = "1.motion\\"
 emg_folder = "2.EMG\\"
 subfolder = "2.LargeFlick\\"
@@ -44,7 +44,7 @@ cortex_folder = ["S11", "S12", "S13", "S14", "S15",
                  "S20",
                  "S21"]
 
-vicon_folder = ["S03", "S04", "S05", "S06", "S07",
+vicon_folder = ["S03", "S04", "S05", "S06", #"S07",
                 "S08", "S09",
                 "S10", "S23",
                 #"S24"
@@ -59,8 +59,8 @@ emg_folder_path = folder_path + emg_folder
 
 # results_save_path = r"E:\Hsin\BenQ\ZOWIE non-sym\4.process_data\\"
 
-stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240929.xlsx"
-# stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240929.xlsx"
+# stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240929.xlsx"
+stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240929.xlsx"
 all_mouse_name = ['_EC2_', '_ECN1_', '_ECN2_', '_ECO_', '_HS_']
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
@@ -115,6 +115,7 @@ joint_threshold = 0.5
 # %% cortex version
 all_hand_include_angle = pd.DataFrame({}, columns = ['mouse'])
 all_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse']+ muscle_name)
+all_emg_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse']+ muscle_name)
 # 創建資料貯存空間
 all_motion_angle_table = pd.DataFrame({}, columns = ['mouse'])
 hand_angle_table = pd.DataFrame({}, columns=["filename","CMP1",
@@ -335,12 +336,23 @@ for folder_name in cortex_folder:
             
                 # 3. EMG 疲勞分析 -----------------------------------------------------------
                 # 定義及設定存檔路徑
-                # emg_path = emg_folder_path + folder_name + "\\" + all_table['EMG_File'][i]
-                # emg_save_path = folder_path + processingData_folder + folder_name + "\\" + \
-                #     "2.emg\\1.motion\\" + save_place
-                # # 前處理EMG data
-                # processing_data, bandpass_filtered_data = emg.EMG_processing(emg_path, smoothing=smoothing)
-                # # 畫 bandpass 後之資料圖
+                emg_path = emg_folder_path + folder_name + "\\" + all_table['EMG_File'][i]
+                emg_save_path = folder_path + processingData_folder + folder_name + "\\" + \
+                    "2.emg\\1.motion\\" + save_place
+                    
+      
+                # 前處理EMG data
+                processing_data, bandpass_filtered_data = emg.EMG_processing(emg_path, smoothing=smoothing)
+                # 計算採樣頻率
+                emg_fs = 1 / (processing_data.iloc[1, 0] - processing_data.iloc[0, 0])
+                
+                emg_start = int((task_start - oneset_idx/10)*emg_fs/motion_info['frame_rate'])
+                # EMG end
+                emg_end = int((task_end- oneset_idx/10)*emg_fs/motion_info['frame_rate'])
+                # truncut data
+                bandpass_filtered_data = bandpass_filtered_data.iloc[emg_start:emg_end, :]
+                processing_data = processing_data.iloc[emg_start:emg_end, :]
+                # 畫 bandpass 後之資料圖
                 # emg.plot_plot(bandpass_filtered_data, str(emg_save_path),
                 #               save_name, "_Bandpass")
                 # # 畫smoothing 後之資料圖
@@ -354,26 +366,39 @@ for folder_name in cortex_folder:
                 #                 (emg_save_path),
                 #                 save_name,
                 #                 notch=True)
-                # # writting data in worksheet
-                # file_name = emg_save_path + save_name + end_name + ".xlsx"
+                # writting data in worksheet
+                file_name = emg_save_path + save_name + end_name + ".xlsx"
                 # pd.DataFrame(processing_data).to_excel(emg_save_path + save_name + "_lowpass.xlsx",
-                #                                        sheet_name='Sheet1', index=False, header=True)
-                # # 計算 iMVC
-                # emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
-                #                         columns=processing_data.columns)
-                # emg_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
-                # emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
-                #                                  MVC_value.values)*100
-                    
+                #                                         sheet_name='Sheet1', index=False, header=True)
+                # 計算 iMVC
+                emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
+                                        columns=processing_data.columns)
+                emg_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
+                emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
+                                                  MVC_value.values)*100
+                emg_mean = pd.DataFrame(np.zeros([int(np.shape(emg_iMVC)[0]/int(duration * emg_fs)), np.shape(emg_iMVC)[1]]),
+                                        columns=processing_data.columns)
+                for col in range(np.shape(emg_iMVC)[1]):
+                    for row in range(int(np.shape(emg_iMVC)[0]/int(duration * emg_fs))):
+                        index = int(duration * emg_fs)
+                        emg_mean.iloc[row, col] = np.mean(emg_iMVC.iloc[row*index:(row+1)*index, col])
+                
                 # pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
                 #                                 sheet_name='Sheet1', index=False, header=True)
-                # # 進行中頻率分析
-                # med_freq_data, slope_data = emg.median_frquency(emg_path,
-                #                                                 duration, emg_save_path, save_name)
-                # # 儲存斜率的資料，並合併成一個資料表
-                # slope_data['mouse'] = [trial_info['mouse']]
-                # slope_data['data_name'] = [save_name]
-                # all_slope_data = pd.concat([all_slope_data, slope_data])
+                pd.DataFrame(emg_mean).to_excel(emg_save_path + save_name + "_mvcMean.xlsx",
+                                                sheet_name='Sheet1', index=False, header=True)
+                
+                emg_slope = emg.iMVC_plot(emg_mean, save_name, emg_save_path)
+                emg_slope['mouse'] = [trial_info['mouse']]
+                emg_slope['data_name'] = [save_name]
+                all_emg_slope_data = pd.concat([all_emg_slope_data, emg_slope])
+                # 進行中頻率分析
+                med_freq_data, slope_data = emg.median_frquency(emg_path,
+                                                                duration, emg_save_path, save_name)
+                # 儲存斜率的資料，並合併成一個資料表
+                slope_data['mouse'] = [trial_info['mouse']]
+                slope_data['data_name'] = [save_name]
+                all_slope_data = pd.concat([all_slope_data, slope_data])
      # 將尤拉角資料寫進excel
      # 使用 ExcelWriter 寫入 Excel 文件
 with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_GridShot_cortex_table" + formatted_date + ".xlsx",
@@ -390,6 +415,7 @@ with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_GridShot_c
 # %% Vicon version
 all_dis_data = pd.DataFrame({}, columns = ['mouse'])
 all_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse']+ muscle_name)
+all_emg_slope_data = pd.DataFrame({}, columns = ['data_name', 'mouse']+ muscle_name)
 # 在不同的受試者資料夾下執行
 for folder_name in vicon_folder:
     # 讀資料夾下的 c3d file
@@ -429,6 +455,8 @@ for folder_name in vicon_folder:
     #         index = 1
     #         static_ArmCoord, static_ForearmCoord, static_HandCoord = kincal.arm_natural_pos(c3d_list[num], p1_all, index)
     
+    
+   
     # 讀取all MVC data
     MVC_value = pd.read_excel(processing_folder_path + '\\' + folder_name + '\\2.emg\\' + folder_name + '_all_MVC.xlsx')
     MVC_value = MVC_value.iloc[-1, 2:]
@@ -457,8 +485,10 @@ for folder_name in vicon_folder:
                       "trial_num": trial_info[3]}
         # 1. 讀取資料與初步處理-------------------------------------------------
         # 讀取 c3d data
-        motion_info, motion_data, analog_info, analog_data, np_motion_data = func.read_c3d(gridshot_c3d_list[num])
+        motion_info, motion_data, analog_info, analog_data, np_motion_data = func.read_c3d(gridshot_c3d_list[num], method='viocn')
         motion_data = motion_data.fillna(0)
+        
+
         # 重新命名欄位名稱
         # motion_data.rename(columns=c3d_recolumns_cortex, inplace=True)
         # 計算時間，時間從trigger on後三秒開始
@@ -476,6 +506,12 @@ for folder_name in vicon_folder:
         for iii in range(np.shape(motion_data)[1]-1):
             filted_motion.iloc[:, iii+1] = signal.sosfiltfilt(lowpass_sos,
                                                               motion_data.iloc[:, iii+1].values)
+        # 開始索引從analog begin後加 8 秒
+        task_start = int(motion_info["frame_rate"]*8)
+        # 開始索引從 motion start 加 52 秒 (多截斷一些數值，避免動作上的誤差)
+        task_end = int(len(filted_motion) - motion_info['frame_rate']*10)
+        # motion 去除不必要的Virtual marker, 裁切, 計算坐標軸旋轉矩陣
+        trun_motion = np_motion_data[:, task_start:task_end, :]
             # 2. 計算資料 95% confidence ellipse -----------------------------------------------------------
             # 計算中指掌指關節座標點與 mouse 的距離
             # # 平均 mouse M2, M3的距離, 相加除以2，再扣除R.M.Finger1
@@ -514,25 +550,46 @@ for folder_name in vicon_folder:
             "2.emg\\1.motion\\" + save_place
         # 前處理EMG data
         processing_data, bandpass_filtered_data = emg.EMG_processing(emg_path, smoothing=smoothing)
+        emg_fs = 1 / (processing_data.iloc[1, 0] - processing_data.iloc[0, 0])
+        
+        emg_start = int((task_start)*emg_fs/motion_info['frame_rate'])
+        # EMG end
+        emg_end = int((task_end)*emg_fs/motion_info['frame_rate'])
+        processing_data = processing_data.iloc[emg_start:emg_end, :]
         # 畫 bandpass 後之資料圖
-        emg.plot_plot(bandpass_filtered_data, str(emg_save_path),
-                      save_name, "_Bandpass")
+        # emg.plot_plot(bandpass_filtered_data, str(emg_save_path),
+        #               save_name, "_Bandpass")
         # 畫smoothing 後之資料圖
-        emg.plot_plot(processing_data, str(emg_save_path),
-                      save_name, str("_" + smoothing))
+        # emg.plot_plot(processing_data, str(emg_save_path),
+        #               save_name, str("_" + smoothing))
         # writting data in worksheet
         file_name = emg_save_path + save_name + end_name + ".xlsx"
-        pd.DataFrame(processing_data).to_excel(emg_save_path + save_name + "_lowpass.xlsx",
-                                               sheet_name='Sheet1', index=False, header=True)
-        # 計算 iMVC
+        # pd.DataFrame(processing_data).to_excel(emg_save_path + save_name + "_lowpass.xlsx",
+        #                                        sheet_name='Sheet1', index=False, header=True)
+        # # 計算 iMVC
         emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
                                 columns=processing_data.columns)
         emg_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
         emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
                                          MVC_value.values)*100
-            
-        pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
+        emg_mean = pd.DataFrame(np.zeros([int(np.shape(emg_iMVC)[0]/int(duration * emg_fs)), np.shape(emg_iMVC)[1]]),
+                                columns=processing_data.columns)
+        for col in range(np.shape(emg_iMVC)[1]):
+            for row in range(int(np.shape(emg_iMVC)[0]/int(duration * emg_fs))):
+                index = int(duration * emg_fs)
+                emg_mean.iloc[row, col] = np.mean(emg_iMVC.iloc[row*index:(row+1)*index, col])
+        
+        # pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
+        #                                 sheet_name='Sheet1', index=False, header=True)
+        pd.DataFrame(emg_mean).to_excel(emg_save_path + save_name + "_mvcMean.xlsx",
                                         sheet_name='Sheet1', index=False, header=True)
+    
+        emg_slope = emg.iMVC_plot(emg_mean, save_name, emg_save_path)
+        emg_slope['mouse'] = [trial_info['mouse']]
+        emg_slope['data_name'] = [save_name]
+        all_emg_slope_data = pd.concat([all_emg_slope_data, emg_slope])
+            
+        # 進行中頻率分析
         # 進行中頻率分析
         med_freq_data, slope_data = emg.median_frquency(emg_path,
                                                         duration, emg_save_path, save_name)

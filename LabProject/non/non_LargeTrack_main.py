@@ -7,8 +7,8 @@ Created on Mon Sep 30 08:45:10 2024
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 import plotFig_function as FigPlot
@@ -31,8 +31,8 @@ now = datetime.now()
 # 将日期转换为指定格式
 formatted_date = now.strftime("%Y-%m-%d")
 # %% 路徑設置
-folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
-# folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
+# folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
+folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
 motion_folder = "1.motion\\"
 emg_folder = "2.EMG\\"
 subfolder = "2.LargeFlick\\"
@@ -59,8 +59,8 @@ emg_folder_path = folder_path + emg_folder
 
 # results_save_path = r"E:\Hsin\BenQ\ZOWIE non-sym\4.process_data\\"
 
-stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240930.xlsx"
-# stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240929.xlsx"
+# stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240930.xlsx"
+stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240930.xlsx"
 all_mouse_name = ['_EC2_', '_ECN1_', '_ECN2_', '_ECO_', '_HS_']
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
@@ -322,24 +322,23 @@ for folder_name in cortex_folder:
                 
                 tep_motion_angle_table = pd.DataFrame({'檔名': save_name,
                                                        'mouse': trial_info["mouse"],
-                                                       # peak
+                                                       # mean
                                                        'Elbow:Add-Abd平均': np.mean(ElbowEuler[:, 2]), #
-                                                       'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
-                                                       # peak
                                                        'Elbow:Pro-Sup平均': np.mean(ElbowEuler[:, 1]),
-                                                       'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
-                                                       # peak
                                                        'Elbow:Flex-Ext平均': np.mean(ElbowEuler[:, 0]),
-                                                       'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
-                                                       # peak
                                                        'Hand:Add-Abd平均': np.mean(WristEuler[:, 1]), #
-                                                       'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
-                                                       # peak
                                                        'Hand:Pro-Sup平均': np.mean(WristEuler[:, 2]),
-                                                       'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
-                                                       # peak
                                                        'Hand:Flex-Ext平均': np.mean(WristEuler[:, 0]),
+                                                       # max                                                
+                                                       'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
+                                                       'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
+                                                       'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
+                                                       'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
+                                                       'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
                                                        'Hand:Flex-Ext最大值': np.max(WristEuler[:, 0]),
+                                               
+                                                       
+                                                       
                                                        },
                                                        index=[0])
                 #合併統計資料 table
@@ -404,15 +403,24 @@ for folder_name in cortex_folder:
                 # 儲存 iMVC data
                 for muscle in muscle_name:
                     imvc_data.loc[0, 'method'] = 'mean'
+                    imvc_data.loc[0, 'subject'] = trial_info["subject"]
+                    imvc_data.loc[0, 'data_name'] = save_name
+                    imvc_data.loc[0, 'mouse'] = trial_info['mouse']
                     imvc_data.loc[0, muscle] = np.mean(emg_iMVC.loc[:, muscle])
                     imvc_data.loc[1, 'method'] = 'max'
+                    imvc_data.loc[1, 'data_name'] = save_name
+                    imvc_data.loc[1, 'mouse'] = trial_info['mouse']
+                    imvc_data.loc[1, 'subject'] = trial_info["subject"]
                     imvc_data.loc[1, muscle] = np.max(emg_iMVC.loc[:, muscle])
                     imvc_data.loc[2, 'method'] = 'min'
+                    imvc_data.loc[2, 'data_name'] = save_name
+                    imvc_data.loc[2, 'mouse'] = trial_info['mouse']
+                    imvc_data.loc[2, 'subject'] = trial_info["subject"]
                     imvc_data.loc[2, muscle] = np.min(emg_iMVC.loc[:, muscle])
                 
-                imvc_data['mouse'].replace(np.NaN, trial_info['mouse'], inplace=True)
-                imvc_data['data_name'].replace(np.NaN, save_name, inplace=True)
-                imvc_data['subject'].replace(np.NaN, trial_info["subject"], inplace=True)
+                # imvc_data['mouse'].replace(np.NaN, trial_info['mouse'], inplace=True)
+                # imvc_data['data_name'].replace(np.NaN, save_name, inplace=True)
+                # imvc_data['subject'].replace(np.NaN, trial_info["subject"], inplace=True)
                 all_imvc_data = pd.concat([all_imvc_data, imvc_data])
      # 將尤拉角資料寫進excel
      # 使用 ExcelWriter 寫入 Excel 文件
@@ -646,23 +654,19 @@ for folder_name in vicon_folder:
         
         tep_motion_angle_table = pd.DataFrame({'檔名': save_name,
                                                'mouse': trial_info["mouse"],
-                                               # peak
+                                               # mean
                                                'Elbow:Add-Abd平均': np.mean(ElbowEuler[:, 2]), #
-                                               'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
-                                               # peak
                                                'Elbow:Pro-Sup平均': np.mean(ElbowEuler[:, 1]),
-                                               'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
-                                               # peak
                                                'Elbow:Flex-Ext平均': np.mean(ElbowEuler[:, 0]),
-                                               'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
-                                               # peak
                                                'Hand:Add-Abd平均': np.mean(WristEuler[:, 1]), #
-                                               'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
-                                               # peak
                                                'Hand:Pro-Sup平均': np.mean(WristEuler[:, 2]),
-                                               'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
-                                               # peak
                                                'Hand:Flex-Ext平均': np.mean(WristEuler[:, 0]),
+                                               # max                                                
+                                               'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
+                                               'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
+                                               'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
+                                               'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
+                                               'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
                                                'Hand:Flex-Ext最大值': np.max(WristEuler[:, 0]),
                                                },
                                                index=[0])
@@ -711,15 +715,18 @@ for folder_name in vicon_folder:
         # 儲存 iMVC data
         for muscle in emg_iMVC.columns:
             imvc_data.loc[0, 'method'] = 'mean'
+            imvc_data.loc[0, 'subject'] = trial_info["subject"]
             imvc_data.loc[0, muscle] = np.mean(emg_iMVC.loc[:, muscle])
             imvc_data.loc[1, 'method'] = 'max'
+            imvc_data.loc[1, 'subject'] = trial_info["subject"]
             imvc_data.loc[1, muscle] = np.max(emg_iMVC.loc[:, muscle])
             imvc_data.loc[2, 'method'] = 'min'
+            imvc_data.loc[2, 'subject'] = trial_info["subject"]
             imvc_data.loc[2, muscle] = np.min(emg_iMVC.loc[:, muscle])
         
-        imvc_data['mouse'].replace(np.NaN, trial_info['mouse'], inplace=True)
-        imvc_data['data_name'].replace(np.NaN, save_name, inplace=True)
-        imvc_data['subject'].replace(np.NaN, trial_info["subject"], inplace=True)
+        # imvc_data['mouse'].replace(np.NaN, trial_info['mouse'], inplace=True)
+        # imvc_data['data_name'].replace(np.NaN, save_name, inplace=True)
+        # imvc_data['subject'].replace(np.NaN, trial_info["subject"], inplace=True)
         all_imvc_data = pd.concat([all_imvc_data, imvc_data])
             
       

@@ -149,9 +149,9 @@ def DefCoordForearm(R_Elbow_Lat, R_Elbow_Med, R_Wrist_Una, R_Wrist_Rad, side='R'
 ## 定義手掌座標系
 def DefCoordHand(R_Wrist_Una, R_Wrist_Rad, R_M_Finger1):
     """
-    x-axis : (R_Wrist_Una + R_Wrist_Rad)/2 - R_M_Finger1
-    y-axis : x cross z
-    z-axis : R_Wrist_Rad - R_Wrist_Una
+    x-axis : y cross (R_Wrist_Rad - R_Wrist_Una)
+    y-axis : (R_Wrist_Una + R_Wrist_Rad)/2 - R_M_Finger1
+    z-axis : x cross y
     
     R = [[ix, iy, iz],
          [jx, jy, jz],
@@ -884,15 +884,15 @@ def arm_natural_pos(c3d_path, p1_all, index, method=None, replace=None):
     static_HandCoord = np.empty(shape=(3, 3))
     # 定義人體自然角度坐標系, tpose 手部自然放置角度
     static_ArmCoord[:, :] = DefCoordArm(motion_data.loc[index, "R.Shoulder_x":"R.Shoulder_z"],
-                                            motion_data.loc[index, "R.Elbow.Lat_x":"R.Elbow.Lat_z"],
-                                            V_R_Elbow_Med[:])
+                                        motion_data.loc[index, "R.Elbow.Lat_x":"R.Elbow.Lat_z"],
+                                        V_R_Elbow_Med[:])
     static_ForearmCoord[:, :] = DefCoordForearm(motion_data.loc[index, "R.Elbow.Lat_x":"R.Elbow.Lat_z"],
-                                                    V_R_Elbow_Med[:],
-                                                    motion_data.loc[index, "R.Wrist.Uln_x":"R.Wrist.Uln_z"],
-                                                    motion_data.loc[index, "R.Wrist.Rad_x":"R.Wrist.Rad_z"])
+                                                V_R_Elbow_Med[:],
+                                                motion_data.loc[index, "R.Wrist.Uln_x":"R.Wrist.Uln_z"],
+                                                motion_data.loc[index, "R.Wrist.Rad_x":"R.Wrist.Rad_z"])
     static_HandCoord[:, :] = DefCoordHand(motion_data.loc[index, "R.Wrist.Uln_x":"R.Wrist.Uln_z"],
-                                              motion_data.loc[index, "R.Wrist.Rad_x":"R.Wrist.Rad_z"],
-                                              motion_data.loc[index, "R.M.Finger1_x":"R.M.Finger1_z"])
+                                          motion_data.loc[index, "R.Wrist.Rad_x":"R.Wrist.Rad_z"],
+                                          motion_data.loc[index, "R.M.Finger1_x":"R.M.Finger1_z"])
     # 清除不需要的變數
     del motion_info, motion_data, analog_info, FP_data, np_motion_data, index
     gc.collect()

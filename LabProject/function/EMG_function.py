@@ -621,7 +621,7 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
     plt.show()
 
 # %% 中頻率分析
-def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None):
+def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None, MVC_value=None):
     """
     最終修訂時間: 20240329
     
@@ -646,7 +646,7 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None
     參考資料 :
         1. https://dsp.stackexchange.com/questions/85683/how-to-find-median-frequency-of-binned-signal-fft
     """
-    # raw_data_path = r'E:\Hsin\BenQ\ZOWIE non-sym\\1.motion\Vicon\S03\S03_SmallFlick_EC2_1.c3d'
+    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S04\S04_LargeTrack_ECN2_2.c3d"
     # fig_svae_path, filename = emg_save_path, save_name
     # 創建資料處存位置
     slope_data = pd.DataFrame({}, columns = muscle_name)
@@ -728,6 +728,12 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None
     # bandpass filter used in signal
     # bandpass_filtered_data = pd.DataFrame(np.zeros([int(min(Fs)//(min(freq)/down_freq)), len(num_columns)]),
     #                         columns=raw_data.iloc[:, num_columns].columns)
+    # bandpass_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
+    #                         columns=raw_data.iloc[:, num_columns].columns)
+    # notch_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
+    #                         columns=raw_data.iloc[:, num_columns].columns)
+    # lowpass_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
+    #                         columns=raw_data.iloc[:, num_columns].columns)
 
     # ---------------------開始計算 FFT -----------------------------------
     for col in range(len(num_columns)):
@@ -758,8 +764,19 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None
             notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
                                                 notch_filtered_2)
             notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_4,
+            notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
                                                 notch_filtered_3)
+            notch_sos_5 = signal.butter(2, csv_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
+            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
+                                                notch_filtered_4)
+            notch_sos_6 = signal.butter(2, csv_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_6,
+                                                notch_filtered_5)
+            # abs_data = abs(notch_filtered)
+            # # ------linear envelop analysis-----------                          
+            # # ------lowpass filter parameter that the user must modify for your experiment        
+            # lowpass_sos = signal.butter(2, lowpass_freq, btype='low', fs=sample_freq, output='sos')        
+            # lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data)
         elif '.c3d' in raw_data_path:
             notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
             notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
@@ -774,11 +791,28 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None
             notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
                                                 notch_filtered_3)
             notch_sos_5 = signal.butter(2, c3d_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_5,
+            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
                                                 notch_filtered_4)
+            notch_sos_6 = signal.butter(2, c3d_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
+            notch_filtered_6 = signal.sosfiltfilt(notch_sos_6,
+                                                notch_filtered_5)
+            notch_sos_7 = signal.butter(2, c3d_notch_cutoff_7, btype='bandstop', fs=freq, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_7,
+                                                notch_filtered_6)
+            # abs_data = abs(notch_filtered)
+            # # ------linear envelop analysis-----------                          
+            # # ------lowpass filter parameter that the user must modify for your experiment        
+            # lowpass_sos = signal.butter(2, lowpass_freq, btype='low', fs=sample_freq, output='sos')        
+            # lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data)
         
         # 降採樣
         resam_bandpass = signal.resample(notch_filtered, int((data_len_cal)//decimation_factor))
+        # if begin is not None:
+        #     abs_badpass = abs(resam_bandpass)
+            
+        #     emg_iMVC.iloc[:, 0] = abs_badpass.iloc[:, 0].values
+        #     emg_iMVC.iloc[:, 1:] = np.divide(abs(abs_badpass.iloc[:, 1:].values),
+        #                                          MVC_value.values)*100
         # 2. 資料前處理
         # 計算資料長度
         N = int(np.prod(resam_bandpass.shape[0]))#length of the array
@@ -801,9 +835,7 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None
                 N2 = 2**(N.bit_length()-1) #last power of 2
                 N = N2 #truncate array to the last power of 2
                 xf = np.linspace(0.0, np.ceil(1.0/(2.0*T)), N//2)
-                # print(i*freq, (i+1)*freq)
                 yf = fft(resam_bandpass[i*fft_len:(i+1)*fft_len])      
-                # plt.plot(xf, 2.0/N * np.abs(yf[:N//2]))
                 # 計算每個 duration 的 FFT 總和
                 all_y = np.sum(2.0/N * np.abs(yf[:N//2]))
                 med_y = 0
@@ -823,6 +855,15 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None
                         break
         # 將資料輸進矩陣
         median_freq_table.iloc[:, col] = med_freq_list[:median_freq_table.shape[0]]
+    # if MVC_value is not None:
+    #     MVC_list = []
+    #     for i in range(int(np.ceil(len(resam_bandpass)/(fft_len)))):
+    #         if down_freq*(i+1) < len(resam_bandpass):
+    #             MVC_list.append(np.mean(emg_iMVC.iloc[i:i+fft_len, :]))
+    #         else:
+    #             MVC_list.append(np.mean(emg_iMVC.iloc[i:, :]))
+
+        
     # 去掉中頻率的前五秒、後三秒的時間
     if begin is None:
         median_freq_table = median_freq_table.iloc[int(10/duration):-int(5/duration), :]
@@ -904,3 +945,45 @@ def plot_plot(data, savepath, filename, filter_type):
     plt.ylabel("Voltage (V)", fontsize = 14)
     plt.savefig(save, dpi=200, bbox_inches = "tight")
     plt.show()
+    
+def iMVC_plot(emg_mean, filename, fig_svae_path):
+    slope_data = pd.DataFrame({}, columns = muscle_name)
+    # fig_svae_path, filename = emg_save_path, save_name
+    cal_emg = emg_mean.drop(columns='time')
+    n = int(math.ceil((len(cal_emg.columns)) /2))
+    fig, axs = plt.subplots(n, 2, figsize = (2*n+1,10))
+    # 計算各採樣頻率與計算downsample所需的位點數，並取最小的位點數
+    for col in range(np.shape(cal_emg)[1]):
+        x, y = col - n*math.floor(abs(col)/n), math.floor(abs(col)/n)
+        # idx = col+1
+        # print(col)
+        
+        # 畫中頻率圖
+        axs[x, y].plot(cal_emg.iloc[:, col])
+        axs[x, y].set_title(cal_emg.columns[col], fontsize = 16)
+        # 計算趨勢線的斜率
+        slope, intercept, r_value, p_value, std_err = linregress(cal_emg.index, cal_emg.iloc[:, col])
+        trendline = intercept + slope * np.array(cal_emg.index)
+        # 將趨勢線的 slope 儲存
+        slope_data.loc[0, cal_emg.columns[col]] = slope
+        # 畫趨勢線
+        axs[x, y].plot(cal_emg.index, trendline, linewidth=1, color='red', linestyle='--')
+        annotation_text = 'Slope: {:.2f}'.format(slope)
+        axs[x, y].annotate(annotation_text, xy=(0.5, 0.9), xycoords='axes fraction', ha='center', fontsize=12)
+        # 畫水平線
+        # axs[x, y].axhline(y=np.mean(median_freq_table.iloc[:, col]), color = 'darkslategray', linewidth=1, linestyle = '--')
+        # 設定科學符號 : 小數點後幾位數
+        axs[x, y].ticklabel_format(axis='y', style = 'scientific', scilimits = (-2, 2))
+    # 設定整張圖片之參數
+    plt.suptitle(str("Muscle activation (%) " + filename), fontsize = 16)
+    plt.tight_layout()
+    fig.add_subplot(111, frameon=False)
+    # hide tick and tick label of the big axes
+    plt.grid(False)
+    plt.xlabel("time (second)", fontsize = 14)
+    plt.ylabel("Muscle activation (%)", fontsize = 14)
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+    plt.savefig(str(fig_svae_path + filename + "_iemgSlope.jpg"),
+                dpi=200, bbox_inches = "tight")
+    plt.show()
+    return slope_data
