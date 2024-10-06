@@ -7,8 +7,8 @@ Created on Mon Sep 30 08:45:10 2024
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 import plotFig_function as FigPlot
@@ -31,11 +31,11 @@ now = datetime.now()
 # 将日期转换为指定格式
 formatted_date = now.strftime("%Y-%m-%d")
 # %% 路徑設置
-# folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
-folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
+folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
+# folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
 motion_folder = "1.motion\\"
 emg_folder = "2.EMG\\"
-subfolder = "2.LargeFlick\\"
+subfolder = "3.LargeTrack\\"
 motion_type = ["Cortex\\", "Vicon\\"]
 
 cortex_folder = ["S11", "S12", "S13",
@@ -59,8 +59,8 @@ emg_folder_path = folder_path + emg_folder
 
 # results_save_path = r"E:\Hsin\BenQ\ZOWIE non-sym\4.process_data\\"
 
-# stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240930.xlsx"
-stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240930.xlsx"
+stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240930.xlsx"
+# stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240930.xlsx"
 all_mouse_name = ['_EC2_', '_ECN1_', '_ECN2_', '_ECO_', '_HS_']
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
@@ -221,7 +221,7 @@ for folder_name in cortex_folder:
                 # 設定開始索引
                 task_start = int(all_table['start'][i] + motion_info['frame_rate'])
                 # 結束索引是開始後加15秒
-                task_end = int(task_start + motion_info['frame_rate']*15)
+                task_end = int(task_start + motion_info['frame_rate']*25)
                 
                 # 設定 sampling rate
                 sampling_time = 1/motion_info['frame_rate']
@@ -360,7 +360,7 @@ for folder_name in cortex_folder:
                 # EMG start index
                 emg_start = int((task_start - oneset_idx/10)*emg_fs/motion_info['frame_rate'])
                 # EMG end
-                emg_end = int((task_end- oneset_idx/10)*emg_fs/motion_info['frame_rate'])
+                emg_end = int((task_end - oneset_idx/10)*emg_fs/motion_info['frame_rate'])
                 # truncut data
                 bandpass_filtered_data = bandpass_filtered_data.iloc[emg_start:emg_end, :]
                 processing_data = processing_data.iloc[emg_start:emg_end, :]
@@ -541,7 +541,7 @@ for folder_name in vicon_folder:
         # 設定開始索引
         task_start = int(motion_info['frame_rate'])
         # 結束索引是開始後加15秒
-        task_end = int(motion_info['frame_rate']*15)
+        task_end = int(motion_info['frame_rate']*25)
         
         # 設定 sampling rate
         sampling_time = 1/motion_info['frame_rate']
@@ -731,7 +731,7 @@ for folder_name in vicon_folder:
             
       
 # 儲存檔案  
-with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_LargeTrack_motion_table" + formatted_date + ".xlsx",
+with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_LargeTrack_vicon_table" + formatted_date + ".xlsx",
                     engine='openpyxl') as writer:
     all_motion_angle_table.to_excel(writer, sheet_name='arm_motion', index=False, header=True)
     all_hand_include_angle.to_excel(writer, sheet_name='FingerIncludeAngle', index=False, header=True)

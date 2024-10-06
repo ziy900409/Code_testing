@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Oct  2 12:12:59 2024
-
-@author: h7058
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Created on Mon Sep 30 08:45:10 2024
 
 @author: Hsin.YH.Yang
@@ -59,7 +52,7 @@ vicon_folder = ["S03", "S04",# "S05", "S06", "S07", "S08", "S09",
 
 RawData_folder = ""
 processingData_folder = "4.process_data\\"
-save_place = "1.SmallFlick\\"
+save_place = "2.LargeFlick\\"
 
 motion_folder_path = folder_path + motion_folder
 emg_folder_path = folder_path + emg_folder
@@ -192,7 +185,7 @@ for folder_name in cortex_folder:
     # stage_file = pd.read_excel(stage_file_path, sheet_name=folder_name)
     # 第二次loop計算Gridshot的問題
     imvc_data = pd.DataFrame({}, columns = ['subject', 'data_name', 'mouse', 'method'] + muscle_name)
-    gridshot_c3d_list = [file for file in c3d_list if 'SmallFlick' in file]
+    gridshot_c3d_list = [file for file in c3d_list if 'LargeFlick' in file]
     for num in range(len(gridshot_c3d_list)):
         for i in range(len(all_table['Motion_File_C3D'])):
             if gridshot_c3d_list[num].split('\\')[-1].replace(".c3d", "") == all_table['Motion_File_C3D'][i] \
@@ -228,7 +221,7 @@ for folder_name in cortex_folder:
                 # 設定開始索引
                 task_start = int(all_table['start'][i] + motion_info['frame_rate'])
                 # 結束索引是開始後加15秒
-                task_end = int(task_start + motion_info['frame_rate']*15)
+                task_end = int(task_start + motion_info['frame_rate']*25)
                 
                 # 設定 sampling rate
                 sampling_time = 1/motion_info['frame_rate']
@@ -329,24 +322,23 @@ for folder_name in cortex_folder:
                 
                 tep_motion_angle_table = pd.DataFrame({'檔名': save_name,
                                                        'mouse': trial_info["mouse"],
-                                                       # peak
+                                                       # mean
                                                        'Elbow:Add-Abd平均': np.mean(ElbowEuler[:, 2]), #
-                                                       'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
-                                                       # peak
                                                        'Elbow:Pro-Sup平均': np.mean(ElbowEuler[:, 1]),
-                                                       'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
-                                                       # peak
                                                        'Elbow:Flex-Ext平均': np.mean(ElbowEuler[:, 0]),
-                                                       'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
-                                                       # peak
                                                        'Hand:Add-Abd平均': np.mean(WristEuler[:, 1]), #
-                                                       'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
-                                                       # peak
                                                        'Hand:Pro-Sup平均': np.mean(WristEuler[:, 2]),
-                                                       'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
-                                                       # peak
                                                        'Hand:Flex-Ext平均': np.mean(WristEuler[:, 0]),
+                                                       # max                                                
+                                                       'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
+                                                       'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
+                                                       'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
+                                                       'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
+                                                       'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
                                                        'Hand:Flex-Ext最大值': np.max(WristEuler[:, 0]),
+                                               
+                                                       
+                                                       
                                                        },
                                                        index=[0])
                 #合併統計資料 table
@@ -368,7 +360,7 @@ for folder_name in cortex_folder:
                 # EMG start index
                 emg_start = int((task_start - oneset_idx/10)*emg_fs/motion_info['frame_rate'])
                 # EMG end
-                emg_end = int((task_end- oneset_idx/10)*emg_fs/motion_info['frame_rate'])
+                emg_end = int((task_end - oneset_idx/10)*emg_fs/motion_info['frame_rate'])
                 # truncut data
                 bandpass_filtered_data = bandpass_filtered_data.iloc[emg_start:emg_end, :]
                 processing_data = processing_data.iloc[emg_start:emg_end, :]
@@ -432,7 +424,7 @@ for folder_name in cortex_folder:
                 all_imvc_data = pd.concat([all_imvc_data, imvc_data])
      # 將尤拉角資料寫進excel
      # 使用 ExcelWriter 寫入 Excel 文件
-with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_SmallFlick_motion_table" + formatted_date + ".xlsx",
+with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_LargeFlick_motion_table" + formatted_date + ".xlsx",
                     engine='openpyxl') as writer:
     all_motion_angle_table.to_excel(writer, sheet_name='arm_motion', index=False, header=True)
     all_hand_include_angle.to_excel(writer, sheet_name='FingerIncludeAngle', index=False, header=True)
@@ -440,7 +432,7 @@ with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_SmallFlick
     all_slope_data.to_excel(writer, sheet_name='MedFreq', index=False, header=True)
     all_imvc_data.to_excel(writer, sheet_name='iMVC_cal', index=False, header=True)
     
-print("輸出檔案： ", folder_path + "6.Statistic\\" + save_place + "All_SmallFlick_motion_table" + formatted_date + ".xlsx")
+print("輸出檔案： ", folder_path + "6.Statistic\\" + save_place + "All_LargeFlick_motion_table" + formatted_date + ".xlsx")
     
         
                     
@@ -506,7 +498,7 @@ for folder_name in vicon_folder:
     # stage_file = pd.read_excel(stage_file_path, sheet_name=folder_name)
     # 第二次loop計算Gridshot的問題
     imvc_data = pd.DataFrame({}, columns = ['subject', 'data_name', 'mouse', 'method'] + muscle_name)
-    gridshot_c3d_list = [file for file in c3d_list if 'SmallFlick' in file]
+    gridshot_c3d_list = [file for file in c3d_list if 'LargeFlick' in file]
     for num in range(len(gridshot_c3d_list)):
         print(gridshot_c3d_list[num])
         # 0. 處理檔名問題------------------------------------------------------
@@ -549,7 +541,7 @@ for folder_name in vicon_folder:
         # 設定開始索引
         task_start = int(motion_info['frame_rate'])
         # 結束索引是開始後加15秒
-        task_end = int(motion_info['frame_rate']*15)
+        task_end = int(motion_info['frame_rate']*25)
         
         # 設定 sampling rate
         sampling_time = 1/motion_info['frame_rate']
@@ -662,23 +654,19 @@ for folder_name in vicon_folder:
         
         tep_motion_angle_table = pd.DataFrame({'檔名': save_name,
                                                'mouse': trial_info["mouse"],
-                                               # peak
+                                               # mean
                                                'Elbow:Add-Abd平均': np.mean(ElbowEuler[:, 2]), #
-                                               'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
-                                               # peak
                                                'Elbow:Pro-Sup平均': np.mean(ElbowEuler[:, 1]),
-                                               'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
-                                               # peak
                                                'Elbow:Flex-Ext平均': np.mean(ElbowEuler[:, 0]),
-                                               'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
-                                               # peak
                                                'Hand:Add-Abd平均': np.mean(WristEuler[:, 1]), #
-                                               'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
-                                               # peak
                                                'Hand:Pro-Sup平均': np.mean(WristEuler[:, 2]),
-                                               'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
-                                               # peak
                                                'Hand:Flex-Ext平均': np.mean(WristEuler[:, 0]),
+                                               # max                                                
+                                               'Elbow:Add-Abd最大值': np.max(ElbowEuler[:, 2]),
+                                               'Elbow:Pro-Sup最大值': np.max(ElbowEuler[:, 1]),
+                                               'Elbow:Flex-Ext最大值': np.max(ElbowEuler[:, 0]),
+                                               'Hand:Add-Abd最大值': np.max(WristEuler[:, 1]),
+                                               'Hand:Pro-Sup最大值': np.max(WristEuler[:, 2]),
                                                'Hand:Flex-Ext最大值': np.max(WristEuler[:, 0]),
                                                },
                                                index=[0])
@@ -728,17 +716,11 @@ for folder_name in vicon_folder:
         for muscle in emg_iMVC.columns:
             imvc_data.loc[0, 'method'] = 'mean'
             imvc_data.loc[0, 'subject'] = trial_info["subject"]
-            imvc_data.loc[0, 'data_name'] = save_name
-            imvc_data.loc[0, 'mouse'] = trial_info['mouse']
             imvc_data.loc[0, muscle] = np.mean(emg_iMVC.loc[:, muscle])
             imvc_data.loc[1, 'method'] = 'max'
-            imvc_data.loc[1, 'data_name'] = save_name
-            imvc_data.loc[1, 'mouse'] = trial_info['mouse']
             imvc_data.loc[1, 'subject'] = trial_info["subject"]
             imvc_data.loc[1, muscle] = np.max(emg_iMVC.loc[:, muscle])
             imvc_data.loc[2, 'method'] = 'min'
-            imvc_data.loc[2, 'data_name'] = save_name
-            imvc_data.loc[2, 'mouse'] = trial_info['mouse']
             imvc_data.loc[2, 'subject'] = trial_info["subject"]
             imvc_data.loc[2, muscle] = np.min(emg_iMVC.loc[:, muscle])
         
@@ -749,7 +731,7 @@ for folder_name in vicon_folder:
             
       
 # 儲存檔案  
-with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_SmallFlick_vicon_table" + formatted_date + ".xlsx",
+with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_LargeFlick_vicon_table" + formatted_date + ".xlsx",
                     engine='openpyxl') as writer:
     all_motion_angle_table.to_excel(writer, sheet_name='arm_motion', index=False, header=True)
     all_hand_include_angle.to_excel(writer, sheet_name='FingerIncludeAngle', index=False, header=True)
