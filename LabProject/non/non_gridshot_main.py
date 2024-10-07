@@ -7,8 +7,8 @@ Created on Mon Sep 30 08:45:10 2024
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+# sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 import plotFig_function as FigPlot
@@ -32,8 +32,8 @@ now = datetime.now()
 # 将日期转换为指定格式
 formatted_date = now.strftime("%Y-%m-%d")
 # %% 路徑設置
-folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
-# folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
+# folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
+folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
 motion_folder = "1.motion\\"
 emg_folder = "2.EMG\\"
 subfolder = "2.LargeFlick\\"
@@ -59,8 +59,8 @@ emg_folder_path = folder_path + emg_folder
 
 # results_save_path = r"E:\Hsin\BenQ\ZOWIE non-sym\4.process_data\\"
 
-stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240929.xlsx"
-# stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240929.xlsx"
+# stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240929.xlsx"
+stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20241006.xlsx"
 all_mouse_name = ['_EC2_', '_ECN1_', '_ECN2_', '_ECO_', '_HS_']
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
@@ -293,7 +293,7 @@ for folder_name in cortex_folder:
                 del motion_data, analog_data, np_motion_data
                 # --------------------------------------------------------------------
                 # 計算手指的關節角度: 只計算食、中指以及大拇指.
-                tem_hand_angle_table = kincal.finger_angle_cal(c3d_list[num], new_motion_data, new_motion_info)
+                tem_hand_angle_table = kincal.finger_angle_cal(save_name, new_motion_data, new_motion_info)
                 hand_angle_table = pd.concat([hand_angle_table, tem_hand_angle_table],
                                              ignore_index=True)
                 # 計算關節的旋轉矩陣
@@ -383,10 +383,10 @@ for folder_name in cortex_folder:
                         index = int(duration * emg_fs)
                         emg_mean.iloc[row, col] = np.mean(emg_iMVC.iloc[row*index:(row+1)*index, col])
                 
-                # pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
+                # # pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
+                # #                                 sheet_name='Sheet1', index=False, header=True)
+                # pd.DataFrame(emg_mean).to_excel(emg_save_path + save_name + "_mvcMean.xlsx",
                 #                                 sheet_name='Sheet1', index=False, header=True)
-                pd.DataFrame(emg_mean).to_excel(emg_save_path + save_name + "_mvcMean.xlsx",
-                                                sheet_name='Sheet1', index=False, header=True)
                 
                 emg_slope = emg.iMVC_plot(emg_mean, save_name, emg_save_path)
                 emg_slope['mouse'] = [trial_info['mouse']]
@@ -406,7 +406,8 @@ with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_GridShot_c
     all_motion_angle_table.to_excel(writer, sheet_name='arm_motion', index=False, header=True)
     all_hand_include_angle.to_excel(writer, sheet_name='FingerIncludeAngle', index=False, header=True)
     hand_angle_table.to_excel(writer, sheet_name='FingerAngle', index=False, header=True)
-    all_slope_data.to_excel(writer, sheet_name='_MedFreq', index=False, header=True)
+    all_slope_data.to_excel(writer, sheet_name='MedFreq', index=False, header=True)
+    all_emg_slope_data.to_excel(writer, sheet_name='iMVCslope', index=False, header=True)
     
    
      
@@ -425,35 +426,35 @@ for folder_name in vicon_folder:
     all_table = pd.read_excel(stage_file_path,
                               sheet_name=excel_sheetr_name)
     # 第一次loop先計算tpose的問題
-    # for num in range(len(c3d_list)):
-    #     # 1.2.0. ---------使用tpose計算 手肘內上髁 Virtual marker 之位置 --------------
-    #     if "tpose_elbow" in c3d_list[num]:
-    #         print(c3d_list[num])
-    #         motion_info, motion_data, analog_info, FP_data, np_motion_data = func.read_c3d(c3d_list[num])
-    #         # 1. 設定輸入計算 Virtual marker 參數 : 手肘內上髁, 外上髁, UA1, UA3
-    #         R_Elbow_Med = motion_data.loc[:, "R.Elbow.Med_x":"R.Elbow.Med_z"].dropna(axis=0)
-    #         R_Elbow_Lat = motion_data.loc[:, "R.Elbow.Lat_x":"R.Elbow.Lat_z"].dropna(axis=0)
-    #         UA1 = motion_data.loc[:, "UA1_x":"UA1_z"].dropna(axis=0)
-    #         UA3 = motion_data.loc[:, "UA3_x":"UA3_z"].dropna(axis=0)
-    #         # 2. 避免數量中出現NAN，請造成不同變數見長短不一致，因此找出最短數列的 index
-    #         ind_frame = min([np.shape(R_Elbow_Med)[0], np.shape(R_Elbow_Lat)[0], np.shape(UA1)[0], np.shape(UA3)[0]])
-    #         for ii in [R_Elbow_Med, R_Elbow_Lat, UA1, UA3]:
-    #             if ind_frame == np.shape(ii)[0]:
-    #                 ind_frame = ii.index
-    #                 break
-    #         # 3. 計算手肘內上髁在 LCS 之位置
-    #         p1_all = pd.DataFrame(np.zeros([len(ind_frame), 3]))
-    #         for frame in ind_frame:
-    #             p1_all.iloc[frame :] = (kincal.transformation_matrix(R_Elbow_Lat.iloc[frame, :].values, UA1.iloc[frame, :].values, UA3.iloc[frame, :].values,
-    #                                                                  R_Elbow_Med.iloc[frame, :].values, np.array([0, 0, 0]),
-    #                                                                  rotation='GCStoLCS'))
-    #             # 4. 清除不需要的變數
-    #         del motion_info, motion_data, analog_info, FP_data, R_Elbow_Med, UA1, UA3, np_motion_data
-    #         gc.collect()
-    #     if "tpose_hand" in c3d_list[num].lower():
-    #         print(c3d_list[num])
-    #         index = 1
-    #         static_ArmCoord, static_ForearmCoord, static_HandCoord = kincal.arm_natural_pos(c3d_list[num], p1_all, index)
+    for num in range(len(c3d_list)):
+        # 1.2.0. ---------使用tpose計算 手肘內上髁 Virtual marker 之位置 --------------
+        if "tpose_elbow" in c3d_list[num]:
+            print(c3d_list[num])
+            motion_info, motion_data, analog_info, FP_data, np_motion_data = func.read_c3d(c3d_list[num])
+            # 1. 設定輸入計算 Virtual marker 參數 : 手肘內上髁, 外上髁, UA1, UA3
+            R_Elbow_Med = motion_data.loc[:, "R.Elbow.Med_x":"R.Elbow.Med_z"].dropna(axis=0)
+            R_Elbow_Lat = motion_data.loc[:, "R.Elbow.Lat_x":"R.Elbow.Lat_z"].dropna(axis=0)
+            UA1 = motion_data.loc[:, "UA1_x":"UA1_z"].dropna(axis=0)
+            UA3 = motion_data.loc[:, "UA3_x":"UA3_z"].dropna(axis=0)
+            # 2. 避免數量中出現NAN，請造成不同變數見長短不一致，因此找出最短數列的 index
+            ind_frame = min([np.shape(R_Elbow_Med)[0], np.shape(R_Elbow_Lat)[0], np.shape(UA1)[0], np.shape(UA3)[0]])
+            for ii in [R_Elbow_Med, R_Elbow_Lat, UA1, UA3]:
+                if ind_frame == np.shape(ii)[0]:
+                    ind_frame = ii.index
+                    break
+            # 3. 計算手肘內上髁在 LCS 之位置
+            p1_all = pd.DataFrame(np.zeros([len(ind_frame), 3]))
+            for frame in ind_frame:
+                p1_all.iloc[frame :] = (kincal.transformation_matrix(R_Elbow_Lat.iloc[frame, :].values, UA1.iloc[frame, :].values, UA3.iloc[frame, :].values,
+                                                                      R_Elbow_Med.iloc[frame, :].values, np.array([0, 0, 0]),
+                                                                      rotation='GCStoLCS'))
+                # 4. 清除不需要的變數
+            del motion_info, motion_data, analog_info, FP_data, R_Elbow_Med, UA1, UA3, np_motion_data
+            gc.collect()
+        if "tpose_hand" in c3d_list[num].lower():
+            print(c3d_list[num])
+            index = 1
+            static_ArmCoord, static_ForearmCoord, static_HandCoord = kincal.arm_natural_pos(c3d_list[num], p1_all, index)
     
     
    
@@ -604,7 +605,8 @@ with pd.ExcelWriter(folder_path + "6.Statistic\\" + save_place + "All_GridShot_v
     # all_motion_angle_table.to_excel(writer, sheet_name='arm_motion', index=False, header=True)
     # all_hand_include_angle.to_excel(writer, sheet_name='FingerIncludeAngle', index=False, header=True)
     # hand_angle_table.to_excel(writer, sheet_name='FingerAngle', index=False, header=True)
-    all_slope_data.to_excel(writer, sheet_name='_MedFreq', index=False, header=True)            
+    all_slope_data.to_excel(writer, sheet_name='MedFreq', index=False, header=True)
+    all_emg_slope_data.to_excel(writer, sheet_name='iMVCslope', index=False, header=True)        
       
 
         
