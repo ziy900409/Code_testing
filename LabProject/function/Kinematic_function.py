@@ -552,6 +552,7 @@ def transformation_matrix(LCS_0, LCS_1, LCS_2, p, O, rotation="GCStoLCS"):
         the specific point coordinate with respect to LCS/GCS.
 
     """
+    
     # determinate the axis
     v1 = LCS_1 - LCS_0  # long axis
     v2 = np.cross(v1, (LCS_2 - LCS_0))  # superior direction

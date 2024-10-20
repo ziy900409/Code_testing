@@ -315,7 +315,15 @@ def conf95_ellipse(COPxy, filename):
     ax.legend()
     plt.show()
     
-    return Area95, fig
+    
+    a = math.dist(semimaj[:, 0], semimaj[:, 1])
+    b = math.dist(semimin[:, 0], semimin[:, 1])
+    if a > b:
+        r = a/b
+    else:
+        r = b/a
+    
+    return Area95, fig, r
 
 
 
