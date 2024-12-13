@@ -50,34 +50,26 @@ csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
                      'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
                      'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
 
-c3d_recolumns_name = {'ExtRad.IM EMG1': 'Extensor Carpi Radialis',
-                     'FleRad.IM EMG2': 'Flexor Carpi Radialis',
-                     'Triceps.IM EMG3': 'Triceps Brachii',
-                     'Triceps.IM EMG9': 'Triceps Brachii',
-                     'ExtUlnar.IM EMG4': 'Extensor Carpi Ulnaris',
-                     'ExtUlnar A.IM EMG4': 'Extensor Carpi Ulnaris',
-                     'DorInter_1st.IM EMG5': '1st Dorsal Interosseous', 
-                     'AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
+c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
+                     'FleRad': 'Flexor Carpi Radialis',
+                     'Triceps': 'Triceps Brachii',
+                     'Triceps': 'Triceps Brachii',
+                     'ExtUlnar': 'Extensor Carpi Ulnaris',
+                     'ExtUlnar': 'Extensor Carpi Ulnaris',
+                     'DorInter': '1st Dorsal Interosseous', 
+                     'AbdDigMin': 'Abductor Digiti Quinti',
                      #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
-                     'ExtInd.IM EMG7': 'Extensor Indicis',
-                     'Biceps.IM EMG8': 'Biceps Brachii',
+                     'ExtInd': 'Extensor Indicis',
+                     'Biceps': 'Biceps Brachii',
                      }
 
-c3d_analog_cha = ['ExtRad.IM EMG1', 'FleRad.IM EMG2', 'ExtUlnar.IM EMG4', 'ExtUlnar A.IM EMG4'
-                  'DorInter_1st.IM EMG5', 'AbdDigMin.IM EMG6',  'ExtInd.IM EMG7', 'Biceps.IM EMG8',
-                  'Triceps.IM EMG9']
+c3d_analog_cha = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
+                  "Biceps", "Triceps"]
 
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
                'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
 
-# csv_recolumns_name = {}
-
-# c3d_recolumns_name = {}
-
-# c3d_analog_cha = []
-
-# c3d_analog_idx = []
 
 # %% EMG data processing
 def EMG_processing(raw_data_path, smoothing="lowpass"):
@@ -114,10 +106,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
     3. 插入時間軸
             
     '''
-    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\raw_data\S5\MVC\S5_AbdDigMin_MVC.c3d"
-    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\09_ZowieAllSeries\2. EMG\S01\MVC\S01_MVC_Rep_2.1.csv"
-    # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_07 non-symmetry\\\\2.EMG\\S21\\S21_Triceps_MVC_Rep_2.129.csv'
-    # raw_data_path = r"E:\Hsin\BenQ\ZOWIE non-sym\1.motion\Vicon\S03\S03_ExtInd_MVC.c3d"
+    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_Asymmetric\S01\20241123\S01_Biceps_MVC.c3d"
     if '.csv' in raw_data_path:
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:

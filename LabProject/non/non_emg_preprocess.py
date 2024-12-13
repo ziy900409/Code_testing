@@ -19,21 +19,22 @@ import EMG_function as emg
 
 import gc
 # %%
-folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
+folder_path = r"D:\BenQ_Project\01_UR_lab\2024_11 上海Major\Major_Asymmetric\\"
 # folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
 motion_folder = "1.motion\\"
 emg_folder = "2.EMG\\"
 subfolder = "2.LargeFlick\\"
 motion_type = ["Cortex\\", "Vicon\\"]
 
-cortex_folder = ["S11", "S12", "S13", "S14", "S15",
-                 "S16", "S17", "S18", "S19", 
-                "S20", "S21"]
+# cortex_folder = ["S11", "S12", "S13", "S14", "S15",
+#                  "S16", "S17", "S18", "S19", 
+#                 "S20", "S21"]
 
-vicon_folder = ["S03", "S04", "S05", "S06", "S07", "S08", "S09",
-                "S10", "S23",
-                #"S24"
+vicon_folder = ["S01",
+                #"S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09",
+                #"S10", "S11", "S12",
                 ]
+
 
 RawData_folder = ""
 processingData_folder = "4.process_data\\"
