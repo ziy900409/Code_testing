@@ -11,7 +11,7 @@ import csv
 
 import matplotlib.pyplot as plt
 
-
+remove_model = ['New Subject:']
 vicon2cortex = {'MOS1': 'M1',
                 'MOS2': 'M2',
                 'MOS3': 'M3',
@@ -31,40 +31,11 @@ vicon2cortex = {'MOS1': 'M1',
                 'RMD3': 'R.M.Finger3',
                 'RRG1': 'R.R.Finger1',                
                 'RRG2': 'R.R.Finger2',
-                'RLT1': 'R.P.Finger2',
-                'RLT2': 'R.P.Finger1',                
+                'RLT1': 'R.P.Finger1',
+                'RLT2': 'R.P.Finger2',                
                 }
- 
-c3d_recolumns_vicon = {'RMD1_x': 'R.M.Finger1_x', # 中指掌指關節
-                       'RMD1_y': 'R.M.Finger1_y',
-                       'RMD1_z': 'R.M.Finger1_z',
-                       'RUS_x': 'R.Wrist.Uln_x', # 手腕尺側莖狀突
-                       'RUS_y': 'R.Wrist.Uln_y',
-                       'RUS_z': 'R.Wrist.Uln_z',
-                       'RRS_x': 'R.Wrist.Rad_x', # 手腕橈側莖狀突
-                       'RRS_y': 'R.Wrist.Rad_y',
-                       'RRS_z': 'R.Wrist.Rad_z',
-                       'RTB1_x': 'R.Thumb1_x', # 拇指掌指關節
-                       'RTB1_y': 'R.Thumb1_y',
-                       'RTB1_z': 'R.Thumb1_z',
-                       'RTB2_x': 'R.Thumb2_x', # 拇指第一指關節
-                       'RTB2_y': 'R.Thumb2_y',
-                       'RTB2_z': 'R.Thumb2_z',
-                       'RRG1_x': 'R.R.Finger1_x', # 無名指掌指關節
-                       'RRG1_y': 'R.R.Finger1_y',
-                       'RRG1_z': 'R.R.Finger1_z',
-                       'RRG2_x': 'R.R.Finger2_x', # 無名指第一指關節
-                       'RRG2_y': 'R.R.Finger2_y',
-                       'RRG2_z': 'R.R.Finger2_z',
-                       'RLT1_x': 'R.P.Finger1_x', #小指掌指關節
-                       'RLT1_y': 'R.P.Finger1_y',
-                       'RLT1_z': 'R.P.Finger1_z',
-                       'RLT2_x': 'R.P.Finger2_x', # 小指第一指關節
-                       'RLT2_y': 'R.P.Finger2_y',
-                       'RLT2_z': 'R.P.Finger2_z',
-                       'RUEL_x': 'R.Elbow.Lat_x', # 手肘外上髁
-                       'RUEL_y': 'R.Elbow.Lat_y',
-                       'RUEL_z': 'R.Elbow.Lat_z'}
+
+
 # %% read c3d
 def read_c3d(path, method='cortex'):
     """
@@ -94,7 +65,7 @@ def read_c3d(path, method='cortex'):
     # # 1. read c3d file
     # path = r'E:\\Hsin\\BenQ\\ZOWIE non-sym\\\\1.motion\\Vicon\\S04\\S04_Tpose_elbow.c3d'
     # method = 'vicon'
-    # path = r"E:/Hsin/BenQ/ZOWIE non-sym/1.motion/Cortex/S11/S11_LargeTrack_ECO_3.c3d"
+    # path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_Asymmetric/S02/20241123/S02_Tpose_elbow.c3d"
     c = ezc3d.c3d(path)
 
     # 數據的基本資訊，使用dict儲存
@@ -109,6 +80,8 @@ def read_c3d(path, method='cortex'):
     )
     # 新增功能: 替換掉Vicon中的欄位名稱
     if method == 'vicon':
+        for model in remove_model:
+            motion_info["LABELS"] = [x.replace(model, '') for x in motion_info["LABELS"]]
         new_strings_list = [s for s in motion_info["LABELS"]]
         for key, value in vicon2cortex.items():
             new_strings_list = [s.replace(key, value) for s in new_strings_list]
@@ -286,6 +259,7 @@ def conf95_ellipse(COPxy, filename):
     Input: COPxy [n frame x 2 (COPx COPy)]
     Output: Area95 [1x1]. Area of the ellipse
     """
+
     d = np.array(COPxy)
     m, n = d.shape          # Returns m=rows, n=columns of d
     mean_d = np.mean(d, axis=0)  # Mean of each column
@@ -312,6 +286,8 @@ def conf95_ellipse(COPxy, filename):
     ax.plot(semimin[:, 0], semimin[:, 1], 'r', linewidth=2, label='Semiminor axis')
     ax.plot(ellipse[:, 0], ellipse[:, 1], 'g', linewidth=2, label='95% Confidence Ellipse')
     ax.set_title(str(filename + f' Area: {Area95:.2f}'))
+    ax.set_xlabel('X axis (mm)')
+    ax.set_ylabel('Y axis (mm)')
     ax.legend()
     plt.show()
     

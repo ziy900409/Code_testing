@@ -41,6 +41,10 @@ c3d_notch_cutoff_5 = [249.5, 250.5]
 c3d_notch_cutoff_6 = [299.5, 300.5]
 c3d_notch_cutoff_7 = [349.5, 350.5]
 
+c3d_notch_cutoff_8 = [295, 297]
+c3d_notch_cutoff_9 = [369, 371]
+c3d_notch_cutoff_10 = [73, 75]
+
 csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
                      'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
                      'Mini sensor 3: EMG 3': 'Triceps Brachii',
@@ -287,8 +291,17 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             notch_filtered_6 = signal.sosfiltfilt(notch_sos_6,
                                                 notch_filtered_5)
             notch_sos_7 = signal.butter(2, c3d_notch_cutoff_7, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_7,
-                                                notch_filtered_6)
+            notch_filtered_7 = signal.sosfiltfilt(notch_sos_7,
+                                                  notch_filtered_6)
+            notch_sos_8 = signal.butter(2, c3d_notch_cutoff_8, btype='bandstop', fs=Fs, output='sos')
+            notch_filtered_8 = signal.sosfiltfilt(notch_sos_8,
+                                                  notch_filtered_7)
+            notch_sos_9 = signal.butter(2, c3d_notch_cutoff_9, btype='bandstop', fs=Fs, output='sos')
+            notch_filtered_9 = signal.sosfiltfilt(notch_sos_9,
+                                                notch_filtered_8)
+            notch_sos_10 = signal.butter(2, c3d_notch_cutoff_10, btype='bandstop', fs=Fs, output='sos')
+            notch_filtered = signal.sosfiltfilt(notch_sos_10,
+                                                notch_filtered_9)
   
             # 取絕對值，將訊號翻正
             abs_data = abs(notch_filtered)
@@ -384,7 +397,7 @@ def Find_MVC_max(MVC_folder, MVC_save_path):
     # find_max_all = find_max_all.append(MVC_max)
     find_max_all = pd.concat([find_max_all, MVC_max], axis=0, ignore_index=True)
     # writting data to EXCEl file
-    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-3] + '_all_MVC.xlsx'
+    find_max_name = MVC_save_path + '\\' + MVC_save_path.split('\\')[-1] + '_all_MVC.xlsx'
     pd.DataFrame(find_max_all).to_excel(find_max_name, sheet_name='Sheet1', index=False, header=True)
 
 # %% 傅立葉轉換與畫圖
