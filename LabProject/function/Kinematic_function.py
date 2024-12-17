@@ -995,24 +995,24 @@ def finger_angle_cal(file_name, motion_data, motion_info):
 
 
     wrist_cen = (motion_data[indices[0], :, :] + motion_data[indices[1], :, :])/2
-    CMP1 = included_angle(wrist_cen,                         # wrist
-                              motion_data[indices[2], :, :], # R.Thumb1
-                              motion_data[indices[3], :, :]) # R.Thumb2
-    CMP2 = included_angle(wrist_cen,                         # wrist
-                              motion_data[indices[4], :, :], # R.I.Finger1
-                              motion_data[indices[5], :, :]) # R.I.Finger2
+    CMP1 = included_angle(wrist_cen,                     # wrist
+                          motion_data[indices[2], :, :], # R.Thumb1
+                          motion_data[indices[3], :, :]) # R.Thumb2
+    CMP2 = included_angle(wrist_cen,                     # wrist
+                          motion_data[indices[4], :, :], # R.I.Finger1
+                          motion_data[indices[5], :, :]) # R.I.Finger2
     PIP2 = included_angle(motion_data[indices[4], :, :], # R.I.Finger1
-                              motion_data[indices[5], :, :], # R.I.Finger2
-                              motion_data[indices[6], :, :]) # R.I.Finger3
-    CMP3 = included_angle(wrist_cen,                         # wrist
-                              motion_data[indices[7], :, :], # R.M.Finger1
-                              motion_data[indices[8], :, :]) # R.M.Finger2
-    CMP4 = included_angle(wrist_cen,                         # wrist
-                              motion_data[indices[9], :, :], # R.R.Finger1
-                              motion_data[indices[10], :, :]) # R.R.Finger2
-    CMP5 = included_angle(wrist_cen,                          # wrist
-                              motion_data[indices[11], :, :], # R.P.Finger1
-                              motion_data[indices[12], :, :]) # R.P.Finger2
+                          motion_data[indices[5], :, :], # R.I.Finger2
+                          motion_data[indices[6], :, :]) # R.I.Finger3
+    CMP3 = included_angle(wrist_cen,                     # wrist
+                          motion_data[indices[7], :, :], # R.M.Finger1
+                          motion_data[indices[8], :, :]) # R.M.Finger2
+    CMP4 = included_angle(wrist_cen,                     # wrist
+                          motion_data[indices[9], :, :], # R.R.Finger1
+                          motion_data[indices[10], :, :]) # R.R.Finger2
+    CMP5 = included_angle(wrist_cen,                      # wrist
+                          motion_data[indices[11], :, :], # R.P.Finger1
+                          motion_data[indices[12], :, :]) # R.P.Finger2
     hand_angle_table = pd.concat([hand_angle_table,
                                   pd.DataFrame({"filename":file_name,
                                                 "CMP1":np.mean(CMP1),

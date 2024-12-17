@@ -4,7 +4,7 @@ Created on Mon Sep 30 08:45:10 2024
 
 @author: Hsin.YH.Yang
 """
-import os
+
 import sys
 # 路徑改成你放自己code的資料夾
 # sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
@@ -27,26 +27,22 @@ import matplotlib.pyplot as plt
 # from scipy import signal
 # import math
 from datetime import datetime
-# 获取当前日期和时间
-now = datetime.now()
-# 将日期转换为指定格式
-formatted_date = now.strftime("%Y-%m-%d")
+
 # %% 路徑設置
 # folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
 folder_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\\"
 RawData_folder = "1. Motion\Major_Asymmetric\\"
 processingData_folder = "2. ProsessingData\\"
 
-save_place = "3. Spider\\"
-
+save_place = "2. SmallTrack\\"
+task_name = 'SmallTrack'
 
 vicon_folder = ["S01",
                 "S02", "S03", "S04",
                 "S05", "S06", "S07", "S08", "S09",
-                # "S10", "S11", "S12",
+                #"S10",
+                "S11", "S12",
                 ]
-
-
 
 motion_folder_path = folder_path + RawData_folder
 
@@ -245,7 +241,7 @@ for folder_name in vicon_folder:
     # 第二次loop計算Gridshot的問題
     imvc_data = pd.DataFrame({}, columns = ['subject', 'data_name', 'mouse', 'method'] + muscle_name)
     # 取得 c3d list 下的所有 Spider 檔案
-    motion_list = [file for file in c3d_list if 'SpiderShot' in file]
+    motion_list = [file for file in c3d_list if task_name in file]
 
     for num in range(len(motion_list)):
         print(motion_list[num])
@@ -316,22 +312,12 @@ for folder_name in vicon_folder:
         # 儲存圖片
         fig.savefig(motion_save_path + save_name + "_conf95_ellipse.jpg")                 
   
-        # 2.1. 儲存資料-----------------------------------------------------------
-        # 將資料儲存至矩陣
-        add_data = pd.DataFrame({"file_name": save_name,
-                                 "subject": trial_info["subject"],
-                                 "task": trial_info["task"],
-                                 "mouse": trial_info["mouse"],
-                                 "Area95": Area95,
-                                 },
-                                index=[0])
         #2.1. 計算手掌與桌面的夾角------------------------------------------------------------
-        # 創建一的Y軸向量，長度
+        # 定義手指 marker
         R_Thumb1 = filted_motion.loc[:, ['R.Thumb1_x', 'R.Thumb1_y', 'R.Thumb1_z']].\
             iloc[task_start:task_end, :].values
         R_Thumb2 = filted_motion.loc[:, ['R.Thumb2_x', 'R.Thumb2_y', 'R.Thumb2_z']].\
             iloc[task_start:task_end, :].values
-        
         R_M_Finger1 = filted_motion.loc[:, ['R.M.Finger1_x', 'R.M.Finger1_y', 'R.M.Finger1_z']].\
             iloc[task_start:task_end, :].values
         R_M_Finger2 = filted_motion.loc[:, ['R.M.Finger2_x', 'R.M.Finger2_y', 'R.M.Finger2_z']].\
@@ -346,7 +332,7 @@ for folder_name in vicon_folder:
             iloc[task_start:task_end, :].values
         wrist_mid = (filted_motion.loc[task_start:task_end, 'R.Wrist.Uln_x':'R.Wrist.Uln_z'].values + \
             filted_motion.loc[task_start:task_end, 'R.Wrist.Rad_x':'R.Wrist.Rad_z'].values )/2
-        # matrix = np.tile([0, 1, 0], (len(R_I_Finger1), 1))
+        # 計算關節夾角
         MvsR_angle = kincal.included_angle(R_M_Finger1,
                                            R_M_Finger2,                                      
                                            R_R_Finger1,
@@ -365,11 +351,12 @@ for folder_name in vicon_folder:
                                              R_Thumb1,
                                              wrist_mid)
         # 2.1. 儲存資料-----------------------------------------------------------
-        # 將資料儲存至矩陣
+        # 將資料儲存至矩陣 
         hand_include_angle = pd.DataFrame({"file_name": save_name,
                                           "subject": trial_info["subject"],
                                           "task": trial_info["task"],
                                           "mouse": trial_info["mouse"],
+                                          "trial": trial_info["trial_num"],
                                           "Area95": Area95,
                                           "MvsR_angle_mean": np.mean(MvsR_angle),
                                           "MvsR_angle_min": np.min(MvsR_angle),
@@ -386,7 +373,11 @@ for folder_name in vicon_folder:
                                           "Little_angle_mean": np.mean(LittleFinger),
                                           "Little_angle_min": np.min(LittleFinger),
                                           "Little_angle_max": np.max(LittleFinger),
-                                          "Little_angle_std": np.std(LittleFinger)
+                                          "Little_angle_std": np.std(LittleFinger),
+                                          "Thumb_angle_mean": np.mean(ThumbFinger),
+                                          "Thumb_angle_min": np.min(ThumbFinger),
+                                          "Thumb_angle_max": np.max(ThumbFinger),
+                                          "Thumb_angle_std": np.std(ThumbFinger)
                                           },
                                           index=[0])
         all_hand_include_angle = pd.concat([hand_include_angle, all_hand_include_angle],
@@ -400,7 +391,12 @@ for folder_name in vicon_folder:
         del motion_data, analog_data, np_motion_data
         # --------------------------------------------------------------------
         # 計算手指的關節角度: 只計算食、中指以及大拇指.
-        tem_hand_angle_table = kincal.finger_angle_cal(c3d_list[num], new_motion_data, new_motion_info)
+        tem_hand_angle_table = kincal.finger_angle_cal(motion_list[num], new_motion_data, new_motion_info)
+        tem_hand_angle_table["subject"] = [trial_info["subject"]]
+        tem_hand_angle_table["task"] = [trial_info["task"]]
+        tem_hand_angle_table["mouse"] = [trial_info["mouse"]]
+        tem_hand_angle_table["trial"] = [trial_info["trial_num"]]
+        
         hand_angle_table = pd.concat([hand_angle_table, tem_hand_angle_table],
                                      ignore_index=True)
         # 計算關節的旋轉矩陣
@@ -413,7 +409,10 @@ for folder_name in vicon_folder:
         Wrist_AngVel, Wrist_AngAcc = kincal.Rot2LocalAngularEP(WristRot, 180, place="joint", unit="degree")
         
         tep_motion_angle_table = pd.DataFrame({'檔名': save_name,
-                                               'mouse': trial_info["mouse"],
+                                               "subject": trial_info["subject"],
+                                               "task": trial_info["task"],
+                                               "mouse": trial_info["mouse"],
+                                               "trial": trial_info["trial_num"],
                                                # mean
                                                'Elbow:Add-Abd平均': np.mean(ElbowEuler[:, 2]), #
                                                'Elbow:Pro-Sup平均': np.mean(ElbowEuler[:, 1]),
@@ -439,86 +438,95 @@ for folder_name in vicon_folder:
 
         # 3. 疲勞分析 -----------------------------------------------------------
         # 定義及設定存檔路徑
-        # emg_path = motion_list[num]
-        # emg_save_path = folder_path + processingData_folder + folder_name + "\\" + \
-        #          save_place + "\\2. EMG\\"
-        # # 前處理EMG data
-        # processing_data, bandpass_filtered_data = emg.EMG_processing(emg_path, smoothing=smoothing)
-        # emg_fs = 1 / (processing_data.iloc[1, 0] - processing_data.iloc[0, 0])
-        # # 畫 bandpass 後之資料圖
-        # emg.plot_plot(bandpass_filtered_data, str(emg_save_path),
-        #               save_name, "_Bandpass")
-        # # 畫smoothing 後之資料圖
-        # emg.plot_plot(processing_data, str(emg_save_path),
-        #               save_name, str(smoothing + "_"))
-        # # 畫 FFT analysis 的圖
-        # emg.Fourier_plot(emg_path,
-        #                 (str(emg_save_path)),
-        #                 save_name)
-        # emg.Fourier_plot(emg_path,
-        #                 (str(emg_save_path)),
-        #                 (save_name),
-        #                 notch=True)
-        # # writting data in worksheet
-        # file_name = emg_save_path + save_name + end_name + ".xlsx"
-        # pd.DataFrame(processing_data).to_excel(emg_save_path + save_name + "_lowpass.xlsx",
-        #                                        sheet_name='Sheet1', index=False, header=True)
-        # # 計算 iMVC
-        # emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
-        #                         columns=processing_data.columns)
-        # emg_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
-        # emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
-        #                                  MVC_value.values)*100
+        emg_path = motion_list[num]
+        emg_save_path = folder_path + processingData_folder + folder_name + "\\" + \
+                  save_place + "\\2. EMG\\"
+        # 前處理EMG data
+        processing_data, bandpass_filtered_data = emg.EMG_processing(emg_path, smoothing=smoothing)
+        emg_fs = 1 / (processing_data.iloc[1, 0] - processing_data.iloc[0, 0])
+        # 畫 bandpass 後之資料圖
+        emg.plot_plot(bandpass_filtered_data, str(emg_save_path),
+                      save_name, "_Bandpass")
+        # 畫smoothing 後之資料圖
+        emg.plot_plot(processing_data, str(emg_save_path),
+                      save_name, str(smoothing + "_"))
+        # 畫 FFT analysis 的圖
+        emg.Fourier_plot(emg_path,
+                        (str(emg_save_path)),
+                        save_name)
+        emg.Fourier_plot(emg_path,
+                        (str(emg_save_path)),
+                        (save_name),
+                        notch=True)
+        # writting data in worksheet
+        file_name = emg_save_path + save_name + end_name + ".xlsx"
+        pd.DataFrame(processing_data).to_excel(emg_save_path + save_name + "_lowpass.xlsx",
+                                                sheet_name='Sheet1', index=False, header=True)
+        # 計算 iMVC
+        emg_iMVC = pd.DataFrame(np.zeros(np.shape(processing_data)),
+                                columns=processing_data.columns)
+        emg_iMVC.iloc[:, 0] = processing_data.iloc[:, 0].values
+        emg_iMVC.iloc[:, 1:] = np.divide(abs(processing_data.iloc[:, 1:].values),
+                                          MVC_value.values)*100
             
+        pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
+                                        sheet_name='Sheet1', index=False, header=True)
+        # 進行中頻率分析
+        med_freq_data, slope_data = emg.median_frquency(emg_path,
+                                                        duration, emg_save_path, save_name,
+                                                        begin=[0, motion_info['frame_rate']*15*10])
+        # 儲存斜率的資料，並合併成一個資料表
+        slope_data['data_name'] = [save_name]
+        slope_data["subject"] = [trial_info["subject"]]
+        slope_data["task"] = [trial_info["task"]]
+        slope_data["mouse"] = [trial_info["mouse"]]
+        slope_data["trial"] = [trial_info["trial_num"]]
+    
+        all_slope_data = pd.concat([all_slope_data, slope_data])
+        
+        emg_mean = pd.DataFrame(np.zeros([int(np.shape(emg_iMVC)[0]/int(duration * emg_fs)), np.shape(emg_iMVC)[1]]),
+                                columns=processing_data.columns)
+        for col in range(np.shape(emg_iMVC)[1]):
+            for row in range(int(np.shape(emg_iMVC)[0]/int(duration * emg_fs))):
+                index = int(duration * emg_fs)
+                emg_mean.iloc[row, col] = np.mean(emg_iMVC.iloc[row*index:(row+1)*index, col])
+        
         # pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
         #                                 sheet_name='Sheet1', index=False, header=True)
-        # # 進行中頻率分析
-        # med_freq_data, slope_data = emg.median_frquency(emg_path,
-        #                                                 duration, emg_save_path, save_name,
-        #                                                 begin=[0, motion_info['frame_rate']*15*10])
-        # # 儲存斜率的資料，並合併成一個資料表
-        # slope_data['mouse'] = [trial_info['mouse']]
-        # slope_data['data_name'] = [save_name]
-        # slope_data['subject'] = [trial_info["subject"]]
-        # all_slope_data = pd.concat([all_slope_data, slope_data])
-        
-        # emg_mean = pd.DataFrame(np.zeros([int(np.shape(emg_iMVC)[0]/int(duration * emg_fs)), np.shape(emg_iMVC)[1]]),
-        #                         columns=processing_data.columns)
-        # for col in range(np.shape(emg_iMVC)[1]):
-        #     for row in range(int(np.shape(emg_iMVC)[0]/int(duration * emg_fs))):
-        #         index = int(duration * emg_fs)
-        #         emg_mean.iloc[row, col] = np.mean(emg_iMVC.iloc[row*index:(row+1)*index, col])
-        
-        # # pd.DataFrame(emg_iMVC).to_excel(emg_save_path + save_name + "_iMVC.xlsx",
-        # #                                 sheet_name='Sheet1', index=False, header=True)
-        # pd.DataFrame(emg_mean).to_excel(emg_save_path + save_name + "_mvcMean.xlsx",
-        #                                 sheet_name='Sheet1', index=False, header=True)
+        pd.DataFrame(emg_mean).to_excel(emg_save_path + save_name + "_mvcMean.xlsx",
+                                        sheet_name='Sheet1', index=False, header=True)
     
-        # emg_slope = emg.iMVC_plot(emg_mean, save_name, emg_save_path)
-        # emg_slope['mouse'] = [trial_info['mouse']]
-        # emg_slope['data_name'] = [save_name]
-        # all_emg_slope_data = pd.concat([all_emg_slope_data, emg_slope])
+        emg_slope = emg.iMVC_plot(emg_mean, save_name, emg_save_path)
         
-        # # 儲存 iMVC data
-        # for muscle in emg_iMVC.columns:
-        #     imvc_data.loc[0, 'method'] = 'mean'
-        #     imvc_data.loc[0, 'subject'] = trial_info["subject"]
-        #     imvc_data.loc[0, muscle] = np.mean(emg_iMVC.loc[:, muscle])
-        #     imvc_data.loc[1, 'method'] = 'max'
-        #     imvc_data.loc[1, 'subject'] = trial_info["subject"]
-        #     imvc_data.loc[1, muscle] = np.max(emg_iMVC.loc[:, muscle])
-        #     imvc_data.loc[2, 'method'] = 'min'
-        #     imvc_data.loc[2, 'subject'] = trial_info["subject"]
-        #     imvc_data.loc[2, muscle] = np.min(emg_iMVC.loc[:, muscle])
+        emg_slope['data_name'] = [save_name]
+        emg_slope["subject"] = [trial_info["subject"]]
+        emg_slope["task"] = [trial_info["task"]]
+        emg_slope["mouse"] = [trial_info["mouse"]]
+        emg_slope["trial"] = [trial_info["trial_num"]]
         
-        # # imvc_data['mouse'].replace(np.NaN, trial_info['mouse'], inplace=True)
-        # # imvc_data['data_name'].replace(np.NaN, save_name, inplace=True)
-        # # imvc_data['subject'].replace(np.NaN, trial_info["subject"], inplace=True)
-        # all_imvc_data = pd.concat([all_imvc_data, imvc_data])
+        all_emg_slope_data = pd.concat([all_emg_slope_data, emg_slope])
+        
+        # 儲存 iMVC data
+        for muscle in emg_iMVC.columns:
+            imvc_data.loc[0, 'method'] = 'mean'
+            imvc_data.loc[0, 'subject'] = trial_info["file_name"]
+            imvc_data.loc[0, muscle] = np.mean(emg_iMVC.loc[:, muscle])
+            imvc_data.loc[1, 'method'] = 'max'
+            imvc_data.loc[1, 'subject'] = trial_info["file_name"]
+            imvc_data.loc[1, muscle] = np.max(emg_iMVC.loc[:, muscle])
+            imvc_data.loc[2, 'method'] = 'min'
+            imvc_data.loc[2, 'subject'] = trial_info["file_name"]
+            imvc_data.loc[2, muscle] = np.min(emg_iMVC.loc[:, muscle])
+        
+
+        all_imvc_data = pd.concat([all_imvc_data, imvc_data])
             
-      
+# 获取当前日期和时间
+now = datetime.now()
+# 将日期转换为指定格式
+formatted_date = now.strftime("%m-%d-%H%M")
 # 儲存檔案  
-with pd.ExcelWriter(folder_path + "4. Statistics\\" + save_place + "All_Spider_vicon_table" + formatted_date + ".xlsx",
+with pd.ExcelWriter(folder_path + "4. Statistics\\" + save_place + "All_" + task_name + "_vicon_table_" + formatted_date + ".xlsx",
                     engine='openpyxl') as writer:
     all_motion_angle_table.to_excel(writer, sheet_name='arm_motion', index=False, header=True)
     all_hand_include_angle.to_excel(writer, sheet_name='FingerIncludeAngle', index=False, header=True)
