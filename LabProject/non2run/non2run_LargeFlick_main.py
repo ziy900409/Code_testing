@@ -34,8 +34,8 @@ folder_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\\"
 RawData_folder = "1. Motion\Major_Asymmetric\\"
 processingData_folder = "2. ProsessingData\\"
 
-save_place = "3. SpiderShot\\"
-task_name = 'SpiderShot'
+save_place = "2. SmallTrack\\"
+task_name = 'SmallTrack'
 
 vicon_folder = [#"S01",
                 #"S02", "S03", "S04",
@@ -338,15 +338,15 @@ for folder_name in vicon_folder:
                                            R_R_Finger1,
                                            R_R_Finger2)
         RvsP_angle = kincal.included_angle(R_R_Finger1,
-                                           R_R_Finger2,                                      
-                                           R_P_Finger1,
-                                           R_P_Finger2)
+                                            R_R_Finger2,                                      
+                                            R_P_Finger1,
+                                            R_P_Finger2)
         RingFinger = kincal.included_angle(R_R_Finger2,                                      
                                            R_R_Finger1,
                                            wrist_mid)
         LittleFinger = kincal.included_angle(R_P_Finger2,
-                                             R_P_Finger1,
-                                             wrist_mid)
+                                              R_P_Finger1,
+                                              wrist_mid)
         ThumbFinger = kincal.included_angle(R_Thumb2,
                                              R_Thumb1,
                                              wrist_mid)
@@ -398,7 +398,7 @@ for folder_name in vicon_folder:
         tem_hand_angle_table["trial"] = [trial_info["trial_num"]]
         
         hand_angle_table = pd.concat([hand_angle_table, tem_hand_angle_table],
-                                     ignore_index=True)
+                                      ignore_index=True)
         # 計算關節的旋轉矩陣
         ElbowRot = kincal.joint_angle_rot(ArmCoord, ForearmCoord, OffsetRotP=static_ArmCoord, OffsetRotD=static_ForearmCoord)
         WristRot = kincal.joint_angle_rot(ForearmCoord, HandCoord, OffsetRotP=static_ForearmCoord, OffsetRotD=static_HandCoord)

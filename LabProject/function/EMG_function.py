@@ -243,24 +243,13 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=sample_freq, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos, data)
             # 做 band stop filter
-            notch_sos_1 = signal.butter(2, csv_notch_cutoff_1, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
-                                                bandpass_filtered)
-            notch_sos_2 = signal.butter(2, csv_notch_cutoff_2, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
-                                                notch_filtered_1)
-            notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
-                                                notch_filtered_2)
-            notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
-                                                notch_filtered_3)
-            notch_sos_5 = signal.butter(2, csv_notch_cutoff_5, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
-                                                notch_filtered_4)
-            notch_sos_6 = signal.butter(2, csv_notch_cutoff_6, btype='bandstop', fs=sample_freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_6,
-                                                notch_filtered_5)
+            notch_filtered = bandpass_filtered  # 起始輸入信號
+
+            # 使用迴圈進行多次 Notch 過濾
+            for cutoff in csv_notch_cutoff_list:
+                notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=sample_freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
+            
             # 取絕對值，將訊號翻正
             abs_data = abs(notch_filtered)
             # ------linear envelop analysis-----------                          
@@ -274,36 +263,13 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=Fs, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos, data)
             # notch filter
-            notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
-                                                bandpass_filtered)
-            notch_sos_2 = signal.butter(2, c3d_notch_cutoff_2, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
-                                                notch_filtered_1)
-            notch_sos_3 = signal.butter(2, c3d_notch_cutoff_3, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
-                                                notch_filtered_2)
-            notch_sos_4 = signal.butter(2, c3d_notch_cutoff_4, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
-                                                notch_filtered_3)
-            notch_sos_5 = signal.butter(2, c3d_notch_cutoff_5, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
-                                                notch_filtered_4)
-            notch_sos_6 = signal.butter(2, c3d_notch_cutoff_6, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_6 = signal.sosfiltfilt(notch_sos_6,
-                                                notch_filtered_5)
-            notch_sos_7 = signal.butter(2, c3d_notch_cutoff_7, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_7 = signal.sosfiltfilt(notch_sos_7,
-                                                  notch_filtered_6)
-            notch_sos_8 = signal.butter(2, c3d_notch_cutoff_8, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_8 = signal.sosfiltfilt(notch_sos_8,
-                                                  notch_filtered_7)
-            notch_sos_9 = signal.butter(2, c3d_notch_cutoff_9, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered_9 = signal.sosfiltfilt(notch_sos_9,
-                                                notch_filtered_8)
-            notch_sos_10 = signal.butter(2, c3d_notch_cutoff_10, btype='bandstop', fs=Fs, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_10,
-                                                notch_filtered_9)
+            # 初始化過濾數據
+            notch_filtered = bandpass_filtered  # 起始輸入信號
+
+            # 使用迴圈進行多次 Notch 過濾
+            for cutoff in c3d_notch_cutoff_list:
+                notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=Fs, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
   
             # 取絕對值，將訊號翻正
             abs_data = abs(notch_filtered)
@@ -518,33 +484,19 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
         if notch:
             # print(0)
             if '.csv' in raw_data_path:
-                notch_sos_1 = signal.butter(2, csv_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
-                                                    bandpass_filtered)
-                notch_sos_2 = signal.butter(2, csv_notch_cutoff_2, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
-                                                    notch_filtered_1)
-                notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
-                                                    notch_filtered_2)
-                notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
-                                                    notch_filtered_3)
-                notch_sos_5 = signal.butter(2, csv_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
-                                                    notch_filtered_4)
-                notch_sos_6 = signal.butter(2, csv_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
-                notch_filtered = signal.sosfiltfilt(notch_sos_6,
-                                                    notch_filtered_5)
+                notch_filtered = bandpass_filtered  # 起始輸入信號
+                # 使用迴圈進行多次 Notch 過濾
+                for cutoff in csv_notch_cutoff_list:
+                    notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=freq, output='sos')
+                    notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
             elif '.c3d' in raw_data_path:
                 # print(0)
                 # 初始化過濾數據
-                filtered_signal = bandpass_filtered  # 起始輸入信號
-                
+                notch_filtered = bandpass_filtered  # 起始輸入信號
                 # 使用迴圈進行多次 Notch 過濾
                 for cutoff in c3d_notch_cutoff_list:
                     notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=freq, output='sos')
-                    filtered_signal = signal.sosfiltfilt(notch_sos, filtered_signal)
+                    notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
             fft_data = notch_filtered
         else:
             # print(1)
@@ -744,51 +696,22 @@ def median_frquency(raw_data_path, duration, fig_svae_path, filename, begin=None
         bandpass_filtered = signal.sosfiltfilt(bandpass_sos, raw_data.iloc[:data_len_cal, num_columns[col]])
         # 1.2. 
         if '.csv' in raw_data_path:
-            notch_sos_1 = signal.butter(2, csv_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
-                                                bandpass_filtered)
-            notch_sos_2 = signal.butter(2, csv_notch_cutoff_2, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
-                                                notch_filtered_1)
-            notch_sos_3 = signal.butter(2, csv_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
-                                                notch_filtered_2)
-            notch_sos_4 = signal.butter(2, csv_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
-                                                notch_filtered_3)
-            notch_sos_5 = signal.butter(2, csv_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
-                                                notch_filtered_4)
-            notch_sos_6 = signal.butter(2, csv_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_6,
-                                                notch_filtered_5)
+            notch_filtered = bandpass_filtered  # 起始輸入信號
+            # 使用迴圈進行多次 Notch 過濾
+            for cutoff in csv_notch_cutoff_list:
+                notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
             # abs_data = abs(notch_filtered)
             # # ------linear envelop analysis-----------                          
             # # ------lowpass filter parameter that the user must modify for your experiment        
             # lowpass_sos = signal.butter(2, lowpass_freq, btype='low', fs=sample_freq, output='sos')        
             # lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data)
         elif '.c3d' in raw_data_path:
-            notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
-                                                bandpass_filtered)
-            notch_sos_2 = signal.butter(2, c3d_notch_cutoff_2, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
-                                                notch_filtered_1)
-            notch_sos_3 = signal.butter(2, c3d_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
-                                                notch_filtered_2)
-            notch_sos_4 = signal.butter(2, c3d_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
-                                                notch_filtered_3)
-            notch_sos_5 = signal.butter(2, c3d_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
-                                                notch_filtered_4)
-            notch_sos_6 = signal.butter(2, c3d_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
-            notch_filtered_6 = signal.sosfiltfilt(notch_sos_6,
-                                                notch_filtered_5)
-            notch_sos_7 = signal.butter(2, c3d_notch_cutoff_7, btype='bandstop', fs=freq, output='sos')
-            notch_filtered = signal.sosfiltfilt(notch_sos_7,
-                                                notch_filtered_6)
+            notch_filtered = bandpass_filtered  # 起始輸入信號
+            # 使用迴圈進行多次 Notch 過濾
+            for cutoff in c3d_notch_cutoff_list:
+                notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=freq, output='sos')
+                notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
             # abs_data = abs(notch_filtered)
             # # ------linear envelop analysis-----------                          
             # # ------lowpass filter parameter that the user must modify for your experiment        

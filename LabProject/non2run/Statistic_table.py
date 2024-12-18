@@ -13,8 +13,9 @@ from openpyxl import load_workbook, Workbook
 from datetime import datetime
 
 # %%
-data_path = [r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/4. Statistics/3. SpiderShot/All_Spider_Data.xlsx"]
-
+data_path = [r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\4. Statistics\1. SmallFlick\All_SmallFlick_data_1218.xlsx",
+             r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\4. Statistics\2. SmallTrack\All_SmallTrack_data_1218.xlsx",
+             r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\4. Statistics\3. SpiderShot\All_Spider_Data_1218.xlsx"]
 file_sheet = ["arm_motion", "FingerIncludeAngle", "FingerAngle",
               "MedFreq", "iMVC_cal", "iMVCslope"]
 
@@ -38,9 +39,8 @@ formatted_date = now.strftime("%m-%d-%H%M")
 
 
 for file in data_path:
-    
-    save_name = "All_Spider_Statistic_" + formatted_date
-    save_name = data_path[0].replace("All_Spider_Data", save_name)
+    save_name, extension = os.path.splitext(file)
+    save_name = save_name + "_ed.xlsx"
     
     if os.path.exists(save_name):
         workbook = load_workbook(save_name)
@@ -53,15 +53,20 @@ for file in data_path:
         workbook = load_workbook(save_name)
     
     for ind_sheet in file_sheet:
-        data = pd.read_excel(data_path[0],
+        data = pd.read_excel(file,
                              sheet_name = ind_sheet)
         # 生成一個資料儲存的地方
         pos_data = pd.DataFrame(np.zeros([len(combinations), len(data.columns)]),
                                  columns = data.columns)
         
         for idx in range(len(combinations)):
-            filtered_df = data[(data['subject'] == combinations[idx][0]) & \
-                               (data['mouse'] == combinations[idx][1])]
+            if "method" in data.columns:
+                filtered_df = data[(data['subject'] == combinations[idx][0]) & \
+                                   (data['mouse'] == combinations[idx][1]) & \
+                                    (data['method'] == "mean")]
+            else:
+                filtered_df = data[(data['subject'] == combinations[idx][0]) & \
+                                   (data['mouse'] == combinations[idx][1])]
             if filtered_df.index.any():
                 for column in filtered_df.columns:
                     # print(column)
