@@ -26,24 +26,26 @@ lowpass_freq = 10/c
 time_of_window = 0.1 # 窗格長度 (單位 second)
 overlap_len = 0.5 # 百分比 (%)
 # 設定 notch filter cutoff frequency
-csv_notch_cutoff_1 = [59, 61]
-csv_notch_cutoff_2 = [295.5, 296.5]
-csv_notch_cutoff_3 = [369.5, 370.5]
-csv_notch_cutoff_4 = [179, 181]
-csv_notch_cutoff_5 = [299, 301]
-csv_notch_cutoff_6 = [419, 421]
 
-c3d_notch_cutoff_1 = [49.5, 50.5]
-c3d_notch_cutoff_2 = [99.5, 100.5]
-c3d_notch_cutoff_3 = [149.5, 150.5]
-c3d_notch_cutoff_4 = [199.5, 200.5]
-c3d_notch_cutoff_5 = [249.5, 250.5]
-c3d_notch_cutoff_6 = [299.5, 300.5]
-c3d_notch_cutoff_7 = [349.5, 350.5]
+csv_notch_cutoff_list = [[59, 61],
+                         [295.5, 296.5],
+                         [369.5, 370.5],
+                         [179, 181],
+                         [299, 301],
+                         [419, 421],
+                        ]
 
-c3d_notch_cutoff_8 = [295, 297]
-c3d_notch_cutoff_9 = [369, 371]
-c3d_notch_cutoff_10 = [73, 75]
+c3d_notch_cutoff_list = [[49.5, 50.5],
+                         [99.5, 100.5],
+                         [149.5, 150.5],
+                         [199.5, 200.5],
+                         [249.5, 250.5],
+                         [299.5, 300.5],
+                         [349.5, 350.5],
+                         [295, 297],
+                         [369, 371],
+                         [73, 75],
+                        ]
 
 csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
                      'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
@@ -536,27 +538,13 @@ def Fourier_plot(raw_data_path, savepath, filename, notch=False):
                                                     notch_filtered_5)
             elif '.c3d' in raw_data_path:
                 # print(0)
-                notch_sos_1 = signal.butter(2, c3d_notch_cutoff_1, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_1 = signal.sosfiltfilt(notch_sos_1,
-                                                    bandpass_filtered)
-                notch_sos_2 = signal.butter(2, c3d_notch_cutoff_2, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_2 = signal.sosfiltfilt(notch_sos_2,
-                                                    notch_filtered_1)
-                notch_sos_3 = signal.butter(2, c3d_notch_cutoff_3, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_3 = signal.sosfiltfilt(notch_sos_3,
-                                                    notch_filtered_2)
-                notch_sos_4 = signal.butter(2, c3d_notch_cutoff_4, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_4 = signal.sosfiltfilt(notch_sos_4,
-                                                    notch_filtered_3)
-                notch_sos_5 = signal.butter(2, c3d_notch_cutoff_5, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_5 = signal.sosfiltfilt(notch_sos_5,
-                                                    notch_filtered_4)
-                notch_sos_6 = signal.butter(2, c3d_notch_cutoff_6, btype='bandstop', fs=freq, output='sos')
-                notch_filtered_6 = signal.sosfiltfilt(notch_sos_6,
-                                                    notch_filtered_5)
-                notch_sos_7 = signal.butter(2, c3d_notch_cutoff_7, btype='bandstop', fs=freq, output='sos')
-                notch_filtered = signal.sosfiltfilt(notch_sos_7,
-                                                    notch_filtered_6)
+                # 初始化過濾數據
+                filtered_signal = bandpass_filtered  # 起始輸入信號
+                
+                # 使用迴圈進行多次 Notch 過濾
+                for cutoff in c3d_notch_cutoff_list:
+                    notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=freq, output='sos')
+                    filtered_signal = signal.sosfiltfilt(notch_sos, filtered_signal)
             fft_data = notch_filtered
         else:
             # print(1)

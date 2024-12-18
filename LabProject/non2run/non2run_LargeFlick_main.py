@@ -34,14 +34,14 @@ folder_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\\"
 RawData_folder = "1. Motion\Major_Asymmetric\\"
 processingData_folder = "2. ProsessingData\\"
 
-save_place = "2. SmallTrack\\"
-task_name = 'SmallTrack'
+save_place = "3. SpiderShot\\"
+task_name = 'SpiderShot'
 
-vicon_folder = ["S01",
-                "S02", "S03", "S04",
-                "S05", "S06", "S07", "S08", "S09",
-                #"S10",
-                "S11", "S12",
+vicon_folder = [#"S01",
+                #"S02", "S03", "S04",
+                #"S05", "S06", "S07", "S08", "S09",
+                "S10",
+                #"S11", "S12",
                 ]
 
 motion_folder_path = folder_path + RawData_folder
