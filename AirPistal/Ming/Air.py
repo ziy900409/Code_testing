@@ -47,7 +47,7 @@ plt.show()
 
 # %%
 palette = plt.get_cmap('Set1')
-color = palette(0)
+color = palette(1)
 data1 = raw_data.iloc[:, 1:11]
 data2 = raw_data.iloc[:, 14:25]
 
@@ -65,7 +65,7 @@ plt.fill_between(iters, r1, r2, color=color, alpha=0.2)
 # 找所有數值的最大值，方便畫括弧用
 yy = max(r2)
 # 畫第二條線
-color = palette(1) # 設定顏色
+color = palette(0) # 設定顏色
 avg2 = np.mean(data2, axis=1) # 計畫平均
 std2 = np.std(data2, axis=1) # 計算標準差
 r1 = list(map(lambda x: x[0]-x[1], zip(avg2, std2))) # 畫一個標準差以內的線
