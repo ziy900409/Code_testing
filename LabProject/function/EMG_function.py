@@ -35,7 +35,7 @@ csv_notch_cutoff_list = [[59, 61],
                          [419, 421],
                         ]
 
-c3d_notch_cutoff_list = [[49.5, 50.5],
+c3d_notch_cutoff_list = [[49, 51],
                          [99.5, 100.5],
                          [149.5, 150.5],
                          [199.5, 200.5],
@@ -45,6 +45,7 @@ c3d_notch_cutoff_list = [[49.5, 50.5],
                          [295, 297],
                          [369, 371],
                          [73, 75],
+                         [399, 401]
                         ]
 
 csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
