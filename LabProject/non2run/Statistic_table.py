@@ -25,6 +25,10 @@ subject = ["S01", "S02", "S03", "S04",
 
 mouse = ["A", "C", "EC2", "HS"]
 
+axis_dir = ["elbow_x", "elbow_y", "elbow_z",
+            "wrist_x", "wrist_y", "wrist_z"]
+
+direct = ["+", "-"]
 
 # 使用 itertools.product 生成所有組合
 combinations = list(product(subject, mouse))
@@ -79,7 +83,72 @@ for file in data_path:
         with pd.ExcelWriter(save_name, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
             pos_data.to_excel(writer, sheet_name=ind_sheet, index=False)
  
+# %%
+subject = ["S01", "S02", "S03", "S04",
+           "S05", "S06", "S07", "S08",
+           "S09", "S10", "S11", "S12"]
+
+mouse = ["A", "C", "EC2", "HS"]
+
+# axis_dir = ["elbow_x", "elbow_y", "elbow_z",
+#             "wrist_x", "wrist_y", "wrist_z"]
+
+axis_dir = ["elbow", "wrist"]
+
+direct = ["+", "-"]
+
+method_dir = ["vel", "acc"]
+
+# 使用 itertools.product 生成所有組合
+combinations = list(product(subject, mouse, axis_dir, method_dir))
+
+# %%
+
+data_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\4. Statistics\3. SpiderShot\All_Spider_vicon_motion+emg_short.xlsx"
+
+
+save_name, extension = os.path.splitext(data_path)
+save_name = save_name + "_eded.xlsx"
+    
+if os.path.exists(save_name):
+    workbook = load_workbook(save_name)
+    print(f"檔案 {save_name} 已存在，成功打開。")
+else:
+    workbook = Workbook()
+    sheet = workbook.active
+    workbook.save(save_name)
+    
+    workbook = load_workbook(save_name)
+    
+
+data = pd.read_excel(data_path,
+                     sheet_name = "工作表2")
+# 生成一個資料儲存的地方
+pos_data = pd.DataFrame(np.zeros([len(combinations), len(data.columns)]),
+                            columns = data.columns)
         
+for idx in range(len(combinations)):
+    # if "method" in data.columns:
+    #     filtered_df = data[(data['subject'] == combinations[idx][0]) & \
+    #                        (data['mouse'] == combinations[idx][1]) & \
+    #                            (data['method'] == "mean")]
+
+    filtered_df = data[(data['subject'] == combinations[idx][0]) & \
+                       (data['mouse'] == combinations[idx][1]) & \
+                       (data['位置'] == combinations[idx][2]) & \
+                    (data['method'] == combinations[idx][3])]
+    if filtered_df.index.any():
+        for column in filtered_df.columns:
+            # print(column)
+            if type(filtered_df.loc[filtered_df.index[0], column]) != str and \
+                type(filtered_df.loc[filtered_df.index[0], column]) != bool:
+                pos_data.loc[idx, column] = np.mean(filtered_df.loc[filtered_df.index, column])
+            else:
+                pos_data.loc[idx, column] = filtered_df.loc[filtered_df.index[0], column]
+# 將 pos_data 寫入新分頁
+with pd.ExcelWriter(save_name, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
+    pos_data.to_excel(writer, sheet_name="Sheet", index=False)
+   
         
        
     
