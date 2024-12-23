@@ -113,7 +113,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
     3. 插入時間軸
             
     '''
-    # raw_data_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_Asymmetric\S01\20241123\S01_Biceps_MVC.c3d"
+    # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_11 Shanghai CS Major\\\\1. Motion\\Major_Asymmetric\\S09\\20241202\\S09_SmallTrack_HS_3.c3d'
     if '.csv' in raw_data_path:
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:
@@ -216,7 +216,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             # 取採樣時間的前十個採樣點計算採樣頻率
             sample_freq = 1/np.mean(np.array(raw_data.iloc[2:11, (num_columns[col] - 1)])
                                         - np.array(raw_data.iloc[1:10, (num_columns[col] - 1)]))
-            decimation_factor = sample_freq / down_freq
+            # decimation_factor = sample_freq / down_freq
             # 在raw data中以最短的數據長短為標準，只取最短數據的資料找其中是否包含NAN
             if type(data_len) != int:
                 indi_data_len = data_len[col]
@@ -259,7 +259,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
             lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data)
         
         elif '.c3d' in raw_data_path:
-            decimation_factor = Fs / down_freq
+            # decimation_factor = Fs / down_freq
             data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].values
             bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=Fs, output='sos')
             bandpass_filtered = signal.sosfiltfilt(bandpass_sos, data)
@@ -314,6 +314,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
                 
     # 3. -------------插入時間軸-------------------
     # 定義bandpass filter的時間
+    min_stop_time = 0 + np.shape(bandpass_filtered_data)[0] * 1/down_freq
     bandpass_time_index = np.linspace(0, min_stop_time, np.shape(bandpass_filtered_data)[0])
     bandpass_filtered_data.insert(0, 'time', bandpass_time_index)
     # 定義 notch filter的時間
