@@ -233,23 +233,44 @@ def joint_angle_rot(RotP, RotD, OffsetRotP=None, OffsetRotD=None):
 # %% 將旋轉矩陣轉為尤拉角
 
 def Rot2EulerAngle(Rot, sequence, Unit='deg'):
+
     """
+    Converts a series of rotation matrices into Euler angles based on the specified rotation sequence.
 
     Parameters
     ----------
-    Rot : TYPE
-        DESCRIPTION.
-    sequence : TYPE
-        DESCRIPTION.
-    Unit : TYPE, optional
-        DESCRIPTION. The default is 'deg'.
+    Rot : ndarray
+        A 3x3xN array of rotation matrices, where N is the number of matrices.
+    sequence : str
+        The rotation sequence for Euler angles (e.g., 'xyz', 'zyx'). Supported sequences include:
+        - 'xyz', 'xzy', 'yxz', 'yzx', 'zxy', 'zyx'
+        - 'xyx', 'xzx', 'yxy', 'yzy', 'zxz', 'zyz'
+    Unit : str, optional
+        The unit of the output Euler angles. Options are:
+        - 'deg' (default): Returns angles in degrees.
+        - 'rad': Returns angles in radians.
 
     Returns
     -------
-    theta : TYPE
-        DESCRIPTION.
+    theta : ndarray
+        An Nx3 array of Euler angles, where N is the number of input rotation matrices.
+        Each row contains the [theta_1, theta_2, theta_3] angles for the corresponding rotation matrix.
 
+    Notes
+    -----
+    The function supports both standard and non-standard Euler angle sequences. The input rotation 
+    matrices are assumed to follow the right-hand rule.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> R = np.array([[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                      [[0, -1, 0], [1, 0, 0], [0, 0, 1]]]).transpose(2, 0, 1)
+    >>> sequence = 'xyz'
+    >>> angles = Rot2EulerAngle(R, sequence)
+    >>> print(angles)
     """
+ 
     if Unit == 'rad':
         Rot = np.radians(Rot)
         
@@ -630,9 +651,7 @@ def EulerP2Angular(EulerP, smprate, CS='local', method="continuous"):
         AngVel：角速度。
         AngAcc：角加速度。
     """
-    # EulerP = P
-    # EulerP = ElbowEulerP
-    # smprate=180
+
     # 獲取數據的行數
     DataL = EulerP.shape[0]
     # 根據採樣率計算時間數組
@@ -707,27 +726,54 @@ def EulerP2Angular(EulerP, smprate, CS='local', method="continuous"):
 
 def Rot2LocalAngularEP(Rot, smprate, place = "joint", unit="degree"):
     """
-    
+    Computes angular velocity (AngVel) and angular acceleration (AngAcc) 
+    from a series of rotation matrices.
 
     Parameters
     ----------
-    Rot : TYPE
-        DESCRIPTION.
-    smprate : TYPE
-        DESCRIPTION.
-    place : TYPE, optional
-        DESCRIPTION. The default is "joint".
+    Rot : ndarray
+        A 3x3xN array of rotation matrices, where N is the number of matrices.
+        Each rotation matrix represents the orientation of a joint or segment 
+        at a specific time frame.
+    smprate : float
+        Sampling rate of the motion data in Hz (frames per second).
+    place : str, optional
+        Specifies the reference frame for calculations:
+        - "joint" (default): Computes angular properties relative to the joint.
+        - "segment": Computes angular properties relative to the segment.
     unit : str, optional
-        choosing the unit of output value is degree or rad
+        The unit for the output angular velocity and acceleration:
+        - "degree" (default): Returns results in degrees per second (°/s) and 
+          degrees per second squared (°/s²).
+        - "rad": Returns results in radians per second (rad/s) and radians per 
+          second squared (rad/s²).
 
     Returns
     -------
-    AngVel : TYPE
-        DESCRIPTION.
-    AngAcc : TYPE
-        DESCRIPTION.
+    AngVel : ndarray
+        A Nx3 array containing the angular velocity [ωx, ωy, ωz] for each time 
+        frame, expressed in the specified unit.
+    AngAcc : ndarray
+        A Nx3 array containing the angular acceleration [αx, αy, αz] for each 
+        time frame, expressed in the specified unit.
 
+    Notes
+    -----
+    - When `place="joint"`, the rotation matrices are transposed to calculate
+      angular properties relative to the joint.
+    - The function internally calls `Rot2EulerP` to convert rotation matrices
+      to Euler parameters and `EulerP2Angular` to calculate angular properties.
+    - The unit parameter ensures consistency in the output values.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> Rot = np.random.rand(3, 3, 100)  # Example 3x3x100 rotation matrices
+    >>> smprate = 100  # Sampling rate in Hz
+    >>> AngVel, AngAcc = Rot2LocalAngularEP(Rot, smprate, place="joint", unit="degree")
+    >>> print(AngVel.shape, AngAcc.shape)  # Outputs: (100, 3), (100, 3)
     """
+    
     if place == "joint":
         new_Rot = np.empty(shape=np.shape(Rot))    
         for i in range(np.shape(Rot)[2]):
