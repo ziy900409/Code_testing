@@ -1070,3 +1070,4 @@ def finger_angle_cal(file_name, motion_data, motion_info):
                                                 },index=[0])],
                                  ignore_index=True)
     return hand_angle_table
+
