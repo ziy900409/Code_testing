@@ -1,4 +1,11 @@
 # %%
+import numpy as np
+import pandas as pd
+import sys
+sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+import gen_function as func
+
+# %%
 
 clo_convert = {'C7': 'C7',
                'CLAV': 'Clavicle',
@@ -118,3 +125,7 @@ def DefCoordPelvis(R_ASIS, L_ASIS, R_PSIS, L_PSIS, side = 'r'):
                L_ASIS[:, :, 2] - 0.30*W)
         
     return RotMatrix, hip
+
+
+# %%
+

@@ -135,23 +135,23 @@ else:
 
 # %%
 # 繪製 R Hip Flexion / Extension Joint Angle (deg)
-fig, axes = plt.subplots(2, 2, figsize=(16, 8))  # 建立 2 行 1 列的子圖佈局
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))  # 建立 2 行 1 列的子圖佈局
 # 第一張子圖 繪製髖關節--------------------------------------------------------------
 axes[0, 0].plot(r_hip_ext)
 # 繪製 Event 2
-axes[0, 0].plot(peaks_event2, r_hip_ext[peaks_event2], "x")
+# axes[0, 0].plot(peaks_event2, r_hip_ext[peaks_event2], "x")
 axes[0, 0].plot(event_2_motion, r_hip_ext[event_2_motion], "o",
              markerfacecolor="none",  # 中空
              markeredgecolor="g",  # 邊框顏色
              markersize=8)
-axes[0, 0].plot(event_2_fp1/4, r_hip_ext[int(event_2_fp1/4)], "o",
-             markerfacecolor="none",  # 中空
-             markeredgecolor="b",  # 邊框顏色
-             markersize=12)
-axes[0, 0].vlines(x=peaks_event2, ymin=r_hip_ext[peaks_event2] - properties_event2["prominences"],
-               ymax=r_hip_ext[peaks_event2], color="C1")
-axes[0, 0].hlines(y=properties_event2["width_heights"], xmin=properties_event2["left_ips"],
-               xmax=properties_event2["right_ips"], color="C1")
+# axes[0, 0].plot(event_2_fp1/4, r_hip_ext[int(event_2_fp1/4)], "o",
+#              markerfacecolor="none",  # 中空
+#              markeredgecolor="b",  # 邊框顏色
+#              markersize=12)
+# axes[0, 0].vlines(x=peaks_event2, ymin=r_hip_ext[peaks_event2] - properties_event2["prominences"],
+#                ymax=r_hip_ext[peaks_event2], color="C1")
+# axes[0, 0].hlines(y=properties_event2["width_heights"], xmin=properties_event2["left_ips"],
+#                xmax=properties_event2["right_ips"], color="C1")
 # 繪製 Event 3
 
 # 圖資訊
