@@ -64,10 +64,80 @@ motion_data.loc[:, 'R_ASIS_x':'R_ASIS_z']
 ## 定義骨盆坐標系
 def DefCoordPelvis(R_ASIS, L_ASIS, R_PSIS, L_PSIS, side = 'r'):
     """
-    骨盆坐標系定義
+    骨盆坐標系定義: 旋轉順序 - XYZ
+    O (Hip Joint Center): Tylkowski-Andriacchi method
+        
+        W = |R_ASIS - L_ASIS|
+        
+        R_Hip = (R_ASIS_x - 0.14*W,
+                 R_ASIS_y - 0.19*W,
+                 R_ASIS_z - 0.30*W)
+        
+        L_Hip = (L_ASIS_x + 0.14*W,
+                 L_ASIS_y - 0.19*W,
+                 L_ASIS_z - 0.30*W)
+        
+    z-axis: (R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)/ |(R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)|
+    x-axis: (((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis) / 
+            |(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis)|
+    y-axis: z cross x
+    
+    R = [[ix, iy, iz],
+         [jx, jy, jz],
+         [kx, ky, kz]]
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    RotMatrix : TYPE
+        DESCRIPTION.
+        
+    Reference:
+        1. https://www.wiki.has-motion.com/doku.php?id=visual3d:documentation:kinematics_and_kinetics:joint
+
+    """
+    # 將 input 轉成 np.array
+    R_ASIS = np.array(R_ASIS)
+    L_ASIS = np.array(L_ASIS)
+    R_PSIS = np.array(R_PSIS)
+    L_PSIS = np.array(L_PSIS)
+    
+    W = np.linalg.norm(R_ASIS - L_ASIS)
+    # 定義座標軸方向
+    z_vector = (np.cross((R_ASIS - L_PSIS), (L_ASIS - R_PSIS))) \
+        (np.linalg.norm(np.cross((R_ASIS - L_PSIS), (L_ASIS - R_PSIS))))
+    x_vector = np.cross(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2), z_vector) \
+        (np.linalg.norm(np.cross(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2), z_vector)))
+    y_vector = np.cross(z_vector, x_vector) \
+        (np.linalg.norm(np.cross(z_vector, x_vector)))
+    RotMatrix = np.array([x_vector, y_vector, z_vector])
+    
+    if side == 'R':
+        hip = (R_ASIS[:, :, 0] - 0.14*W,
+               R_ASIS[:, :, 1] - 0.19*W,
+               R_ASIS[:, :, 2] - 0.30*W)
+    elif side == 'L':
+        hip = (L_ASIS[:, :, 0] + 0.14*W,
+               L_ASIS[:, :, 1] - 0.19*W,
+               L_ASIS[:, :, 2] - 0.30*W)
+        
+    return RotMatrix, hip
+
+
+# %% 定義大腿座標系
+def DefCoordFemoral(R_hip, Knee_Med, Knee_Lat, side = 'r'):
+    """
+
+    大腿骨坐標系定義:  旋轉順序 - XYZ
+    
+    O: Hip Joint Center
     x-axis : (((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis) / 
             |(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis)|
-    y-axis : z cross x
+            
+    y-axis : O - ((Knee_Med + Knee_Lat) / 2)
+        
     z-axis : (R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)/ |(R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)|
     
     
@@ -127,5 +197,14 @@ def DefCoordPelvis(R_ASIS, L_ASIS, R_PSIS, L_PSIS, side = 'r'):
     return RotMatrix, hip
 
 
-# %%
+
+
+
+
+
+
+
+
+
+
 
