@@ -80,7 +80,7 @@ def DefCoordPelvis(R_ASIS, L_ASIS, R_PSIS, L_PSIS, side = 'r'):
     z-axis: (R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)/ |(R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)|
     x-axis: (((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis) / 
             |(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis)|
-    y-axis: z cross x
+    y-axis: z-axis cross x-axis
     
     R = [[ix, iy, iz],
          [jx, jy, jz],
@@ -106,12 +106,13 @@ def DefCoordPelvis(R_ASIS, L_ASIS, R_PSIS, L_PSIS, side = 'r'):
     
     W = np.linalg.norm(R_ASIS - L_ASIS)
     # 定義座標軸方向
-    z_vector = (np.cross((R_ASIS - L_PSIS), (L_ASIS - R_PSIS))) \
+    z_vector = (np.cross((R_ASIS - L_PSIS), (L_ASIS - R_PSIS)))/ \
         (np.linalg.norm(np.cross((R_ASIS - L_PSIS), (L_ASIS - R_PSIS))))
-    x_vector = np.cross(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2), z_vector) \
+    x_vector = np.cross(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2), z_vector)/ \
         (np.linalg.norm(np.cross(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2), z_vector)))
-    y_vector = np.cross(z_vector, x_vector) \
+    y_vector = np.cross(z_vector, x_vector)/ \
         (np.linalg.norm(np.cross(z_vector, x_vector)))
+        
     RotMatrix = np.array([x_vector, y_vector, z_vector])
     
     if side == 'R':
@@ -127,32 +128,127 @@ def DefCoordPelvis(R_ASIS, L_ASIS, R_PSIS, L_PSIS, side = 'r'):
 
 
 # %% 定義大腿座標系
-def DefCoordFemoral(R_hip, Knee_Med, Knee_Lat, side = 'r'):
+def DefCoordThigh(hip, Knee_Med, Knee_Lat, side = 'r'):
     """
 
     大腿骨坐標系定義:  旋轉順序 - XYZ
     
     O: Hip Joint Center
-    x-axis : (((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis) / 
-            |(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2) X y-axis)|
+    y-axis : (O - 0.5*(Knee_Med + Knee_Lat))/
+            |(O - 0.5*(Knee_Med + Knee_Lat))|
+    v vector: (Knee_Lat - Knee_Med)/
+            |(Knee_Lat - Knee_Med)|
+    x-axis : y-axis cross v vector
             
-    y-axis : O - ((Knee_Med + Knee_Lat) / 2)
+    z-axis : x-axis cross y-axis
         
-    z-axis : (R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)/ |(R_ASIS - L_PSIS) X (L_ASIS - R_PSIS)|
+    R = [[ix, iy, iz],
+         [jx, jy, jz],
+         [kx, ky, kz]]
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    RotMatrix : TYPE
+        DESCRIPTION.
+
+
+    """
+    # 將 input 轉成 np.array
+    hip = np.array(hip)
+    Knee_Med = np.array(Knee_Med)
+    Knee_Lat = np.array(Knee_Lat)
     
+    # W = np.linalg.norm(R_ASIS - L_ASIS)
+    # 定義座標軸方向
+    y_vector = (hip - 0.5*(Knee_Med + Knee_Lat))/ \
+        (np.linalg.norm((hip - 0.5*(Knee_Med + Knee_Lat))))
+    v_vector = (Knee_Lat - Knee_Med)/ \
+        np.linalg.norm((Knee_Lat - Knee_Med))
+
+    x_vector = np.cross(y_vector, v_vector)/ \
+        (np.linalg.norm(np.cross(y_vector, v_vector)))
+        
+    z_vector = (np.cross(x_vector, y_vector)) / \
+          (np.linalg.norm(np.cross(x_vector, y_vector)))
+
+    RotMatrix = np.array([x_vector, y_vector, z_vector])
+        
+    return RotMatrix
+
+# %% 定義小腿坐標系
+
+def DefCoordShank(Knee_Med, Knee_Lat, Ankle_Med, Ankle_Lat,
+                  side = 'r'):
+    """
+
+    小腿坐標系定義:  旋轉順序 - XYZ
     
-    Hip Joint Center (O): Tylkowski-Andriacchi method
+    O(Knee Joint Center): 0.5*(Knee_Med + Knee_Lat)
+    y-axis : (O - 0.5*(Ankle_Med + Ankle_Lat))/
+            |(O - 0.5*(Ankle_Med + Ankle_Lat))|
+    v vector: (Knee_Lat - Knee_Med)/
+            |(Knee_Lat - Knee_Med)|
+    x-axis : y-axis cross v vector
+            
+    z-axis : x-axis cross y-axis
         
-        W = |R_ASIS - L_ASIS|
+    R = [[ix, iy, iz],
+         [jx, jy, jz],
+         [kx, ky, kz]]
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    RotMatrix : TYPE
+        DESCRIPTION.
         
-        R_Hip = (R_ASIS_x - 0.14*W,
-                 R_ASIS_y - 0.19*W,
-                 R_ASIS_z - 0.30*W)
-        
-        L_Hip = (L_ASIS_x + 0.14*W,
-                 L_ASIS_y - 0.19*W,
-                 L_ASIS_z - 0.30*W)
+
+    """
+    # 將 input 轉成 np.array
+    Knee_Med = np.array(Knee_Med)
+    Knee_Lat = np.array(Knee_Lat)
+    Ankle_Med = np.array(Ankle_Med)
+    Ankle_Lat = np.array(Ankle_Lat)
     
+    o = 0.5*(Knee_Med + Knee_Lat)
+    # 定義座標軸方向
+    y_vector = (o - 0.5*(Ankle_Med + Ankle_Lat))/ \
+        (np.linalg.norm((o - 0.5*(Ankle_Med + Ankle_Lat))))
+    v_vector = (Knee_Lat - Knee_Med)/ \
+        np.linalg.norm((Knee_Lat - Knee_Med))
+
+    x_vector = np.cross(y_vector, v_vector)/ \
+        (np.linalg.norm(np.cross(y_vector, v_vector)))
+        
+    z_vector = (np.cross(x_vector, y_vector)) / \
+          (np.linalg.norm(np.cross(x_vector, y_vector)))
+
+    RotMatrix = np.array([x_vector, y_vector, z_vector])
+        
+    return RotMatrix
+
+# %% 定義小腿坐標系
+
+def DefCoordFoot(Knee_Med, Knee_Lat, Ankle_Med, Ankle_Lat,
+                  side = 'r'):
+    """
+
+    小腿坐標系定義:  旋轉順序 - XYZ
+    
+    O(Knee Joint Center): 0.5*(Knee_Med + Knee_Lat)
+    y-axis : (O - 0.5*(Ankle_Med + Ankle_Lat))/
+            |(O - 0.5*(Ankle_Med + Ankle_Lat))|
+    v vector: (Knee_Lat - Knee_Med)/
+            |(Knee_Lat - Knee_Med)|
+    x-axis : y-axis cross v vector
+            
+    z-axis : x-axis cross y-axis
+        
     R = [[ix, iy, iz],
          [jx, jy, jz],
          [kx, ky, kz]]
@@ -170,33 +266,27 @@ def DefCoordFemoral(R_hip, Knee_Med, Knee_Lat, side = 'r'):
 
     """
     # 將 input 轉成 np.array
-    R_ASIS = np.array(R_ASIS)
-    L_ASIS = np.array(L_ASIS)
-    R_PSIS = np.array(R_PSIS)
-    L_PSIS = np.array(L_PSIS)
+    Knee_Med = np.array(Knee_Med)
+    Knee_Lat = np.array(Knee_Lat)
+    Ankle_Med = np.array(Ankle_Med)
+    Ankle_Lat = np.array(Ankle_Lat)
     
-    W = np.linalg.norm(R_ASIS - L_ASIS)
+    o = 0.5*(Knee_Med + Knee_Lat)
     # 定義座標軸方向
-    z_vector = (np.cross((R_ASIS - L_PSIS), (L_ASIS - R_PSIS))) \
-        (np.linalg.norm(np.cross((R_ASIS - L_PSIS), (L_ASIS - R_PSIS))))
-    x_vector = np.cross(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2), z_vector) \
-        (np.linalg.norm(np.cross(((R_ASIS + L_ASIS)/2 - (R_PSIS + L_PSIS)/2), z_vector)))
-    y_vector = np.cross(z_vector, x_vector) \
-        (np.linalg.norm(np.cross(z_vector, x_vector)))
-    RotMatrix = np.array([x_vector, y_vector, z_vector])
-    
-    if side == 'R':
-        hip = (R_ASIS[:, :, 0] - 0.14*W,
-               R_ASIS[:, :, 1] - 0.19*W,
-               R_ASIS[:, :, 2] - 0.30*W)
-    elif side == 'L':
-        hip = (L_ASIS[:, :, 0] + 0.14*W,
-               L_ASIS[:, :, 1] - 0.19*W,
-               L_ASIS[:, :, 2] - 0.30*W)
+    y_vector = (o - 0.5*(Ankle_Med + Ankle_Lat))/ \
+        (np.linalg.norm((o - 0.5*(Ankle_Med + Ankle_Lat))))
+    v_vector = (Knee_Lat - Knee_Med)/ \
+        np.linalg.norm((Knee_Lat - Knee_Med))
+
+    x_vector = np.cross(y_vector, v_vector)/ \
+        (np.linalg.norm(np.cross(y_vector, v_vector)))
         
-    return RotMatrix, hip
+    z_vector = (np.cross(x_vector, y_vector)) / \
+          (np.linalg.norm(np.cross(x_vector, y_vector)))
 
-
+    RotMatrix = np.array([x_vector, y_vector, z_vector])
+        
+    return RotMatrix
 
 
 
