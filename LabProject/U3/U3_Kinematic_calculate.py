@@ -173,6 +173,8 @@ def DefCoordHand(R_Wrist_Una, R_Wrist_Rad, R_M_Finger1):
 # %% 計算兩坐標系之間的旋轉矩陣
 def joint_angle_rot(RotP, RotD, OffsetRotP=None, OffsetRotD=None):
     """
+    旋轉順序錯了
+    
     Parameters
     ----------
     RotP : numpy.array

@@ -234,13 +234,13 @@ def DefCoordShank(Knee_Med, Knee_Lat, Ankle_Med, Ankle_Lat,
 
 # %% 定義小腿坐標系
 
-def DefCoordFoot(Knee_Med, Knee_Lat, Ankle_Med, Ankle_Lat,
-                  side = 'r'):
+def DefCoordFoot(Heel, Ankle_Med, Ankle_Lat,
+                 side = 'r'):
     """
 
     小腿坐標系定義:  旋轉順序 - XYZ
     
-    O(Knee Joint Center): 0.5*(Knee_Med + Knee_Lat)
+    O(Heel): Heel
     y-axis : (O - 0.5*(Ankle_Med + Ankle_Lat))/
             |(O - 0.5*(Ankle_Med + Ankle_Lat))|
     v vector: (Knee_Lat - Knee_Med)/
