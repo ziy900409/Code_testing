@@ -26,7 +26,7 @@ def compare_fig(data1, data2):
     
     # 確定繪圖順序與位置
     # x, y = muscle - n*math.floor(abs(muscle)/n), math.floor(abs(muscle)/n) 
-    iters = list(np.linspace(-1, 0.5, 51))
+    iters = list(np.linspace(1, 50, 50))
     # 設定計算資料
     avg1 = np.mean(data1, axis=1) # 計算平均
     std1 = np.std(data1, axis=1) # 計算標準差
@@ -58,17 +58,17 @@ file_name = ["01_(0.03秒0.05秒一組)04-2.trigger force 每發減初始值 除
              "04_(0.03秒一組)02-2.trigger force 每發除以個人峰值(綜合).xlsx",
              "05_(0.03秒一組)03-2.trigger force 每發減掉初始值(綜合).xlsx",
              "06_(0.03秒一組)05-2.trigger force 每發減初始值 除以 每發標準差(綜合).xlsx"]
-frame2draw = [[[39, 51]],
-              [[3, 4], [25, 38]],
+frame2draw = [[[39, 50]],
+              [[3, 4], [35, 39], [45, 46]],
               [[33, 34]],
               [],
-              [[42, 51]],
-              [[44, 51]]]
+              [[42, 50]],
+              [[44, 50]]]
 
 # %%
 
 
-time_value = np.linspace(-1, 0.5, 51)
+time_value = np.linspace(-1, 0.5, 50)
 
 for file_path in range(len(file_name)):
     # origin_path = r"D:\BenQ_Project\python\MingData\扳機力量\力量\01-2.trigger force 原始值(綜合)(未達顯著).xlsx"
@@ -77,17 +77,18 @@ for file_path in range(len(file_name)):
     raw_data = pd.read_excel(origin_path, sheet_name='3秒一組T', header=0, skiprows =2)
     labels = 14
     
-    time_tick = np.linspace(-1, 0.5, 51)
+    time_tick = np.linspace(-1, 0.5, 50)
     time_tick = np.around(time_tick, decimals=1)
     
     fig1 = compare_fig(raw_data.iloc[:, 1:13], raw_data.iloc[:, 16:30])
     plt.tick_params(axis='x', labelsize=labels)
     plt.tick_params(axis='y', labelsize=labels)
     for i in range(len(frame2draw[file_path])):
-        plt.axvspan(frame2draw[file_path][i][0]*0.03 - 1,
-                    frame2draw[file_path][i][1]*0.03 - 1, facecolor='0.5', alpha=0.5)
-    plt.xlim(-1, 0.5)
-    plt.axvline(x=0, c='r', ls='--', lw=1)
+        plt.axvspan(frame2draw[file_path][i][0],
+                    frame2draw[file_path][i][1], facecolor='0.5', alpha=0.5)
+    plt.xlim(1, 50)
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))  # 设置 x 轴刻度间隔
+    plt.axvline(x=34, c='r', ls='--', lw=1)
     plt.savefig(folder_path + save_name,
                 dpi=300, bbox_inches='tight')
     plt.show()
