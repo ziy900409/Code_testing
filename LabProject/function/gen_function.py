@@ -259,6 +259,7 @@ def Read_File(file_path, file_type, subfolder=None):
 
     return csv_file_list
 
+
 # %% 開啟 .trc 獲得 marker name
 
 
@@ -347,10 +348,122 @@ def conf95_ellipse(COPxy, filename):
     
     return Area95, fig, r
 
+# %%
+
+def read_c3d(path, forceplate=False, analog=False, prefix=False):
+# the processes including the interpolation 
+    """
+    input1 path of the C3D data
+    inpu2 the re-sampling times (using motion data frequency to time)
+    ----------
+    outcome1 combine marker and fp data in a dictionary
+    outcome2 the description of the data (some variables are mannual)
+    
+    ###
+    總共分成三個區塊
+    1. 處理基本資料
+    2. 處理 motion data
+    3. 處理 analog data
+        3.1. force plate data
+        3.2. EMG data
+    4. 處理力版資料
+    
+    """
+    # Interpolation: using polynomial method, order = 3 
+    def interpolate_with_fallback(data):
+        data = pd.DataFrame(data)
+        data.replace(0, np.nan, inplace=True)
+        data = data.interpolate(method='linear', axis=0)
+        data.bfill(inplace=True)  
+        data.ffill(inplace=True)  
+        if data.isnull().values.any() or (data == 0).any().any():
+            data = data.interpolate(method='polynomial', order=2, axis=0).fillna(method='bfill').fillna(method='ffill')
+        return data.values  
+    # read c3d file
+    c = ezc3d.c3d(path, extract_forceplat_data=True)
+    # multiple = 2
+    ## 1. deal with data information
+    motion_info = c["header"]["points"]
+    label = []
+
+    # add Unit in motion information
+    motion_info.update(
+        {
+            "UNITS": c["parameters"]["POINT"]["UNITS"]["value"],
+            "LABELS": c["parameters"]["POINT"]["LABELS"]["value"],
+        }
+    )
+    if prefix:
+        for label in range(len(motion_info['LABELS'])):
+            motion_info['LABELS'][label] = motion_info['LABELS'][label].replace(prefix, "")
+    # structing the data information
+    descriptions = {
+        "motion info": motion_info,
+        "analog info": c["header"]["analogs"],
+        "FP info": {
+            "caution": "the unit is following Qualisis C3D",
+            "Force_unit": "N",
+            "Torque_unit": "Nm",
+            "COP": "mm"
+            }
+        }
+    ## 2.1. deal with motion data
+    # change the variable type from dataframe to dictionary and change unit 
+    motion_data_dict = {}
+    for i, marker_name in enumerate(c['parameters']['POINT']['LABELS']['value']):  #label the name of the data for each variable
+        # change the Unit from mm to cm
+        motion_data_dict[marker_name] = np.transpose(c['data']['points'][:3, i, :]) / 10  #maker the name of each variable
+    # 2.2. gap filling to marker data 
+    fillgap_markers = {key: interpolate_with_fallback(value) for key, value in motion_data_dict.items()}
+    # create time frame
+    motion_time = np.linspace(
+                                0, # start
+                              ((c['header']['points']['last_frame'])/c['header']['points']['frame_rate']), # stop = last_frame/frame_rate
+                              num = (np.shape(c['data']['points'])[-1]) # num = last_frame
+                              )
+    fillgap_markers.update({"time": motion_time})
+
+    ## 3.1 create force plate channel name (the ori unit Force = N; torque = Nmm; COP = mm in Qualysis C3D)
+    # only if the number of force plate larger than 0
+    
+    force_platform_params = c['parameters']['FORCE_PLATFORM']
+    if forceplate:
+        if 'FORCE_PLATFORM' in c['parameters'] and \
+            force_platform_params['USED']['value'][0] > 0:
+                FP_data_dict = {}
+                for i in range(force_platform_params['USED']['value'][0]):
+                    FP_data_dict[f'PF{i+1}'] = {
+                        "corner": force_platform_params['CORNERS']['value'][:, :, i].T,
+                        "force": c["data"]["platform"][i]['force'].T,
+                        "moment": c["data"]["platform"][i]['moment'].T / 1000, # change the Unit from Nmm to N
+                        "COP": c["data"]["platform"][i]['center_of_pressure'].T / 10 # change the Unit from mm to cm
+                        }
+    if analog:
+        analog_data_dict = {}
+        for i, marker_name in enumerate(c["parameters"]["ANALOG"]["LABELS"]["value"]):  #label the name of the data for each variable
+            analog_data_dict[marker_name] = np.transpose(c["data"]["analogs"][0, i, :])
+    
+    if forceplate and analog:
+        combine_dict = {"marker": fillgap_markers,
+                        "FP": FP_data_dict,
+                        "analog": analog_data_dict}
+    elif forceplate and not analog:
+        combine_dict = {"marker": fillgap_markers,
+                        "FP": FP_data_dict}
+    elif not forceplate and analog:
+        combine_dict = {"marker": fillgap_markers,
+                        "analog": analog_data_dict}
+    else:
+        combine_dict = {"marker": fillgap_markers}
+        
+    return combine_dict, descriptions
+# %%
 
 
-
-
+combine_dict, descriptions = read_c3d(r"E:\Hsin\BenQ\ZOWIE non-sym\1.motion\Vicon\S04\S04_LargeTrack_ECN1_2.c3d",
+                                      forceplate=False,
+                                      analog=True,
+                                      prefix="S04:")
 
 
 
