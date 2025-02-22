@@ -426,14 +426,14 @@ def read_c3d(path, forceplate=False, analog=False, prefix=False):
     ## 3.1 create force plate channel name (the ori unit Force = N; torque = Nmm; COP = mm in Qualysis C3D)
     # only if the number of force plate larger than 0
     
-    force_platform_params = c['parameters']['FORCE_PLATFORM']
+    # force_platform_params = c['parameters']['FORCE_PLATFORM']
     if forceplate:
         if 'FORCE_PLATFORM' in c['parameters'] and \
-            force_platform_params['USED']['value'][0] > 0:
+            c['parameters']['FORCE_PLATFORM']['USED']['value'][0] > 0:
                 FP_data_dict = {}
-                for i in range(force_platform_params['USED']['value'][0]):
+                for i in range(c['parameters']['FORCE_PLATFORM']['USED']['value'][0]):
                     FP_data_dict[f'PF{i+1}'] = {
-                        "corner": force_platform_params['CORNERS']['value'][:, :, i].T,
+                        "corner": c['parameters']['FORCE_PLATFORM']['CORNERS']['value'][:, :, i].T,
                         "force": c["data"]["platform"][i]['force'].T,
                         "moment": c["data"]["platform"][i]['moment'].T / 1000, # change the Unit from Nmm to N
                         "COP": c["data"]["platform"][i]['center_of_pressure'].T / 10 # change the Unit from mm to cm
