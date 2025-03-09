@@ -79,7 +79,7 @@ muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brac
 
 
 # %% EMG data processing
-def EMG_processing(raw_data_path, smoothing="lowpass"):
+def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overlap_len=None):
     '''
     最終修訂時間: 20240329
     note:
@@ -293,8 +293,23 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
         lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:int(downsample_len)]
         # -------Data smoothing. Compute Moving mean
         # window width = window length(second)*sampling rate
-        '''
-        需重新修改 moving mean 以及 RMS method
+        
+        # 需重新修改 moving mean 以及 RMS method
+        
+        # for col in range(columns):  # 針對不同欄位計算
+        #     for ii in range(moving_data.shape[0]):  
+        #         data_location = int(ii * (1 - overlap_len) * window_width)
+        #         if data_location + window_width > len(abs_data):  # 避免超出索引範圍
+        #             break
+        #         moving_data.iloc[ii, col] = np.mean(abs_data[data_location:data_location + window_width])  # 計算移動平均
+        
+        #     for ii in range(rms_data.shape[0]):  
+        #         data_location = int(ii * (1 - overlap_len) * window_width)
+        #         if data_location + window_width > len(abs_data):  # 避免超出索引範圍
+        #             break
+        #         rms_data.iloc[ii, col] = np.sqrt(np.mean(abs_data[data_location:data_location + window_width] ** 2))  # 計算 RMS
+        
+        
         
         # for ii in range(np.shape(moving_data)[0]):
         #     data_location = int(ii*(1-overlap_len)*window_width)
@@ -310,7 +325,7 @@ def EMG_processing(raw_data_path, smoothing="lowpass"):
         #     # print(data_location, data_location+window_width_rms)
         #     rms_data.iloc[int(ii), col] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width])**2)
         #                                   /window_width)
-        '''
+        
                 
     # 3. -------------插入時間軸-------------------
     # 定義bandpass filter的時間

@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
-sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+# sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 from scipy.signal import find_peaks
