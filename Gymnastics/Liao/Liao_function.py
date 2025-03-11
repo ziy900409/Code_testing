@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Feb 21 15:28:41 2025
+
+@author: Hsin.YH.Yang
+"""
+
 import os
 import pandas as pd
 import numpy as np
@@ -75,288 +82,6 @@ c3d_analog_cha = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtI
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
                'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
-# %%
-
-def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overlap_len=None, down_sap=False):
-    '''
-    最終修訂時間: 20240329
-    note:
-        1. 2024.03.28
-        新增可以處理 c3d 的功能
-        2. moving mean, RMS 的功能尚未修正
-    
-    Parameters
-    ----------
-    raw_data : pandas.DataFrame
-        給予欲處理之資料.
-    smoothing : str, optional
-        設定 smoothing method,分別為 lowpass, rms, moving. The default is 'lowpass'
-        
-    Returns
-    -------
-    moving_data : pandas.DataFrame.
-        回傳平滑處理後之資料
-    bandpass_filtered_data  : pandas.DataFrame.
-        回傳僅bandpass filting後之資料
-
-    -------
-    程式邏輯：
-    1. 預處理：
-        1.1. 計算各sensor之採樣頻率與資料長度，最後預估downsample之資料長度，並使用最小值
-        1.2 計算各sensor之採樣截止時間，並做平均
-        1.3 創建資料貯存之位置： bandpass, lowpass, rms, moving mean
-    2. 濾波： 先濾波，再降採樣
-        2.1 依各sensor之採樣頻率分開濾波
-        2.2 降採樣
-    3. 插入時間軸
-            
-    '''
-    raw_data_path = r"E:\Hsin\NTSU_lab\Gymnastics\論文資料CSV檔\EMG\NSF1.1_1\NSF1.1_Back_Tuck_Somersault_Rep_1.5.csv"
-    if '.csv' in raw_data_path:
-        raw_data = pd.read_csv(raw_data_path)
-    elif '.c3d' in raw_data_path:
-        c = ezc3d.c3d(raw_data_path)
-        # 3. convert c3d analog data to DataFrame format
-        raw_data_header = c['parameters']['ANALOG']['LABELS']
-        raw_header_index = []
-        c3d_header_all = []
-        for c3d_header in c3d_recolumns_name:
-            for i in range(len(raw_data_header['value'])):
-                if c3d_header in raw_data_header['value'][i]:
-                    raw_header_index.append(i)
-                    c3d_header_all.append(raw_data_header['value'][i])
-                    
-        # 3. convert c3d analog data to DataFrame format
-        raw_data = pd.DataFrame(np.transpose(c['data']['analogs'][0, raw_header_index, :]),
-                                columns=c3d_header_all)
-        ## 3.3 insert time frame
-        ### 3.3.1 create time frame
-        analog_time = np.linspace(
-            0, # start
-            ((c['header']['analogs']['last_frame'])/c['header']['analogs']['frame_rate']), # stop = last_frame/frame_rate
-            num = (np.shape(c['data']['analogs'])[-1]) # num = last_frame
-                                    )
-        raw_data.insert(0, 'Frame', analog_time)
-    
-    # 1.  -------------前處理---------------------------
-    # 1.1.-------------計算所有sensor之採樣頻率----------
-    # 找尋EMG 訊號所在欄位 num_columns
-    num_columns = []
-    for i in range(len(raw_data.columns)):
-        for ii in range(len(raw_data.columns[raw_data.columns.str.contains("EMG")])):
-            if raw_data.columns[i] == raw_data.columns[raw_data.columns.str.contains("EMG")][ii]:
-                num_columns.append(i)
-    print("處理 EMG 訊號，總共", len(num_columns), "條肌肉， 分別為以下欄位")
-    print(raw_data.columns[raw_data.columns.str.contains("EMG")])
-    if '.csv' in raw_data_path:
-        raw_data.rename(columns=csv_recolumns_name, inplace=True)
-    elif '.c3d' in raw_data_path:
-        raw_data.rename(columns=c3d_recolumns_name, inplace=True)
-    # 只有檔案格式是 .csv 才做
-    if '.csv' in raw_data_path:
-        # 計算各採樣頻率與計算downsample所需的位點數，並取最小的位點數
-        Fs = []
-        data_len = []
-        count0 = []
-        all_stop_time = []
-        downsample_len = []
-        for col in range(len(num_columns)):
-            data_time = raw_data.iloc[:,num_columns[col]-1].dropna()
-            Fs.append((1/np.mean(np.array(data_time[2:11])-np.array(data_time[1:10]))))
-            # 計算數列中0的數量
-            count0.append((raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))
-            # 找到第一個 Raw data 不等於零的位置
-            data_len.append(int((len(raw_data.iloc[:, num_columns[col]]) - (raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))))
-            # 取截止時間
-            all_stop_time.append(raw_data.iloc[(len(raw_data.iloc[:, num_columns[col]]) - (raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))-1 ,
-                                           num_columns[col]-1])
-            
-            downsample_len.append(data_len[-1] / Fs[-1] * down_freq)
-        # 1.2.-------------計算平均截止時間------------------
-        # 丟棄NAN的值，並選擇最小值
-        min_stop_time = np.min([x for x in all_stop_time if math.isnan(x) == False])
-        while max(all_stop_time) - min(all_stop_time) > 1:
-            print("兩 sensor 數據時間差超過 1 秒")
-            print("將使用次短時間的 Sensor 作替代")
-            all_stop_time.remove(min_stop_time)
-            data_len.remove(min(data_len))
-            min_stop_time = np.min([x for x in all_stop_time if math.isnan(x) == False])
-        # data_len = min(data_len)
-        Fs = min(Fs)
-        downsample_len = math.floor(min(downsample_len))
-        data_len = math.floor(min(data_len))
-    elif '.c3d' in raw_data_path:
-        Fs = c['header']['analogs']['frame_rate']
-        data_len = np.shape(raw_data)[0]
-        min_stop_time = c['header']['analogs']['last_frame']/Fs
-        
-        downsample_len = data_len / Fs * down_freq
-    # 計算各採樣頻率與計算downsample所需的位點數，並取最小的位點數
-    # 1.3.-------------創建儲存EMG data的矩陣------------
-    if down_sap:
-        data_len = downsample_len
-        Fs = down_freq
-        
-    # bandpass filter used in signal
-    bandpass_filtered_data = pd.DataFrame(np.zeros([math.floor(data_len), len(num_columns)]),
-                            columns=raw_data.iloc[:, num_columns].columns)
-    notch_filtered_data = pd.DataFrame(np.zeros([math.floor(data_len), len(num_columns)]),
-                            columns=raw_data.iloc[:, num_columns].columns)
-    lowpass_filtered_data = pd.DataFrame(np.zeros([math.floor(data_len), len(num_columns)]),
-                            columns=raw_data.iloc[:, num_columns].columns)
-    # 設定 moving mean 的矩陣大小、欄位名稱
-    
-    window_width = int(time_of_window*np.floor(down_freq))
-    moving_data = pd.DataFrame(np.zeros([int((np.shape(bandpass_filtered_data)[0] - window_width)/  ((1-overlap_len)*window_width)) + 1,
-                                         np.shape(bandpass_filtered_data)[1]]),
-                               columns=raw_data.iloc[:, num_columns].columns)
-    # 設定 Root mean square 的矩陣大小、欄位名稱
-    rms_data = pd.DataFrame(np.zeros([int((np.shape(bandpass_filtered_data)[0] - window_width)/  ((1-overlap_len)*window_width)) + 1,
-                                      np.shape(bandpass_filtered_data)[1]]),
-                            columns=raw_data.iloc[:, num_columns].columns)
-    
-    # 2.2 -------------分不同sensor處理各自的採樣頻率----
-    for col in range(len(num_columns)):
-        if '.csv' in raw_data_path:
-            # 取採樣時間的前十個採樣點計算採樣頻率
-            sample_freq = 1/np.mean(np.array(raw_data.iloc[2:11, (num_columns[col] - 1)])
-                                        - np.array(raw_data.iloc[1:10, (num_columns[col] - 1)]))
-            # decimation_factor = sample_freq / down_freq
-            # 在raw data中以最短的數據長短為標準，只取最短數據的資料找其中是否包含NAN
-            if type(data_len) != int:
-                indi_data_len = data_len[col]
-            isnan = np.where(np.isnan(raw_data.iloc[:(np.shape(raw_data)[0] - (indi_data_len)), num_columns[col]]))
-            # 預處理資料,判斷資料中是否有 nan, 並將 nan 取代為 0 
-            if isnan[0].size == 0:
-            # 計算Bandpass filter
-                # data = raw_data.iloc[:(np.shape(raw_data)[0] - indi_data_len), num_columns[col]].values
-                data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].values
-            # 設定給斷訊超過 0.1 秒的 sensor 警告
-            elif isnan[0].size > 0.1*sample_freq:
-                logging.warning(str(raw_data.columns[num_columns[col]] + "sensor 總訊號斷訊超過 0.1 秒，"))
-                # data = raw_data.iloc[:(np.shape(raw_data)[0] - indi_data_len), num_columns[col]].values
-                data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].values
-            else:
-                logging.warning(str("共發現 " + str(isnan[0].size) + " 個缺值,位置為 " + str(isnan[0])))
-                logging.warning("已將 NAN 換為 0")
-                # data = raw_data.iloc[:(np.shape(raw_data)[0] - indi_data_len), num_columns[col]].fillna(0)
-                data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].fillna(0)
-            # 由於各截止時間不同，所以找出最小的截止時間，並將其他較長時間的 sensor，都截成短的
-            # 找出最小的時間，並且找出所有欄位數據中最接近的索引值
-            end_index = np.abs(raw_data.iloc[:, num_columns[col]-1].fillna(0) - min_stop_time).argmin()
-            data = data[:end_index+1]
-            # 進行 bandpass filter
-            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=sample_freq, output='sos')
-            bandpass_filtered = signal.sosfiltfilt(bandpass_sos, data)
-            # 做 band stop filter
-            notch_filtered = bandpass_filtered  # 起始輸入信號
-
-            # 使用迴圈進行多次 Notch 過濾
-            for cutoff in csv_notch_cutoff_list:
-                notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=sample_freq, output='sos')
-                notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
-            
-            # 取絕對值，將訊號翻正
-            abs_data = abs(notch_filtered)
-            # ------linear envelop analysis-----------                          
-            # ------lowpass filter parameter that the user must modify for your experiment        
-            lowpass_sos = signal.butter(2, lowpass_freq, btype='low', fs=sample_freq, output='sos')        
-            lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data)
-        
-        elif '.c3d' in raw_data_path:
-            # decimation_factor = Fs / down_freq
-            data = raw_data.iloc[:(np.shape(raw_data)[0]), num_columns[col]].values
-            bandpass_sos = signal.butter(2, bandpass_cutoff,  btype='bandpass', fs=Fs, output='sos')
-            bandpass_filtered = signal.sosfiltfilt(bandpass_sos, data)
-            # notch filter
-            # 初始化過濾數據
-            notch_filtered = bandpass_filtered  # 起始輸入信號
-
-            # 使用迴圈進行多次 Notch 過濾
-            for cutoff in c3d_notch_cutoff_list:
-                notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=Fs, output='sos')
-                notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
-  
-            # 取絕對值，將訊號翻正
-            abs_data = abs(notch_filtered)
-            # ------linear envelop analysis-----------                          
-            # ------lowpass filter parameter that the user must modify for your experiment        
-            lowpass_sos = signal.butter(2, lowpass_freq, btype='low', fs=Fs, output='sos')        
-            lowpass_filtered = signal.sosfiltfilt(lowpass_sos, abs_data)
- 
-        
-        
-        # 2.3.------resample data to 1000Hz-----------
-        # 降採樣資料，並將資料儲存在矩陣當中
-        
-        notch_filtered = signal.resample(notch_filtered, int(downsample_len))
-        notch_filtered_data.iloc[:, col] = notch_filtered[:int(downsample_len)]
-        bandpass_filtered = signal.resample(bandpass_filtered, int(downsample_len))
-        bandpass_filtered_data.iloc[:, col] = bandpass_filtered[:int(downsample_len)]
-        abs_data = signal.resample(abs_data, int(downsample_len))
-        lowpass_filtered = signal.resample(lowpass_filtered, int(downsample_len))
-        lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:int(downsample_len)]
-        # -------Data smoothing. Compute Moving mean
-        # window width = window length(second)*sampling rate
-        
-        # 需重新修改 moving mean 以及 RMS method
-        
-        # for col in range(columns):  # 針對不同欄位計算
-        #     for ii in range(moving_data.shape[0]):  
-        #         data_location = int(ii * (1 - overlap_len) * window_width)
-        #         if data_location + window_width > len(abs_data):  # 避免超出索引範圍
-        #             break
-        #         moving_data.iloc[ii, col] = np.mean(abs_data[data_location:data_location + window_width])  # 計算移動平均
-        
-        #     for ii in range(rms_data.shape[0]):  
-        #         data_location = int(ii * (1 - overlap_len) * window_width)
-        #         if data_location + window_width > len(abs_data):  # 避免超出索引範圍
-        #             break
-        #         rms_data.iloc[ii, col] = np.sqrt(np.mean(abs_data[data_location:data_location + window_width] ** 2))  # 計算 RMS
-        
-        
-        
-        # for ii in range(np.shape(moving_data)[0]):
-        #     data_location = int(ii*(1-overlap_len)*window_width)
-        #     # print(data_location, data_location+window_width_rms)
-        #     moving_data.iloc[int(ii), col] = (np.sum((abs_data[data_location:data_location+window_width])**2)
-        #                                   /window_width)
-            
-        # # -------Data smoothing. Compute RMS
-        # # The user should change window length and overlap length that suit for your experiment design
-        # # window width = window length(second)*sampling rate
-        # for ii in range(np.shape(rms_data)[0]):
-        #     data_location = int(ii*(1-overlap_len)*window_width)
-        #     # print(data_location, data_location+window_width_rms)
-        #     rms_data.iloc[int(ii), col] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width])**2)
-        #                                   /window_width)
-        
-                
-    # 3. -------------插入時間軸-------------------
-    # 定義bandpass filter的時間
-    min_stop_time = 0 + np.shape(bandpass_filtered_data)[0] * 1/down_freq
-    bandpass_time_index = np.linspace(0, min_stop_time, np.shape(bandpass_filtered_data)[0])
-    bandpass_filtered_data.insert(0, 'time', bandpass_time_index)
-    # 定義 notch filter的時間
-    notch_time_index = np.linspace(0, min_stop_time, np.shape(notch_filtered_data)[0])
-    notch_filtered_data.insert(0, 'time', notch_time_index)
-    # 定義lowpass filter的時間
-    lowpass_time_index = np.linspace(0, min_stop_time, np.shape(lowpass_filtered_data)[0])
-    lowpass_filtered_data.insert(0, 'time', lowpass_time_index)
-
-    # 定義moving average的時間
-    # moving_time_index = np.linspace(0, min_stop_time, np.shape(moving_data)[0])
-    # moving_data.insert(0, 'time', moving_time_index)
-    # # 定義RMS DATA的時間
-    # rms_time_index = np.linspace(0, min_stop_time, np.shape(rms_data)[0])
-    # rms_data.insert(0, 'time', rms_time_index)
-    # 設定 return 參數
-    if smoothing == "lowpass":
-        return lowpass_filtered_data, notch_filtered_data
-    # elif smoothing == "rms":
-    #     return rms_data, bandpass_filtered_data
-    # elif smoothing == "moving":
-    #     return moving_data, bandpass_filtered_data
 
 # %%
 
@@ -418,9 +143,7 @@ def load_emg_data(file_path):
         raise ValueError("不支援的檔案格式，請提供 CSV 或 C3D 檔案。")
 
 
-raw_data_path = r"E:\Hsin\NTSU_lab\Gymnastics\論文資料CSV檔\EMG\NSF1.1_1\NSF1.1_Back_Tuck_Somersault_Rep_1.5.csv"
-raw_data_path = r"E:\Hsin\BenQ\ZOWIE non-sym\1.motion\Vicon\S03\S03_Biceps_MVC.c3d"
-raw_data, data_type = load_emg_data(raw_data_path)
+
 
 def preprocess_emg_data(raw_data, data_type, down_freq=1000):
     """ 
@@ -480,20 +203,35 @@ def preprocess_emg_data(raw_data, data_type, down_freq=1000):
     return downsample_len
 
 
-downsample_len = preprocess_emg_data(raw_data, data_type, down_freq=1000)
-
 def apply_filters(raw_data, data_type, downsample_len, bandpass_cutoff, notch_cutoff=None):
-    """ 應用 Bandpass、Notch 和 Lowpass 濾波器 """
+    """ 
+    應用 Bandpass、Notch 和 Lowpass 濾波器，適用於 CSV 和 C3D 格式的 EMG 信號處理
+    
+    參數:
+    - raw_data (pd.DataFrame): 原始 EMG 數據
+    - data_type (str): 數據類型 ("csv" 或 "c3d")
+    - downsample_len (int): 降採樣後的數據長度
+    - bandpass_cutoff (list): 帶通濾波的頻率範圍 [low, high]
+    - notch_cutoff (list, optional): 陷波濾波頻率列表，如 [50, 100] (可選)
+
+    回傳:
+    - bandpass_filtered_data (pd.DataFrame): 帶通濾波後的數據
+    - abs_data (pd.DataFrame): 取絕對值後的數據
+    """
+    # ------------------------ 取得需要處理的數據欄位 ------------------------
     if data_type == "csv":
+        # CSV 檔案中，數據欄位是奇數索引 (假設時間欄位為偶數索引)
         data_columns = list(np.arange(1, len(raw_data.columns), 2))
     elif data_type == "c3d":
+        # C3D 檔案中，所有數據欄位都要處理
         data_columns = list(np.arange(1, len(raw_data.columns), 1))
-
+    # ------------------------ 初始化濾波後的 DataFrame ------------------------
+    # 創建與 downsample_len 相同長度的 DataFrame，用來儲存濾波後的數據
     bandpass_filtered_data = pd.DataFrame(np.zeros([downsample_len, len(data_columns)]),
                                           columns=raw_data.iloc[:, data_columns].columns)
     abs_data = pd.DataFrame(np.zeros([downsample_len, len(data_columns)]),
                             columns=raw_data.iloc[:, data_columns].columns)
-    # 針對每個欄位進行濾波
+    # ------------------------ 針對每個 EMG 通道進行濾波 ------------------------
     for col in range(len(data_columns)):
         # 依照不同的檔案格式進行濾波，因為 Delsys 會因為不同的 Sensor 有不同的採樣頻率
         if data_type == "csv":
@@ -502,33 +240,35 @@ def apply_filters(raw_data, data_type, downsample_len, bandpass_cutoff, notch_cu
         elif data_type == "c3d":
             Fs = (1/np.mean(np.array(raw_data.iloc[2:11, 0]) -\
                             np.array(raw_data.iloc[1:10, 0])))
-        # 將資料中的 nan 補零
+        # 將資料中的 nan 補 0
         data = raw_data.iloc[:, data_columns[col]].fillna(0).values
-        # 將資料進行 bandpass filter
+        # ------------------------ Bandpass filter-----------------------
         bandpass_sos = signal.butter(2, bandpass_cutoff, btype='bandpass', fs=Fs, output='sos')
         bandpass_filtered = signal.sosfiltfilt(bandpass_sos, data)
-        # notch filter
+        # ------------------------ Notch filter- ------------------------
         if notch_cutoff:
             notch_filtered = bandpass_filtered
             for cutoff in notch_cutoff:
                 notch_sos = signal.butter(2, cutoff, btype='bandstop', fs=Fs, output='sos')
                 notch_filtered = signal.sosfiltfilt(notch_sos, notch_filtered)
+                # 更新 bandpass_filtered 變數
                 bandpass_filtered = notch_filtered
 
-        # 降採樣
+        # ------------------------ 降採樣 ------------------------
+        # 使用 scipy.signal.resample() 將數據降採樣到 downsample_len
         bandpass_filtered_data.iloc[:, col] = signal.resample(bandpass_filtered, downsample_len)
         # 取絕對值
         abs_data.iloc[:, col] = abs(signal.resample(bandpass_filtered, downsample_len))
     
-    # 定義bandpass filter的時間
+    # ------------------------ 產生時間軸並插入 DataFrame ------------------------
     min_stop_time = 0 + np.shape(bandpass_filtered_data)[0] * 1/down_freq
     bandpass_time_index = np.linspace(0, min_stop_time, np.shape(bandpass_filtered_data)[0])
+    # ------------------------ 產生時間軸並插入 DataFrame ------------------------
     bandpass_filtered_data.insert(0, 'time', bandpass_time_index)
     abs_data.insert(0, 'time', bandpass_time_index)
 
     return bandpass_filtered_data, abs_data
 
-_, abs_data = apply_filters(raw_data, data_type, downsample_len, bandpass_cutoff, notch_cutoff=None)
 
 def smoothing_method(filtered_data, method="moving", lowpass_cutoff=None, window_width=None, overlap_len=None):
     """ 
@@ -550,7 +290,8 @@ def smoothing_method(filtered_data, method="moving", lowpass_cutoff=None, window
     if method.lower() == "lowpass":
         if lowpass_cutoff == None :
             raise ValueError("Must define the lowpass_cutoff")
-        lowpass_filtered_data = pd.DataFrame(np.zeros([downsample_len, len(filtered_data.columns)]),
+        lowpass_filtered_data = pd.DataFrame(np.zeros([np.shape(filtered_data)[0],
+                                                       len(filtered_data.columns)]),
                                              columns=filtered_data.columns)
         for col_idx, col in enumerate(filtered_data.columns):
             if col_idx == 0:
@@ -581,27 +322,6 @@ def smoothing_method(filtered_data, method="moving", lowpass_cutoff=None, window
         
         moving_data = pd.DataFrame(np.zeros([num_windows, filtered_data.shape[1]]),
                                    columns=filtered_data.columns)
-        
-        # 計時開始
-        # start_time = time.time()
-        # for col in filtered_data.columns:
-        #     for i in range(num_windows):
-        #         start_idx = i * step
-        #         end_idx = start_idx + window_width
-        #         window = filtered_data.loc[start_idx:end_idx, col]
-    
-        #         if method.lower() == "moving":
-        #             moving_data.loc[i, col] = np.mean(window)
-        #         elif method.lower() == "rms":
-        #             moving_data.loc[i, col] = np.sqrt(np.mean(window ** 2))
-        # # 計時結束
-        # end_time = time.time()
-
-        # # 計算並輸出運行時間
-        # elapsed_time = end_time - start_time
-        # print(f"函數執行時間: {elapsed_time:.6f} 秒")
-        # 計時開始
-        start_time = time.time()
     
         # 使用 NumPy Sliding Window
         for col_idx in range(num_columns):
@@ -612,25 +332,19 @@ def smoothing_method(filtered_data, method="moving", lowpass_cutoff=None, window
                 smoothing_array[:, col_idx] = np.mean(windows, axis=1)
             elif method.lower() == "rms":
                 smoothing_array[:, col_idx] = np.sqrt(np.mean(windows ** 2, axis=1))
-    
-        # 計時結束
-        end_time = time.time()
-    
         # 轉回 DataFrame
-        smoothing_data_1 = pd.DataFrame(smoothing_array, columns=filtered_data.columns)
-    
-        # 輸出運行時間
-        elapsed_time = end_time - start_time
-        print(f"函數執行時間: {elapsed_time:.6f} 秒")
+        moving_data = pd.DataFrame(smoothing_array, columns=filtered_data.columns)
+
         return moving_data
     else:
         raise ValueError("Invalid method. Choose 'lowpass', 'moving', or 'rms'.")
 
     
 
-smoothing_data = smoothing_method(abs_data, method="moving", window_width=0.02, overlap_len=0.019)
+# smoothing_data = smoothing_method(abs_data, method="moving", window_width=0.02, overlap_len=0.019)
 
-def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overlap_len=None, down_sap=False):
+def EMG_processing(raw_data_path, bandpass_cutoff=[20, 450], lowpass_freq = 6, notch_cutoff_list = [[59, 61]],
+                   smoothing="lowpass", window_width=None, overlap_len=None, down_sap=False):
     """
     EMG 信號處理函數：支援 CSV / C3D 格式，並提供 Lowpass、Moving Mean、RMS 選項
     """
@@ -641,28 +355,24 @@ def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overla
     downsample_len = preprocess_emg_data(raw_data, data_type)
 
     # 3. 濾波處理
-    bandpass_cutoff = [20, 450]
-    notch_cutoff_list = [50, 100, 150]
-    lowpass_freq = 10
-    window_width = 0.02
-    overlap_len = 0.019
-    method = "lowpass"
-    
     _, abs_data = apply_filters(raw_data, data_type, downsample_len, bandpass_cutoff, notch_cutoff=notch_cutoff_list)
 
     # 4. 根據 smoothing 進行額外處理
     if smoothing == "lowpass":
-        smoothing_data = smoothing_method(abs_data, method=method, lowpass_cutoff=lowpass_freq)
+        smoothing_data = smoothing_method(abs_data, method=smoothing, lowpass_cutoff=lowpass_freq)
         return smoothing_data
     elif smoothing in ["moving", "RMS"]:
-        smoothing_data = smoothing_method(abs_data, method=method,
-                                                window_width=window_width, overlap_len=overlap_len)
+        smoothing_data = smoothing_method(abs_data, method=smoothing,
+                                          window_width=window_width, overlap_len=overlap_len)
         return smoothing_data
+# %%
 
+
+raw_data_path = r"E:\Hsin\NTSU_lab\Gymnastics\論文資料CSV檔\EMG\NSF1.1_1\NSF1.1_Back_Tuck_Somersault_Rep_1.5.csv"
 
 # 測試使用範例：
-# lowpass_filtered, notch_filtered = EMG_processing("data.csv", smoothing="lowpass")
-# moving_data, bandpass_data = EMG_processing("data.csv", smoothing="moving", window_width=100, overlap_len=0.5)
+lowpass_filtered = EMG_processing(raw_data_path, smoothing="lowpass")
+moving_data = EMG_processing(raw_data_path, smoothing="moving", window_width=100, overlap_len=0.5)
 
 
 
