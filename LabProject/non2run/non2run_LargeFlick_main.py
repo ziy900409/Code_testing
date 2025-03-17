@@ -30,17 +30,16 @@ from datetime import datetime
 
 # %% 路徑設置
 # folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
-folder_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\\"
-RawData_folder = "1. Motion\Major_Asymmetric\\"
-processingData_folder = "2. ProsessingData\\"
+folder_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\\"
+RawData_folder = "1.Motion\\1.Vicon\\"
+processingData_folder = "4.ProcessData\\"
 
 save_place = "2. SmallTrack\\"
 task_name = 'SmallTrack'
 
-vicon_folder = [#"S01",
-                #"S02", "S03", "S04",
+vicon_folder = ["S01", "S02", "S03", "S04",
                 #"S05", "S06", "S07", "S08", "S09",
-                "S10",
+                # "S10",
                 #"S11", "S12",
                 ]
 
@@ -48,7 +47,7 @@ motion_folder_path = folder_path + RawData_folder
 
 # stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240930.xlsx"
 stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240930.xlsx"
-all_mouse_name = ['_A_', '_C_', '_EC2_', '_HS_']
+all_mouse_name = ['_I_', '_B_', '_HS_', '_DA_']
 vicon_muscle = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
                 "Biceps", "Triceps"]
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
@@ -98,8 +97,7 @@ duration = 1
 # 去除有“.“開頭的檔案 and 只獲得資料夾路徑，排除其他可能的檔案格式
 motion_folder_list = []
 
-motion_folder_list = motion_folder_list + \
-            [f for f in os.listdir(motion_folder_path) if not f.startswith('.') \
+motion_folder_list = [f for f in os.listdir(motion_folder_path) if not f.startswith('.') \
              and os.path.isdir(os.path.join((motion_folder_path), f))]
 # 取得所有 processing data folder list
 processing_folder_path = folder_path + "\\" + processingData_folder + "\\"
