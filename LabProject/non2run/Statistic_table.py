@@ -13,16 +13,24 @@ from openpyxl import load_workbook, Workbook
 from datetime import datetime
 
 # %%
-data_path = [r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\4. Statistics\1. SmallFlick\All_SmallFlick_data_1218.xlsx",
+data_path = [
+    # r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\4. Statistics\1. SmallFlick\All_SmallFlick.xlsx",
+    # r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\4. Statistics\2. SmallTrack\All_SmallTrack.xlsx",
+    # r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\4. Statistics\3. SpiderShot\All_LargeFlick.xlsx",
+    r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\4. Statistics\4. GridShot\All_GridShot.xlsx",
              ]
-file_sheet = ["arm_motion", "FingerIncludeAngle", "FingerAngle",
+file_sheet = [
+    # "arm_emg_motion", "emg_table",
+              "arm_motion", "FingerIncludeAngle", "FingerAngle",
               "MedFreq", "iMVC_cal", "iMVCslope"]
 
-subject = ["S01", "S02", "S03", "S04",
-           "S05", "S06", "S07", "S08",
-           "S09", "S10", "S11", "S12"]
+subject = [
+    "S01", "S02", "S03", "S04",
+        "S05", "S06", "S07", "S08",
+    #    "S09", "S10", "S11", "S12"
+           ]
 
-mouse = ["A", "C", "EC2", "HS"]
+mouse = ["B", "DA", "I", "HS"]
 
 axis_dir = ["elbow_x", "elbow_y", "elbow_z",
             "wrist_x", "wrist_y", "wrist_z"]
@@ -87,7 +95,7 @@ subject = ["S01", "S02", "S03", "S04",
            "S05", "S06", "S07", "S08",
            "S09", "S10", "S11", "S12"]
 
-mouse = ["A", "C", "EC2", "HS"]
+mouse = ["B", "DA", "I", "HS"]
 
 # axis_dir = ["elbow_x", "elbow_y", "elbow_z",
 #             "wrist_x", "wrist_y", "wrist_z"]
@@ -153,14 +161,14 @@ from collections import defaultdict
 
 
 
-data_path = [r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\4. Statistics\1. SmallFlick\All_SmallFlick_data_1218_ed.xlsx",
+data_path = [r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\4. Statistics\1. SmallFlick\All_SmallFlick_ed.xlsx",
              ]
-data_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\4. Statistics\1. SmallFlick\All_SmallFlick_data_1218_ed.xlsx"
+data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\4. Statistics\1. SmallFlick\All_SmallFlick_ed.xlsx"
 file_sheet = ["arm_motion", "FingerIncludeAngle", "FingerAngle",
               "MedFreq", "iMVC_cal", "iMVCslope"]
 
 
-mouse = ["A", "C", "EC2", "HS"]
+mouse = ["B", "DA", "I", "HS"]
 
 X = defaultdict(list)  # 預設為 list，所以不用手動初始化 X["A"] = []
 # 建立一個儲存 ANOVA 結果的字典

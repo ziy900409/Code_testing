@@ -37,8 +37,9 @@ processingData_folder = "4.ProcessData\\"
 save_place = "2. SmallTrack\\"
 task_name = 'SmallTrack'
 
-vicon_folder = ["S01", "S02", "S03", "S04",
-                #"S05", "S06", "S07", "S08", "S09",
+vicon_folder = [#"S01", "S02", "S03", "S04",
+                "S05", "S06", "S07", "S08", 
+                # "S09",
                 # "S10",
                 #"S11", "S12",
                 ]
@@ -534,8 +535,9 @@ with pd.ExcelWriter(folder_path + "4. Statistics\\" + save_place + "All_" + task
     all_emg_slope_data.to_excel(writer, sheet_name='iMVCslope', index=False, header=True)  
         
 
-
-
+# %%
+x = func.Read_File(r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\3.EMG\S12",
+                  ".csv")
 
 
 

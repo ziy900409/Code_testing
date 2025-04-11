@@ -23,6 +23,7 @@ vicon2cortex = {'MOS1': 'M1',
                 'RRS': 'R.Wrist.Rad',
                 'RTB1': 'R.Thumb1',
                 'RTB2': 'R.Thumb2',
+                'RTB3': 'R.Thumb3',
                 'RID1': 'R.I.Finger1',
                 'RID2': 'R.I.Finger2',
                 'RID3': 'R.I.Finger3',
@@ -65,7 +66,7 @@ def read_c3d(path, method='cortex'):
     # # 1. read c3d file
     # path = r'E:\\Hsin\\BenQ\\ZOWIE non-sym\\\\1.motion\\Vicon\\S04\\S04_Tpose_elbow.c3d'
     # method = 'vicon'
-    # path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_Asymmetric/S02/20241123/S02_Tpose_elbow.c3d"
+    # path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\2.Cortex\S09\S01_Tpose_elbow_02.c3d"
     c = ezc3d.c3d(path)
 
     # 數據的基本資訊，使用dict儲存

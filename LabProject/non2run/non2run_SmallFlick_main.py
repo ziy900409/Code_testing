@@ -31,16 +31,17 @@ from datetime import datetime
 
 # %% 路徑設置
 # folder_path = r"E:\Hsin\BenQ\ZOWIE non-sym\\"
-folder_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\\"
-RawData_folder = "1. Motion\Major_Asymmetric\\"
-processingData_folder = "2. ProsessingData\\"
+folder_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\\"
+RawData_folder = "1.Motion\\1.Vicon\\"
+processingData_folder = "4.ProcessData\\"
 
 save_place = "1. SmallFlick\\"
 task_name = 'SmallFlick'
 
 vicon_folder = [#"S01",
                 #"S02", "S03", "S04",
-                "S05", "S06", "S07", "S08", "S09",
+                "S05", "S06", "S07", "S08",
+                # "S09",
                 # "S10",
                 #"S11", "S12",
                 ]
@@ -49,7 +50,7 @@ motion_folder_path = folder_path + RawData_folder
 
 # stage_file_path = r"E:\Hsin\BenQ\ZOWIE non-sym\ZowieNonSymmetry_StagingFile_20240930.xlsx"
 stage_file_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\ZowieNonSymmetry_StagingFile_20240930.xlsx"
-all_mouse_name = ['_A_', '_C_', '_EC2_', '_HS_']
+all_mouse_name = ['_I_', '_B_', '_HS_', '_DA_']
 vicon_muscle = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
                 "Biceps", "Triceps"]
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
@@ -239,7 +240,8 @@ for folder_name in vicon_folder:
         new_columns_list = [s.replace('mouse:', '') for s in new_columns_list]
         motion_info["LABELS"] = new_columns_list
         # 設定開始索引
-        task_start = int(motion_info['first_frame']) + int(motion_info['frame_rate']*1)
+        # task_start = int(motion_info['first_frame']) + int(motion_info['frame_rate']*1)
+        task_start = int(motion_info['frame_rate']*1)
         # 結束索引是開始後加15秒
         task_end = task_start + int(motion_info['frame_rate']*15)
         

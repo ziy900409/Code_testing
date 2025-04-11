@@ -30,8 +30,8 @@ import numpy as np
 import pandas as pd
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"C:\Users\Public\BenQ\myPyCode\U3")
-import gen_function as gen
+sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\function")
+import gen_function_001 as gen
 # from scipy.signal import find_peaks
 # import gc
 # import matplotlib.pyplot as plt
@@ -914,7 +914,7 @@ def V_Elbow_cal_1(c3d_path, method=None, replace=None):
 
 # %% 使用tpose計算手部的自然關節角度
 def arm_natural_pos(c3d_path, p1_all, index, method=None, replace=None):
-    # c3d_path = r'D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_Asymmetric/S01/20241123/S01_Tpose_hand.c3d'
+    # c3d_path = r'D:\\BenQ_Project\\01_UR_lab\\2025_02 Asymmetry\\\\1.Motion\\2.Cortex\\S09\\S01_Tpose_hand_01.c3d'
     motion_info, motion_data, analog_info, FP_data, np_motion_data = gen.read_c3d(c3d_path, method=method)
     if replace:
         motion_data.rename(columns=lambda x: x.replace(str(replace + ':'), ''), inplace=True)

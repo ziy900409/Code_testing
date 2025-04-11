@@ -35,7 +35,7 @@ for ratio in time_ratio.keys():
 time_length = int(total_time * 10 * 2)
 
 # 存檔名稱
-save_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\2. ProsessingData\\"
+save_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\4.ProcessData\\"
 
 # %%
 def compare_mean_std_cloud(data_path, savepath, filename, smoothing,
@@ -462,7 +462,8 @@ def find_and_filter_peaks(peak_value, ori_properties, threshold, num, max_iterat
     return output_peaks
     
 # %%
-def plot_arm_angular(file_name, folder_name, elbow, wrist, emg_data, joint_threshold, cal_method='vel'):
+def plot_arm_angular(file_name, folder_name, elbow, wrist, emg_data, joint_threshold, cal_method='vel',
+                     mot_emg_ratio=10):
     # elbow, wrist, emg_data =  Elbow_AngVel, Wrist_AngVel, emg_iMVC
     # file_name = r'D:\\BenQ_Project\\01_UR_lab\\2024_11 Shanghai CS Major\\\\1. Motion\\Major_Asymmetric\\S10\\20241203\\S10_SmallFlick_C_2.c3d'
     _, tempfilename = file_name.split('\\', -1)[-5], file_name.split('\\', -1)[-1]
@@ -569,7 +570,7 @@ def plot_arm_angular(file_name, folder_name, elbow, wrist, emg_data, joint_thres
     plt.suptitle(str(fig_title + "(motion): " + save_name), fontsize = 18)
     plt.subplots_adjust(top=0.90)
     plt.grid(False)
-    plt.savefig(str(save_path + folder_name + "\\3. SpiderShot\\2. EMG\\" + save_name + "_motion.jpg"),
+    plt.savefig(str(save_path + folder_name + "\\2. EMG\\" + save_name + "_motion.jpg"),
                 dpi=200, bbox_inches = "tight")
     plt.show()
     # -------------繪製EMG對應的關節最大峰值速度
@@ -588,22 +589,22 @@ def plot_arm_angular(file_name, folder_name, elbow, wrist, emg_data, joint_thres
             
             for ii in range(len(Vel_peaks[f'{fig_num}'])):
                 # 避免繪圖+50ms超出資料範圍,
-                if Vel_peaks[f'{fig_num}'][ii]*10+50 < len(emg_data.iloc[:, 0]):    
+                if Vel_peaks[f'{fig_num}'][ii]*mot_emg_ratio+50 < len(emg_data.iloc[:, 0]):    
                 # 抓取峰值前後50ms的區間
-                    axs[x, y].axvspan(emg_data.iloc[Vel_peaks[f'{fig_num}'][ii]*10-50, 0],
-                                      emg_data.iloc[Vel_peaks[f'{fig_num}'][ii]*10+50, 0],
+                    axs[x, y].axvspan(emg_data.iloc[int(Vel_peaks[f'{fig_num}'][ii]*mot_emg_ratio)-50, 0],
+                                      emg_data.iloc[int(Vel_peaks[f'{fig_num}'][ii]*mot_emg_ratio)+50, 0],
                                       color='red', alpha=0.3)    
                 else:
-                    axs[x, y].axvspan(emg_data.iloc[Vel_peaks[f'{fig_num}'][ii]*10-50, 0],
+                    axs[x, y].axvspan(emg_data.iloc[int(Vel_peaks[f'{fig_num}'][ii]*mot_emg_ratio)-50, 0],
                                       emg_data.iloc[-1, 0],
                                       color='red', alpha=0.3)
             for iii in range(len(Vel_valleys[f'{fig_num}'])):
-                if Vel_valleys[f'{fig_num}'][iii]*10+50 < len(emg_data.iloc[:, 0]):
-                    axs[x, y].axvspan(emg_data.iloc[Vel_valleys[f'{fig_num}'][iii]*10-50, 0],
-                                      emg_data.iloc[Vel_valleys[f'{fig_num}'][iii]*10+50, 0],
+                if Vel_valleys[f'{fig_num}'][iii]*mot_emg_ratio+50 < len(emg_data.iloc[:, 0]):
+                    axs[x, y].axvspan(emg_data.iloc[int(Vel_valleys[f'{fig_num}'][iii]*mot_emg_ratio)-50, 0],
+                                      emg_data.iloc[int(Vel_valleys[f'{fig_num}'][iii]*mot_emg_ratio)+50, 0],
                                       color='red', alpha=0.3)
                 else:
-                    axs[x, y].axvspan(emg_data.iloc[Vel_valleys[f'{fig_num}'][iii]*10-50, 0],
+                    axs[x, y].axvspan(emg_data.iloc[int(Vel_valleys[f'{fig_num}'][iii]*mot_emg_ratio)-50, 0],
                                       emg_data.iloc[-1, 0],
                                       color='red', alpha=0.3)
         axs[x, y].set_title(emg_data.columns[i+1], fontsize=16)
@@ -618,7 +619,7 @@ def plot_arm_angular(file_name, folder_name, elbow, wrist, emg_data, joint_thres
     plt.grid(False)
     plt.xlabel("time (second)", fontsize = 14)
     plt.ylabel("Voltage (V)", fontsize = 14)
-    plt.savefig(str(save_path + folder_name + "\\3. SpiderShot\\2. EMG\\" + save_name + "_EMG.jpg"),
+    plt.savefig(str(save_path + folder_name + "\\2. EMG\\" + save_name + "_EMG.jpg"),
                 dpi=200, bbox_inches = "tight")
     plt.show()
     
