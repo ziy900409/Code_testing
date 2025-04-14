@@ -368,14 +368,58 @@ def EMG_processing(raw_data_path, bandpass_cutoff=[20, 450], lowpass_freq = 6, n
 # %%
 
 
-raw_data_path = r"E:\Hsin\NTSU_lab\Gymnastics\論文資料CSV檔\EMG\NSF1.1_1\NSF1.1_Back_Tuck_Somersault_Rep_1.5.csv"
+# raw_data_path = r"E:\Hsin\NTSU_lab\Gymnastics\論文資料CSV檔\EMG\NSF1.1_1\NSF1.1_Back_Tuck_Somersault_Rep_1.5.csv"
 
-# 測試使用範例：
-lowpass_filtered = EMG_processing(raw_data_path, smoothing="lowpass")
-moving_data = EMG_processing(raw_data_path, smoothing="moving", window_width=100, overlap_len=0.5)
+# # 測試使用範例：
+# lowpass_filtered = EMG_processing(raw_data_path, smoothing="lowpass")
+# moving_data = EMG_processing(raw_data_path, smoothing="moving", window_width=100, overlap_len=0.5)
 
+# %% Reading all of data path
+# using a recursive loop to traverse each folder
+# and find the file extension has .csv
+def Read_File(file_path, file_type, subfolder=None):
+    """
+    Parameters
+    ----------
+    file_path : str
+        給予欲讀取資料之路徑.
+    file_type : str
+        給定欲讀取資料之副檔名.
+    subfolder : boolean, optional
+        是否子資料夾一起讀取. The default is 'None'.
 
+    Returns
+    -------
+    csv_file_list : list
+        回給所有路徑下的資料絕對路徑.
 
+    """
+    # if subfolder = True, the function will run with subfolder
+
+    csv_file_list = []
+
+    if subfolder:
+        file_list_1 = []
+        for dirPath, dirNames, fileNames in os.walk(file_path):
+            # file_list = os.walk(folder_name)
+            file_list_1.append(dirPath)
+        # need to change here [1:]
+        for ii in file_list_1[1:]:
+            file_list = os.listdir(ii)
+            for iii in file_list:
+                if os.path.splitext(iii)[1] == file_type:
+                    # replace "\\" to '/', due to MAC version
+                    file_list_name = ii + "\\" + iii
+                    csv_file_list.append(file_list_name)
+    else:
+        folder_list = os.listdir(file_path)
+        for i in folder_list:
+            if os.path.splitext(i)[1] == file_type:
+                # replace "\\" to '/', due to MAC version
+                file_list_name = file_path + "\\" + i
+                csv_file_list.append(file_list_name)
+
+    return csv_file_list
 
 
 
