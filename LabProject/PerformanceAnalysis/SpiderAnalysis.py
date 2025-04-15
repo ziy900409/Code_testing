@@ -97,3 +97,5 @@ plt.ylabel("X Axis (Rotated)")
 plt.title("Rotated 2D Trajectory of Index Finger with Local Minima (90° Counterclockwise)")
 plt.legend()
 plt.show()
+
+# %%

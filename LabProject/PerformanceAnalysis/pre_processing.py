@@ -1,3 +1,4 @@
+# %%
 # -*- coding: utf-8 -*-
 """
 Created on Fri Apr 11 09:28:13 2025
@@ -113,7 +114,7 @@ def read_c3d(path, forceplate=False, analog=False, prefix=False, rename=False):
     motion_data_dict = {}
     for i, marker_name in enumerate(motion_info['LABELS']):  #label the name of the data for each variable
         # change the Unit from mm to cm
-        motion_data_dict[marker_name] = np.transpose(c['data']['points'][:3, i, :]) / 10  #maker the name of each variable
+        motion_data_dict[marker_name] = np.transpose(c['data']['points'][:3, i, :]) #maker the name of each variable
     # 2.2. gap filling to marker data 
     fillgap_markers = {key: interpolate_with_fallback(value) for key, value in motion_data_dict.items()}
     # create time frame
@@ -209,7 +210,7 @@ plt.ylabel("Z Value")
 plt.title("Filtered Local Minima of Z-Axis")
 plt.legend()
 plt.show()
-
+# %%
 # === 加入最小 frame 間隔條件 ===
 # final_minima_idx = []
 # === 最終篩選邏輯 ===
@@ -272,6 +273,8 @@ yaw = 0.022  # CS2 預設值
 delta_x_mm = df["X"].diff().fillna(0)
 delta_y_mm = df["Y"].diff().fillna(0)
 
+# 800*1*c = 20.4545
+
 df["yaw_deg"] = delta_x_mm / 25.4 * DPI * sensitivity * yaw     # 水平視角變化
 df["pitch_deg"] = delta_y_mm / 25.4 * DPI * sensitivity * yaw   # 垂直視角變化
 
@@ -301,7 +304,97 @@ filtered_minima_data = pd.DataFrame({
     "Pitch Angle (°)": df["cum_pitch_deg"].iloc[final_minima_idx].values
 })
 print(filtered_minima_data)
-filtered_minima_data.to_csv("Filtered_Local_Minima_Final_ViewAngle.csv", index=False)
+# filtered_minima_data.to_csv("Filtered_Local_Minima_Final_ViewAngle.csv", index=False)
+
+# %%
+# 以假設的 frame rate 240 fps (可自行調整)
+sampling_rate = descriptions["motion info"]["frame_rate"]
+dt = 1 / sampling_rate
+vx = delta_x_mm / dt
+vy = delta_y_mm / dt
+df["speed"] = np.sqrt(vx**2 + vy**2)   # mm/s
+
+
+# === 取得局部最小值對應的視角資料 ===
+filtered_yaw   = df.loc[final_minima_idx, "cum_yaw_deg"]
+filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
+
+# === 繪圖：以視角軌跡繪圖，使用滑鼠速度作為顏色依據 ===
+plt.figure(figsize=(8, 8))
+sc = plt.scatter(df["cum_pitch_deg"], -df["cum_yaw_deg"],
+                 c=df["speed"], cmap="plasma", alpha=0.7, s=5,
+                 label="View Angle Trajectory")
+# 標記篩選後的局部最小值
+plt.scatter(filtered_pitch, -filtered_yaw, color="red", s=20,
+            label="Final Local Minima", zorder=3)
+
+# 以滑鼠速度 (mm/s) 作為 colorbar 的標示
+plt.colorbar(sc, label="Mouse Speed (mm/s)")
+plt.xlabel("Pitch Angle (Vertical) °")
+plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
+plt.title("View Angle Trajectory Colored by Mouse Speed")
+plt.legend()
+plt.show()
+
+# %%
+# 取得局部最小值的 X, Y 座標
+valid_movement_vectors = []
+small_movement_vectors = []
+min_angle_distance = 1.5  # 視角差異閾值（度），你可以自由設定
+
+for idx in final_minima_idx:
+    if idx <= 0 or idx >= len(df) - 1:
+        continue
+
+    # 當前點與其前/後一點的視角位置
+    current_yaw = df["cum_yaw_deg"].iloc[idx]
+    current_pitch = df["cum_pitch_deg"].iloc[idx]
+    prev_yaw = df["cum_yaw_deg"].iloc[idx - 1]
+    prev_pitch = df["cum_pitch_deg"].iloc[idx - 1]
+    next_yaw = df["cum_yaw_deg"].iloc[idx + 1]
+    next_pitch = df["cum_pitch_deg"].iloc[idx + 1]
+
+    current_z = df["Z"].iloc[idx]
+    prev_z = df["Z"].iloc[idx - 1]
+    next_z = df["Z"].iloc[idx + 1]
+
+    # 是否為局部最低
+    if current_z < prev_z or current_z < next_z:
+        # 與前一點距離（角度）
+        dist_prev = np.linalg.norm([current_yaw - prev_yaw, current_pitch - prev_pitch])
+        # 與後一點距離（角度）
+        dist_next = np.linalg.norm([current_yaw - next_yaw, current_pitch - next_pitch])
+
+        # 判斷是否為顯著視角變化
+        if dist_prev > min_angle_distance or dist_next > min_angle_distance:
+            valid_movement_vectors.append((prev_yaw, prev_pitch, current_yaw, current_pitch))
+            valid_movement_vectors.append((current_yaw, current_pitch, next_yaw, next_pitch))
+        else:
+            small_movement_vectors.append((prev_yaw, prev_pitch, current_yaw, current_pitch))
+            small_movement_vectors.append((current_yaw, current_pitch, next_yaw, next_pitch))
+
+
+plt.figure(figsize=(8, 8))
+for x0, y0, x1, y1 in valid_movement_vectors:
+    plt.plot([x0, x1], [y0, y1], color='green', alpha=0.6)
+plt.xlabel("Yaw Angle (Horizontal) °")
+plt.ylabel("Pitch Angle (Vertical) °")
+plt.title("Significant View Angle Movement near Z-axis Local Minima")
+plt.grid(True)
+plt.axis('equal')
+plt.show()
+
+
+
+plt.figure(figsize=(8, 8))
+for x0, y0, x1, y1 in small_movement_vectors:
+    plt.plot([x0, x1], [y0, y1], color='red', lw=2)
+plt.xlabel("Yaw Angle (Horizontal) °")
+plt.ylabel("Pitch Angle (Vertical) °")
+plt.title("Small View Angle Movement near Z-axis Local Minima (Filtered)")
+plt.grid(True)
+plt.axis('equal')
+plt.show()
 
 
 
@@ -329,9 +422,4 @@ filtered_minima_data.to_csv("Filtered_Local_Minima_Final_ViewAngle.csv", index=F
 
 
 
-
-
-
-
-
-
+# %%
