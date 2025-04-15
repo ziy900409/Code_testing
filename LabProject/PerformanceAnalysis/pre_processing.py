@@ -175,7 +175,6 @@ combine_dict, descriptions = read_c3d(data_path,
 # file_path = "IndexData.csv"  # 請修改成你的文件路徑
 # df = pd.read_csv(file_path, header=None, names=['X', 'Y', 'Z'])
 
-# df
 
 # 取得 Z 軸數據
 # z_values = df["Z"].values
