@@ -8,15 +8,17 @@ import numpy as np
 import pandas as pd
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\git\Code_testing\LabProject\function")
+sys.path.append(r"E:\Hsin\git\git\Code_testing\Gymnastics\Liao")
 # sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
-import gen_function as func
-import Kinematic_function as kincal
+import Liao_function as func
+# import Kinematic_function as kincal
 from scipy.signal import find_peaks
 
 import matplotlib.pyplot as plt
 
+# %%
 
+ana_threshold = 4
 
 
 # %%
@@ -43,6 +45,64 @@ motion 250 hz
 
 
 # read staging file
+stage_data = pd.read_excel(r"E:\Hsin\NTSU_lab\Gymnastics\StagingFile_Liao_20250411.xlsx",
+                           sheet_name="ALL")
+csv_list = func.Read_File(r"E:\Hsin\NTSU_lab\Gymnastics\BTS_experiment",
+                           ".csv",
+                           subfolder=True)
+anc_list = func.Read_File(r"E:\Hsin\NTSU_lab\Gymnastics\BTS_experiment",
+                           ".anc",
+                           subfolder=True)
+
+
+subject_list = stage_data['Subject'].dropna().unique()
+
+for subject in subject_list:
+    motion_list = [file for file in stage_data['motion file'] if file.startswith(subject)]
+    for num in range(len(stage_data['motion file'])):
+        for motion_file in motion_list:
+            if motion_file in stage_data['motion file'][num]:
+                # 找出三種資料的檔案路徑: motion. anc, EMG
+                motion_path = [file for file in csv_list if motion_file in file]
+                anc_path = [file for file in anc_list if stage_data['Force Plate file'][num] in file]
+                EMG_path = [file for file in csv_list if stage_data['EMG file'][num] in file]   
+                # 讀檔 motion, anc, EMG
+                motion_data = pd.read_csv(motion_path[0],
+                                          skiprows=2,
+                                          header=[0, 1])
+                motion_data.columns = motion_data.columns.droplevel([1])
+                anc_data = pd.read_csv(anc_path[0],
+                                       skiprows=8,
+                                       sep="\s+",
+                                       header=[0, 1, 2])
+                anc_data.columns = anc_data.columns.droplevel([1, 2])
+                first_header = anc_data.columns.get_level_values(0).tolist()
+                # emg_data = 
+                # 找到
+                   # 2. find peak with threshold (please parameter setting)
+                peaks, _ = find_peaks(anc_data.loc[:, "C63"], height=ana_threshold)
+                # 繪出 analog data 的起始時間
+                plt.plot(anc_data.loc[:, "Name"], anc_data.loc[:, "C63"], label='Signal')
+                plt.plot(anc_data.loc[peaks, "Name"], anc_data.loc[peaks, "C63"], 'ro', label='Peaks')
+                plt.legend()
+                plt.show()
+                # 3. 找出 analog, motion 兩個時間最接近的 frame, 並定義 start index
+                diffs = np.abs(motion_data.iloc[:, 0] - anc_data.loc[peaks[0], "Name"])
+
+                # 找出絕對差值最小的元素索引
+                closest_index = np.argmin(diffs)
+                    
+                for ii, x in enumerate(motion_data.iloc[:, 0]):
+                    # 使用單一數值 x 來計算每個 peak 與 x 的差異
+                    diff = abs(x - anc_data.loc[peaks, "Name"].values)
+                    # 當 x 與 peaks 中某個值的差異剛好是所有差異中的最小值時
+                    if diff < 0.01: 
+                        print("Analog", anc_data.loc[peaks, "Name"])
+                        print("Frame", ii)
+                        break
+
+
+# %%
 
 # starting frame(motion)
 starting_motion = int(16664/4)
@@ -51,6 +111,7 @@ starting_analog = int(16664)
 # 找到互相對應的檔名
 motion_data = pd.read_csv(r"C:\Users\Hsin.YH.Yang\Downloads\論文資料CSV檔\論文資料CSV檔\MOTION\NSF11__1_ok_20250115.data.csv",
                           skiprows=2)
+
 
 # 確保你的資料是數值型態
 motion_num = pd.DataFrame(np.zeros([np.shape(motion_data)[0] -1,
