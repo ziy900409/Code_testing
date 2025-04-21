@@ -336,74 +336,169 @@ plt.title("View Angle Trajectory Colored by Mouse Speed")
 plt.legend()
 plt.show()
 
+
+
 # %%
-# 取得局部最小值的 X, Y 座標
-valid_movement_vectors = []
-small_movement_vectors = []
-min_angle_distance = 1.5  # 視角差異閾值（度），你可以自由設定
 
-for idx in final_minima_idx:
-    if idx <= 0 or idx >= len(df) - 1:
-        continue
+import pandas as pd
+import numpy as np
+from scipy.signal import argrelextrema
 
-    # 當前點與其前/後一點的視角位置
-    current_yaw = df["cum_yaw_deg"].iloc[idx]
-    current_pitch = df["cum_pitch_deg"].iloc[idx]
-    prev_yaw = df["cum_yaw_deg"].iloc[idx - 1]
-    prev_pitch = df["cum_pitch_deg"].iloc[idx - 1]
-    next_yaw = df["cum_yaw_deg"].iloc[idx + 1]
-    next_pitch = df["cum_pitch_deg"].iloc[idx + 1]
+# === 1. 載入資料 ===
 
-    current_z = df["Z"].iloc[idx]
-    prev_z = df["Z"].iloc[idx - 1]
-    next_z = df["Z"].iloc[idx + 1]
+df = pd.DataFrame(combine_dict["markers"]["R.I.Finger3"],
+                  columns = ["X", "Y", "Z"])
 
-    # 是否為局部最低
-    if current_z < prev_z or current_z < next_z:
-        # 與前一點距離（角度）
-        dist_prev = np.linalg.norm([current_yaw - prev_yaw, current_pitch - prev_pitch])
-        # 與後一點距離（角度）
-        dist_next = np.linalg.norm([current_yaw - next_yaw, current_pitch - next_pitch])
-
-        # 判斷是否為顯著視角變化
-        if dist_prev > min_angle_distance or dist_next > min_angle_distance:
-            valid_movement_vectors.append((prev_yaw, prev_pitch, current_yaw, current_pitch))
-            valid_movement_vectors.append((current_yaw, current_pitch, next_yaw, next_pitch))
-        else:
-            small_movement_vectors.append((prev_yaw, prev_pitch, current_yaw, current_pitch))
-            small_movement_vectors.append((current_yaw, current_pitch, next_yaw, next_pitch))
+# === 3. 視角轉換參數 ===
+DPI = 800
+sensitivity = 1.0
+yaw = 0.022
 
 
-plt.figure(figsize=(8, 8))
-for x0, y0, x1, y1 in valid_movement_vectors:
-    plt.plot([x0, x1], [y0, y1], color='green', alpha=0.6)
-plt.xlabel("Yaw Angle (Horizontal) °")
-plt.ylabel("Pitch Angle (Vertical) °")
-plt.title("Significant View Angle Movement near Z-axis Local Minima")
+
+# === 滑鼠移動轉視角（整段軌跡） ===
+delta_x_mm = df["X"].diff().fillna(0)
+delta_y_mm = df["Y"].diff().fillna(0)
+
+# === 4. 將滑鼠移動換算成視角角度（°）===
+
+df["yaw_deg"] = delta_x_mm / 25.4 * DPI * sensitivity * yaw     # 水平視角變化
+df["pitch_deg"] = delta_y_mm / 25.4 * DPI * sensitivity * yaw   # 垂直視角變化
+
+df["cum_yaw_deg"] = df["yaw_deg"].cumsum()     # 累積水平視角（轉向左/右）
+df["cum_pitch_deg"] = df["pitch_deg"].cumsum() # 累積垂直視角（往上/下）
+
+
+
+# === 6. 計算與前/後最小值的視角差 ===
+angle_diffs = []
+for i in range(1, len(final_minima_idx) - 1):
+    idx_prev = final_minima_idx[i - 1]
+    idx_curr = final_minima_idx[i]
+    idx_next = final_minima_idx[i + 1]
+
+    yaw_prev = df["cum_yaw_deg"].iloc[idx_prev]
+    pitch_prev = df["cum_pitch_deg"].iloc[idx_prev]
+    yaw_curr = df["cum_yaw_deg"].iloc[idx_curr]
+    pitch_curr = df["cum_pitch_deg"].iloc[idx_curr]
+    yaw_next = df["cum_yaw_deg"].iloc[idx_next]
+    pitch_next = df["cum_pitch_deg"].iloc[idx_next]
+
+    # 視角差：前一個 / 後一個
+    diff_prev = np.linalg.norm([yaw_curr - yaw_prev, pitch_curr - pitch_prev])
+    diff_next = np.linalg.norm([yaw_curr - yaw_next, pitch_curr - pitch_next])
+
+    angle_diffs.append({
+        "Frame": idx_curr,
+        "Z Value": df["Z"].iloc[idx_curr],
+        "Angle_Diff_To_Prev_Minima (°)": diff_prev,
+        "Angle_Diff_To_Next_Minima (°)": diff_next
+    })
+
+# === 7. 輸出結果 ===
+angle_diffs_df = pd.DataFrame(angle_diffs)
+angle_diffs_df.to_csv("Z_Minima_ViewAngle_Comparison.csv", index=False)
+print(angle_diffs_df.head())
+
+
+
+# %%
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.family'] = 'Microsoft JhengHei'  # 微軟正黑體（適合繁體）
+# 或使用：'SimHei' for 簡體中文 (黑體)
+
+
+# 條件：視角變化 < 5°
+threshold = 5
+highlight_idx_groups = []
+
+for i, row in angle_diffs_df.iterrows():
+    if (row["Angle_Diff_To_Prev_Minima (°)"] < threshold or
+        row["Angle_Diff_To_Next_Minima (°)"] < threshold):
+        # 對應的是 final_minima_idx[i] 以及它的前後
+        if 0 < i < len(final_minima_idx) - 1:
+            group = [
+                final_minima_idx[i - 1],
+                final_minima_idx[i],
+                final_minima_idx[i + 1]
+            ]
+            highlight_idx_groups.append(group)
+
+# 將 highlight 群組展平成單一 index 集合
+highlight_indices = sorted(set([idx for group in highlight_idx_groups for idx in group]))
+
+# 取得這些 index 對應的 X, Y
+highlight_x = df["X"].iloc[highlight_indices]
+highlight_y = df["Y"].iloc[highlight_indices]
+
+# 原始所有最小值點
+all_minima_x = df["X"].iloc[final_minima_idx]
+all_minima_y = df["Y"].iloc[final_minima_idx]
+
+# === 繪圖 ===
+plt.figure(figsize=(10, 8))
+plt.scatter(df["X"], df["Y"], alpha=0.3, s=5, label="All Points")
+plt.scatter(all_minima_x, all_minima_y, color='blue', s=40, label="Z Minima")
+
+# 圈出 XY 差異小的點群
+plt.scatter(highlight_x, highlight_y, facecolors='none', edgecolors='red',
+            s=120, linewidths=2, label="Minima with small view angle")
+
+plt.xlabel("X Position (mm)")
+plt.ylabel("Y Position (mm)")
+plt.title("Z 最小值與小角度變化的點群標記")
 plt.grid(True)
-plt.axis('equal')
+plt.axis("equal")
+plt.legend()
 plt.show()
 
 
 
-plt.figure(figsize=(8, 8))
-for x0, y0, x1, y1 in small_movement_vectors:
-    plt.plot([x0, x1], [y0, y1], color='red', lw=2)
-plt.xlabel("Yaw Angle (Horizontal) °")
-plt.ylabel("Pitch Angle (Vertical) °")
-plt.title("Small View Angle Movement near Z-axis Local Minima (Filtered)")
-plt.grid(True)
-plt.axis('equal')
-plt.show()
+# %%
 
 
+import pandas as pd
+import numpy as np
 
+# 假設 angle_diffs_df 已存在，包含以下欄位：
+# 'Frame', 'Angle_Diff_To_Prev_Minima (°)', 'Angle_Diff_To_Next_Minima (°)'
 
+# 將必要欄位轉為 NumPy 陣列
+angle_array = angle_diffs_df[["Frame", 
+                              "Angle_Diff_To_Prev_Minima (°)", 
+                              "Angle_Diff_To_Next_Minima (°)"]].to_numpy()
 
+# 初始化
+grouped_frames = []
+current_group = [angle_array[0][0]]
+angle_merge_threshold = 5  # 角度差閾值
 
+# 根據與前一筆的角度差來分群
+for i in range(1, len(angle_array)):
+    curr_frame = angle_array[i][0]
+    angle_diff_prev = angle_array[i][1]  # 與前一筆的角度差
 
+    if angle_diff_prev < angle_merge_threshold:
+        current_group.append(curr_frame)
+    else:
+        if len(current_group) > 1:
+            grouped_frames.append(current_group)
+        current_group = [curr_frame]
 
+# 加入最後一組
+if len(current_group) > 1:
+    grouped_frames.append(current_group)
 
+# 建立 DataFrame 並加上 Frame Start / End / Span 欄位
+grouped_df = pd.DataFrame({
+    "Group ID": list(range(1, len(grouped_frames)+1)),
+    "Frames": grouped_frames,
+    "Shot Count": [len(group) for group in grouped_frames],
+    "Frame Start": [min(group) for group in grouped_frames],
+    "Frame End": [max(group) for group in grouped_frames]
+})
+grouped_df["Frame Span"] = grouped_df["Frame End"] - grouped_df["Frame Start"]
 
 
 
