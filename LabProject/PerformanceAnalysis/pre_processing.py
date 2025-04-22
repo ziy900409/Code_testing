@@ -565,42 +565,60 @@ grouped_df = pd.DataFrame({
 })
 grouped_df["Frame Span"] = grouped_df["Frame End"] - grouped_df["Frame Start"]
 
+
 initial_angles = []
 
 for _, row in grouped_df.iterrows():
     start_idx = int(row["Frame Start"])
     end_idx = int(row["Frame End"])
 
-    # 若總長度不足 5，則以能取的最多 frame 計算
-    move_range = df.iloc[start_idx : start_idx + 5]
-    if len(move_range) < 2:
-        initial_angles.append(np.nan)
-        continue
-
-    # === 1. 初始移動向量（5幀內）
-    init_vec = np.array([
-        move_range["X"].iloc[-1] - move_range["X"].iloc[0],
-        move_range["Y"].iloc[-1] - move_range["Y"].iloc[0]
-    ])
-
-    # === 2. 目標向量（Start → End）
+    # === 目標向量：start → end ===
     goal_vec = np.array([
         df["X"].iloc[end_idx] - df["X"].iloc[start_idx],
         df["Y"].iloc[end_idx] - df["Y"].iloc[start_idx]
     ])
 
-    # === 3. 計算夾角（°）
-    if norm(init_vec) == 0 or norm(goal_vec) == 0:
-        angle_deg = np.nan
-    else:
+    max_len = end_idx - start_idx
+    found_valid = False
+    current_len = 5  # 初始長度
+
+    while current_len <= max_len:
+        move_range = df.iloc[start_idx : start_idx + current_len]
+
+        if len(move_range) < 2:
+            break  # 無法構成向量
+
+        # === 計算初始向量（首尾） ===
+        init_vec = np.array([
+            move_range["X"].iloc[-1] - move_range["X"].iloc[0],
+            move_range["Y"].iloc[-1] - move_range["Y"].iloc[0]
+        ])
+
+        # === 若 init_vec 或 goal_vec 長度為 0，略過 ===
+        if norm(init_vec) == 0 or norm(goal_vec) == 0:
+            break
+
+        # === 計算夾角 ===
         cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
-        cos_theta = np.clip(cos_theta, -1, 1)  # 防止浮點誤差超出 [-1,1]
-        angle_deg = np.degrees(np.arccos(cos_theta))
 
-    initial_angles.append(angle_deg)
+        # 若夾角小於 90 度，接受此向量
+        if cos_theta >= 0:
+            angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
+            initial_angles.append(angle_deg)
+            found_valid = True
+            break
 
-# === 加入回 grouped_df ===
+        # 否則繼續加長
+        current_len += 1
+
+    # 如果找不到符合條件的向量（全部都 > 90°）
+    if not found_valid:
+        initial_angles.append(np.nan)
+
+# === 存回 grouped_df ===
 grouped_df["Initial Move Angle (°)"] = initial_angles
+
+
 
 # === 預備資料（視角單位）===
 all_minima_deg_x = df["cum_yaw_deg"].iloc[final_minima_idx]
