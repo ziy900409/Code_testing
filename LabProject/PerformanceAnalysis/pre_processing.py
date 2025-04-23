@@ -50,10 +50,8 @@ import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
 from numpy.linalg import norm
 
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 使用簡體黑體（通常會有）
+plt.rcParams['font.sans-serif'] = ['Noto Sans TC']  # 改為你實際有的
 plt.rcParams['axes.unicode_minus'] = False    # 避免座標軸負號亂碼
-# import sys
-# import os
 
 # %%
 
@@ -221,7 +219,8 @@ combine_dict, descriptions = read_c3d(data_path,
 
 # 取得 Z 軸數據
 # z_values = df["Z"].values
-df = combine_dict["markers"]["R.I.Finger3"]
+df = pd.DataFrame(combine_dict["markers"]["R.I.Finger3"],
+                  columns=["X", "Y", "Z"])
 z_values = combine_dict["markers"]["R.I.Finger3"][:, 2]
 
 # 找到 Z 軸的局部最小值索引
@@ -285,8 +284,6 @@ plt.title("Filtered Local Minima of Z-Axis")
 plt.legend()
 plt.show()
 # %%
-
-
 
 # === 參數設定 ===
 DPI = 800
@@ -611,7 +608,7 @@ for _, row in grouped_df.iterrows():
         # 否則繼續加長
         current_len += 1
 
-    # 如果找不到符合條件的向量（全部都 > 90°）
+    # 如果找不到符合條件的向量（全部都 > 45°）
     if not found_valid:
         initial_angles.append(np.nan)
 

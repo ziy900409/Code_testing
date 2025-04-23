@@ -11,6 +11,14 @@ from pandas import DataFrame
 import matplotlib.pyplot as plt
 from scipy.fftpack import fft, fftfreq
 from scipy.stats import linregress
+from matplotlib import rcParams
+
+# 直接使用絕對路徑指定字體
+rcParams['font.family'] = 'sans-serif'
+rcParams['font.sans-serif'] = ['Noto Sans TC']  # 改為你實際有的
+
+# 額外設定以避免負號亂碼
+rcParams['axes.unicode_minus'] = False
 
 # %%
 # ---------------------前處理用--------------------------------
