@@ -70,7 +70,8 @@ processing_folder_path = folder_path + "\\" + processingData_folder + "\\"
 processing_folder_list = [f for f in os.listdir(processing_folder_path) if not f.startswith('.') \
                           and os.path.isdir(os.path.join(processing_folder_path, f))]
 
-# %% 資料前處理 : bandpass filter, absolute value, smoothing, trunkcut data
+# %% for Delsys
+# 資料前處理 : bandpass filter, absolute value, smoothing, trunkcut data
 # 處理MVC data
 tic = time.process_time()
 for folder_name in cortex_folder:

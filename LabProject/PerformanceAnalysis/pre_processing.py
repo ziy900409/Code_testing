@@ -43,13 +43,17 @@ Created on Fri Apr 11 09:28:13 2025
 
 @author: Hsin.YH.Yang
 """
-import ezc3d
+import sys
+# 路徑改成你放自己code的資料夾
+sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
 from numpy.linalg import norm
+from scipy.interpolate import interp1d
 
+import Spider_function as func
 plt.rcParams['font.sans-serif'] = ['Noto Sans TC']  # 改為你實際有的
 plt.rcParams['axes.unicode_minus'] = False    # 避免座標軸負號亂碼
 
@@ -80,130 +84,12 @@ vicon2cortex = {'MOS1': 'M1',
                 'RLT2': 'R.P.Finger2',                
                 }
 
-# %%
-def read_c3d(path, forceplate=False, analog=False, prefix=False, rename=False):
-# the processes including the interpolation 
-    """
-    input1 path of the C3D data
-    inpu2 the re-sampling times (using motion data frequency to time)
-    ----------
-    outcome1 combine marker and fp data in a dictionary
-    outcome2 the description of the data (some variables are mannual)
-    
-    ###
-    總共分成三個區塊
-    1. 處理基本資料
-    2. 處理 motion data
-    3. 處理 analog data
-        3.1. force plate data
-        3.2. EMG data
-    4. 處理力版資料
-    
-    """
-    # Interpolation: using polynomial method, order = 3 
-    def interpolate_with_fallback(data):
-        data = pd.DataFrame(data)
-        data.replace(0, np.nan, inplace=True)
-        data = data.interpolate(method='linear', axis=0)
-        data.bfill(inplace=True)  
-        data.ffill(inplace=True)  
-        if data.isnull().values.any() or (data == 0).any().any():
-            data = data.interpolate(method='polynomial', order=2, axis=0).fillna(method='bfill').fillna(method='ffill')
-        return data.values  
-    # read c3d file
-    c = ezc3d.c3d(path, extract_forceplat_data=True)
-    ## 1. deal with data information
-    motion_info = c["header"]["points"]
-    label = []
-
-    # add Unit in motion information
-    motion_info.update(
-        {
-            "UNITS": c["parameters"]["POINT"]["UNITS"]["value"],
-            "LABELS": c["parameters"]["POINT"]["LABELS"]["value"],
-        }
-    )
-    # remove prefix
-    if prefix:
-        for letter in prefix:
-            for label in range(len(motion_info['LABELS'])):
-                motion_info['LABELS'][label] = motion_info['LABELS'][label].replace(letter, "")
-    # rename the markers
-    if rename:
-        new_strings_list = [s for s in motion_info["LABELS"]]
-        for key, value in rename.items():
-                    new_strings_list = [s.replace(key, value) for s in new_strings_list]
-    motion_info.update(
-        {
-            "LABELS": new_strings_list
-         }
-        )
-    # structing the data information
-    descriptions = {
-        "motion info": motion_info,
-        "analog info": c["header"]["analogs"],
-        "FP info": {
-            "caution": "the unit is following Qualisis C3D",
-            "Force_unit": "N",
-            "Torque_unit": "Nm",
-            "COP": "mm"
-            }
-        }
-    ## 2.1. deal with motion data
-    # change the variable type from dataframe to dictionary and change unit 
-    motion_data_dict = {}
-    for i, marker_name in enumerate(motion_info['LABELS']):  #label the name of the data for each variable
-        # change the Unit from mm to cm
-        motion_data_dict[marker_name] = np.transpose(c['data']['points'][:3, i, :]) #maker the name of each variable
-    # 2.2. gap filling to marker data 
-    fillgap_markers = {key: interpolate_with_fallback(value) for key, value in motion_data_dict.items()}
-    # create time frame
-    motion_time = np.linspace(
-        0, # start
-        ((c['header']['points']['last_frame'])/c['header']['points']['frame_rate']), # stop = last_frame/frame_rate
-        num = (np.shape(c['data']['points'])[-1]) # num = last_frame
-                              )
-    fillgap_markers.update({"time": motion_time})
-    ## 3.1 create force plate channel name (the ori unit Force = N; torque = Nmm; COP = mm in Qualysis C3D)
-    # only if the number of force plate larger than 0
-    if forceplate:
-        if 'FORCE_PLATFORM' in c['parameters'] and \
-            c['parameters']['FORCE_PLATFORM']['USED']['value'][0] > 0:
-                FP_data_dict = {}
-                for i in range(c['parameters']['FORCE_PLATFORM']['USED']['value'][0]):
-                    FP_data_dict[f'PF{i+1}'] = {
-                        "corner": c['parameters']['FORCE_PLATFORM']['CORNERS']['value'][:, :, i].T,
-                        "force": c["data"]["platform"][i]['force'].T,
-                        "moment": c["data"]["platform"][i]['moment'].T / 1000, # change the Unit from Nmm to N
-                        "COP": c["data"]["platform"][i]['center_of_pressure'].T / 10 # change the Unit from mm to cm
-                        }
-    ## store data to dict structure
-    if analog:
-        analog_data_dict = {}
-        for i, marker_name in enumerate(c["parameters"]["ANALOG"]["LABELS"]["value"]):  #label the name of the data for each variable
-            analog_data_dict[marker_name] = np.transpose(c["data"]["analogs"][0, i, :])
-    
-    if forceplate and analog:
-        combine_dict = {"markers": fillgap_markers,
-                        "FP": FP_data_dict,
-                        "analog": analog_data_dict}
-    elif forceplate and not analog:
-        combine_dict = {"markers": fillgap_markers,
-                        "FP": FP_data_dict}
-    elif not forceplate and analog:
-        combine_dict = {"markers": fillgap_markers,
-                        "analog": analog_data_dict}
-    else:
-        combine_dict = {"markers": fillgap_markers}
-        
-    return combine_dict, descriptions
-
 
 # %%
 
 data_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
 
-combine_dict, descriptions = read_c3d(data_path,
+combine_dict, descriptions = func.read_c3d(data_path,
                                       prefix="S06", rename=vicon2cortex)
 
 # %% analysis spider shot
@@ -379,9 +265,6 @@ plt.show()
                 1       [53.0, 71.0]          1           53.0         71.0        18.0
 
 """
-
-
-
 
 # === 滑鼠移動轉視角（整段軌跡） ===
 delta_x_mm = df["X"].diff().fillna(0)
@@ -599,7 +482,7 @@ for _, row in grouped_df.iterrows():
         cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
 
         # 若夾角小於 90 度，接受此向量
-        if cos_theta >= 0:
+        if cos_theta:
             angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
             initial_angles.append(angle_deg)
             found_valid = True
@@ -637,6 +520,7 @@ for group in grouped_frames:
     plt.scatter(group_x, group_y, facecolors='none', edgecolors='red',
                 s=120, linewidths=2)
 
+
 # === 圖例與標籤 ===
 plt.xlabel("Yaw Angle (°)")
 plt.ylabel("Pitch Angle (°)")
@@ -645,17 +529,35 @@ plt.grid(True)
 plt.axis("equal")
 plt.legend()
 plt.show()
+# %%
+yaw_center = (df["cum_yaw_deg"].max() + df["cum_yaw_deg"].min()) / 2
+pitch_center = (df["cum_pitch_deg"].max() + df["cum_pitch_deg"].min()) / 2
+
+yaw_range = 10   # 水平方向 ±10°
+pitch_range = 10  # 垂直方向 ±10°
+
+central_minima_frames = []
+
+for idx in final_minima_idx:
+    yaw = df["cum_yaw_deg"].iloc[idx]
+    pitch = df["cum_pitch_deg"].iloc[idx]
+    
+    if (abs(yaw - yaw_center) <= yaw_range) and (abs(pitch - pitch_center) <= pitch_range):
+        central_minima_frames.append(idx)
 
 
 # %%
 """
     2.2. 計算
         2.2.1. 指標
-            o. 擊殺數, 命中率？
+            o. (廢棄)擊殺數, 命中率？
             a. Throughput (Mouse Travel Efficiency): 
             b. Mouse Speed (°/s): 找出整段時間內的最大值 or 平均值，單位換算成視角
             c. Initial Move Angle: 初始 5 個 frame 的移動方向與最終擊殺目標位置的視角差
+                修改條件: 1. 排除所有Initial Move Angle大於45度的trial
+                         2. Frame Span 要大於 20
             d. Full Path Time: 
+                使用 Frame Span/descriptions['motion info']['frame_rate']
             e. Reaction Time: 從這次目標擊殺到某個 frame 移動速度超過一個閾值 
                 扣掉直接回中的反應時間
             i. 一槍擊殺的次數, 二槍, 三槍...
@@ -664,31 +566,154 @@ plt.show()
         2.2.2. 不同方向的計算: 全部方向綜合, 分四個方向 (四象限)
 """
 
+# === o. 篩選機制，只有從中心出發才會計算 ===
+yaw_center = (df["cum_yaw_deg"].max() + df["cum_yaw_deg"].min()) / 2
+pitch_center = (df["cum_pitch_deg"].max() + df["cum_pitch_deg"].min()) / 2
 
-# === o. 擊殺數, 命中率？ ===
-kill_count = len(grouped_df)
-shot_count = sum(grouped_df["Shot Count"])
-accuracy = kill_count/shot_count
+yaw_range = 10   # 水平方向 ±10°
+pitch_range = 10  # 垂直方向 ±10°
+
+central_minima_frames = []
+
+for idx in final_minima_idx:
+    yaw = df["cum_yaw_deg"].iloc[idx]
+    pitch = df["cum_pitch_deg"].iloc[idx]
+    
+    if (abs(yaw - yaw_center) <= yaw_range) and (abs(pitch - pitch_center) <= pitch_range):
+        central_minima_frames.append(idx)
+cen_idx = []
+for idx in range(len(grouped_df)):
+    for num in range(len(central_minima_frames)):
+        if int(grouped_df["Frames"][idx][0]) == central_minima_frames[num]:
+            cen_idx.append(idx)
+            
+cen_grouped_df = grouped_df.iloc[cen_idx, :].reset_index(drop=True)
 
 # === b. Mouse Speed (°/s) ===
-
 max_angle_speed = max(df["angle_speed_dps"])
-# === Initial Move Angle: ===
+mean_angle_speed = np.mean(df["angle_speed_dps"])
+# === c. Initial Move Angle: ===
+# 多做一個統計 去掉outline
+# 排除所有初始角度大於45度的trial    
+final_grouped_df = cen_grouped_df[(cen_grouped_df["Initial Move Angle (°)"] <= 45) \
+                                  & (cen_grouped_df["Frame Span"] > 20)].reset_index(drop=True)
 
-efficiencies = []
-max_speeds = []
-mean_speeds = []
+mean_initial_move_angle = np.mean(cen_grouped_df["Initial Move Angle (°)"]\
+                                  [cen_grouped_df["Initial Move Angle (°)"] <= 45])
+# === d. Full Path Time (單位 Second)===
+path_time = np.mean(cen_grouped_df["Frame Span"])\
+    /descriptions['motion info']['frame_rate']
 
-for group in kill_df["Frames"]:
-    real = compute_real_path(group)
-    ideal = compute_ideal_path(group)
-    eff = ideal / real if real != 0 else np.nan
-    speed_vals = df.loc[group, "angle_speed"]
-    efficiencies.append(eff)
-    max_speeds.append(speed_vals.max())
-    mean_speeds.append(speed_vals.mean())
+# === e. Reaction Time ===
+# 只計算從中心出發，並且 initial move angle 小於 45 度
 
-kill_df["Travel Efficiency"] = efficiencies
-kill_df["Max Speed (°/s)"] = max_speeds
-kill_df["Mean Speed (°/s)"] = mean_speeds
+# === x. 量化速度 ===
+# 將每一筆資料都標準化成固定長度
+target_length = 101
+standardized_data = pd.DataFrame(np.zeros([target_length,
+                                               len(final_grouped_df)]))
+
+for idx in range(len(final_grouped_df)):
+    # 取出路徑
+    # 從速度為正值在開始取
+    start_frame = int(final_grouped_df["Frames"][idx][0])
+    end_frame = int(final_grouped_df["Frames"][idx][-1])
+    signal_trial = df.iloc[start_frame:end_frame, :]
+    
+    original_length = len(signal_trial["angle_speed_dps"])
+    sequence = signal_trial["angle_speed_dps"]
+    if original_length == target_length:
+        standardized_data.iloc[:, idx] = sequence
+    elif original_length > 1:
+        x_original = np.linspace(0, 1, original_length)
+        x_target = np.linspace(0, 1, target_length)
+        interp_func = interp1d(x_original, sequence, kind='cubic', fill_value="extrapolate")
+        standardized_data.iloc[:, idx] = interp_func(x_target).tolist()
+    # 計算速度方向，並區分為四個象限，新增註記
+    # vel_x = signal_trial.loc[signal_trial.index.stop-1, "X"] - \
+    #     signal_trial.loc[0, "X"]
+    # vel_y = signal_trial.loc[signal_trial.index.stop-1, "Y"] - \
+    #     signal_trial.loc[0, "Y"]
+    # if vel_x > 0 and vel_y > 0:
+    #     return 'Quadrant I'
+    # elif vel_x < 0 and vel_y > 0:
+    #     return 'Quadrant II'
+    # elif vel_x < 0 and vel_y < 0:
+    #     return 'Quadrant III'
+    # elif vel_x > 0 and vel_y < 0:
+    #     return 'Quadrant IV'
+    
+
+# === k. Mouse Travel Efficiency
+# Mouse Travel Efficiency: idea path/real path
+
+# %% mean std cloud
+palette = plt.get_cmap('Set1')
+fig, axs = plt.subplots(1, 1, figsize = (8, 6), sharex='col')
+
+# x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
+color = palette(0) # 設定顏色
+# 都改成100個點
+iters = list(np.linspace(0,
+                         len(standardized_data[0]),
+                         len(standardized_data[0])))
+# 設定計算資料
+avg1 = np.mean(standardized_data, axis=1) # 計算平均
+std1 = np.std(standardized_data, axis=1) # 計算標準差
+r1 = list(map(lambda x: x[0]-x[1], zip(avg1, std1))) # 畫一個標準差以內的線
+r2 = list(map(lambda x: x[0]+x[1], zip(avg1, std1)))
+axs.plot(iters, avg1, color=color, label='before', linewidth=3)
+axs.fill_between(iters, r1, r2, color=color, alpha=0.2)
+
+# 畫第二條線
+color = palette(1) # 設定顏色
+avg2 = np.mean(standardized_data, axis=1) # 計畫平均
+std2 = np.std(standardized_data, axis=1) # 計算標準差
+r1 = list(map(lambda x: x[0]-x[1], zip(avg2, std2))) # 畫一個標準差以內的線
+r2 = list(map(lambda x: x[0]+x[1], zip(avg2, std2)))
+
+axs.plot(iters, avg2, color=color, label='after', linewidth=3) # 畫平均線
+axs.fill_between(iters, r1, r2, color=color, alpha=0.2) # 塗滿一個正負標準差以內的區塊
+# 圖片的格式設定
+# axs.set_title(example_data.columns[i+1], fontsize=12)
+axs.legend(loc="lower left") # 圖例位置
+axs.grid(True, linestyle='-.')
+# 畫放箭時間
+# axs[x, y].set_xlim(-(release[0]), release[1])
+# axs.axvline(x=0, color = 'darkslategray', linewidth=1, linestyle = '--')
+    
+plt.suptitle(str("mean std cloud: "), fontsize=16)
+plt.tight_layout()
+fig.add_subplot(111, frameon=False)
+# hide tick and tick label of the big axes
+plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+plt.grid(False)
+plt.xlabel("time (%)", fontsize = 14)
+plt.ylabel("Velocity (°/s)", fontsize = 14)
+# plt.savefig(save, dpi=200, bbox_inches = "tight")
+plt.show()
+
+"""
+1. 待解決問題，分成四象限
+
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
