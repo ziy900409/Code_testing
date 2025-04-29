@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from scipy.fftpack import fft, fftfreq
 from scipy.stats import linregress
 import time
+from numpy.lib.stride_tricks import sliding_window_view
 
 # %%
 # ---------------------前處理用--------------------------------
@@ -86,6 +87,10 @@ muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brac
 # %%
 
 
+raw_data_path = r"D:\Hsin\NTSU_lab\Baseball\Raw_Data\S03\MVC\S03_MVC_Forearm_Rep_1.0.csv"
+
+# %%
+
 def load_emg_data(file_path):
     """ 
     加載 CSV 或 C3D 檔案並轉換為 DataFrame
@@ -100,6 +105,7 @@ def load_emg_data(file_path):
     raw_data (pd.DataFrame): 轉換後的 EMG 數據
     data_type (str): "csv" 或 "c3d"，表示數據類型
     """    
+    # file_path = raw_data_path
     # 讀取 CSV 檔案
     if file_path.endswith('.csv'):
         raw_data = pd.read_csv(file_path)  # 讀取 CSV 為 DataFrame
@@ -143,7 +149,7 @@ def load_emg_data(file_path):
         raise ValueError("不支援的檔案格式，請提供 CSV 或 C3D 檔案。")
 
 
-
+#%%
 
 def preprocess_emg_data(raw_data, data_type, down_freq=1000):
     """ 
@@ -158,29 +164,35 @@ def preprocess_emg_data(raw_data, data_type, down_freq=1000):
     downsample_len (int): 降採樣後的數據長度
     """
 
-    
     if data_type == "csv":
         data_len = []  # 儲存每個 EMG 通道的有效數據長度
         count0 = []  # 儲存數據末尾 0 值的數量 (表示無效數據長度)
         all_stop_time = []  # 儲存每個 EMG 通道的數據截止時間
         downsample_len = []  # 計算降採樣後的數據長度
         Fs = []  # 儲存每個通道的原始採樣頻率 (Hz)
+        # 找尋EMG 訊號所在欄位 num_columns
+        num_columns = []
+        for i in range(len(raw_data.columns)):
+            for ii in range(len(raw_data.columns[raw_data.columns.str.contains("EMG")])):
+                if raw_data.columns[i] == raw_data.columns[raw_data.columns.str.contains("EMG")][ii]:
+                    num_columns.append(i)
+        print("處理 EMG 訊號，總共", len(num_columns), "條肌肉， 分別為以下欄位")
+        print(raw_data.columns[raw_data.columns.str.contains("EMG")])
         
-        # 遍歷每個 EMG 通道 (CSV 格式假設時間欄位與 EMG 數據交錯排列)
-        for col in range(int(len(raw_data.columns)/2)): # 每 2 個欄位是一組 (時間欄 + EMG 數據)
-            data_time = raw_data.iloc[:, col*2].dropna() # 取得該通道的時間欄位 (去掉 NaN)
+        for col in range(len(num_columns)):
+            data_time = raw_data.iloc[:,num_columns[col]-1].dropna()
             # 計算該通道的原始採樣頻率 Fs
             Fs.append((1/np.mean(np.array(data_time[2:11])-np.array(data_time[1:10]))))
             # # 計算數據中 0 值的數量 (表示數據末尾的無效部分)
-            count0.append((raw_data.iloc[:, (col*2+1)][::-1] != 0).argmax(axis = 0)) # 對齊 column of EMG data
+            count0.append((raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))
             # 計算該通道的有效數據長度 (去掉末尾 0 值部分)
-            data_len.append(int((len(raw_data.iloc[:, (col*2+1)]) - (raw_data.iloc[:, (col*2+1)][::-1] != 0).argmax(axis = 0))))
+            data_len.append(int((len(raw_data.iloc[:, num_columns[col]]) - (raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))))
             # 計算該通道的數據截止時間 (找到數據末尾的時間戳記)
-            all_stop_time.append(raw_data.iloc[(len(raw_data.iloc[:, (col*2+1)]) - \
-                                                (raw_data.iloc[:, (col*2+1)][::-1] != 0).argmax(axis = 0))-1 ,
-                                                (col*2)])
+            all_stop_time.append(raw_data.iloc[(len(raw_data.iloc[:, num_columns[col]]) - (raw_data.iloc[:, num_columns[col]][::-1] != 0).argmax(axis = 0))-1 ,
+                                           num_columns[col]-1])
             # 計算降採樣後的數據長度
             downsample_len.append(data_len[-1] / Fs[-1] * down_freq)
+        
         # 使用最小的 Fs (確保所有通道的降採樣保持同步)
         Fs = min(Fs)
         # 使用最短的降採樣長度，確保所有通道數據對齊
@@ -314,7 +326,12 @@ def smoothing_method(filtered_data, method="moving", lowpass_cutoff=None, window
         # 轉換秒數為數據點數
         window_width = max(1, int(window_width * Fs))  # 確保至少為 1
         overlap_len = max(0, int(overlap_len * Fs)) # 確保不為負數
-        step = max(1, int(window_width - overlap_len))  # 確保 step 至少為 1
+        step = max(1, window_width - overlap_len)
+
+        # # 轉換秒數為數據點數
+        # window_width = max(1, int(window_width * Fs))  # 確保至少為 1
+        # overlap_len = max(0, int(overlap_len * Fs)) # 確保不為負數
+        # step = max(1, int(window_width - overlap_len))  # 確保 step 至少為 1
 
         num_windows = max(1, (num_samples - window_width) // step + 1)
         # 初始化結果陣列
@@ -368,11 +385,12 @@ def EMG_processing(raw_data_path, bandpass_cutoff=[20, 450], lowpass_freq = 6, n
 # %%
 
 
-# raw_data_path = r"E:\Hsin\NTSU_lab\Gymnastics\論文資料CSV檔\EMG\NSF1.1_1\NSF1.1_Back_Tuck_Somersault_Rep_1.5.csv"
+
+raw_data, data_type = load_emg_data(raw_data_path)
 
 # # 測試使用範例：
-# lowpass_filtered = EMG_processing(raw_data_path, smoothing="lowpass")
-# moving_data = EMG_processing(raw_data_path, smoothing="moving", window_width=100, overlap_len=0.5)
+lowpass_filtered = EMG_processing(raw_data_path, smoothing="lowpass")
+moving_data = EMG_processing(raw_data_path, smoothing="moving", window_width=100, overlap_len=0.5)
 
 # %% Reading all of data path
 # using a recursive loop to traverse each folder
