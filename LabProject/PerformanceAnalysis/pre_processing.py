@@ -175,7 +175,10 @@ plt.show()
 DPI = 800
 sensitivity = 1.0
 yaw = 0.022  # CS2 預設值
-# df 計算
+# 將df視角轉換成桌面的視角
+df["Y"] = -df["Y"]
+# df["X"] = -df["X"]
+# df["Y"] = -df["Y"]
 # === 滑鼠移動轉視角（整段軌跡） ===
 delta_x_mm = df["X"].diff().fillna(0)
 delta_y_mm = df["Y"].diff().fillna(0)
@@ -208,8 +211,8 @@ filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
 
 # === 視角軌跡圖（逆時針旋轉視角等價於畫 pitch vs -yaw）===
 plt.figure(figsize=(8, 8))
-plt.scatter(df["cum_pitch_deg"], -df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=5, label="View Angle Trajectory")
-plt.scatter(filtered_pitch, -filtered_yaw, color="red", s=20, label="Final Local Minima", zorder=3)
+plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=5, label="View Angle Trajectory")
+plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20, label="Final Local Minima", zorder=3)
 plt.colorbar(label="Frame Index")
 plt.xlabel("Pitch Angle (Vertical) °")
 plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
@@ -235,11 +238,11 @@ filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
 
 # === 繪圖：以視角軌跡繪圖，使用滑鼠速度作為顏色依據 ===
 plt.figure(figsize=(8, 8))
-sc = plt.scatter(df["cum_pitch_deg"], -df["cum_yaw_deg"],
+sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
                  c=df["speed"], cmap="plasma", alpha=0.7, s=5,
                  label="View Angle Trajectory")
 # 標記篩選後的局部最小值
-plt.scatter(filtered_pitch, -filtered_yaw, color="red", s=20,
+plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20,
             label="Final Local Minima", zorder=3)
 
 # 以滑鼠速度 (mm/s) 作為 colorbar 的標示
@@ -263,14 +266,16 @@ plt.show()
             	GroupID   Frames          Shot Count   Frame Start   Frame End   Frame Span
                 -------   --------------  -----------  ------------  ----------  -----------
                 1       [53.0, 71.0]          1           53.0         71.0        18.0
-
+    2.2. 找出從中心出發的開槍軌跡
+    2.3. 定義開槍軌跡: 多重條件
+        2.3.1. 只有速度方向往目標方向才算開始
+        2.3.2. 速度達到一定閾值？ 速度與目標方向的偏差角度？
+    2.4. 計算初始偏移角度
 """
 
 # === 滑鼠移動轉視角（整段軌跡） ===
-delta_x_mm = df["X"].diff().fillna(0)
-delta_y_mm = df["Y"].diff().fillna(0)
-
-
+# delta_x_mm = df["X"].diff().fillna(0)
+# delta_y_mm = df["Y"].diff().fillna(0)
 
 # === 6. 計算與前/後最小值的視角差 ===
 angle_diffs = []
@@ -308,103 +313,16 @@ for i in range(len(final_minima_idx)):
 angle_diffs_df = pd.DataFrame(angle_diffs)
 angle_diffs_df.to_csv("Z_Minima_ViewAngle_Comparison.csv", index=False)
 print(angle_diffs_df.head())
-# %%
-angle_threshold = 5  # 單位為度
-
-kill_groups = []
-current_group = [final_minima_idx[0]]
-
-for i in range(1, len(final_minima_idx)):
-    idx_prev = final_minima_idx[i - 1]
-    idx_curr = final_minima_idx[i]
-
-    # 計算視角差
-    yaw_prev = df["cum_yaw_deg"].iloc[idx_prev]
-    pitch_prev = df["cum_pitch_deg"].iloc[idx_prev]
-    yaw_curr = df["cum_yaw_deg"].iloc[idx_curr]
-    pitch_curr = df["cum_pitch_deg"].iloc[idx_curr]
-    angle_diff = np.linalg.norm([yaw_curr - yaw_prev, pitch_curr - pitch_prev])
-    
-
-    if angle_diff < angle_threshold:
-        current_group.append(idx_curr)
-    else:
-        kill_groups.append(current_group)
-        current_group = [idx_curr]
-
-# 補上最後一組
-if len(current_group) > 0:
-    kill_groups.append(current_group)
-
-# 整理成表格
-kill_df = pd.DataFrame({
-    "GroupID": list(range(1, len(kill_groups)+1)),
-    "Frames": kill_groups,
-    "Shot Count": [len(g) for g in kill_groups],
-    "Frame Start": [min(g) for g in kill_groups],
-    "Frame End": [max(g) for g in kill_groups],
-})
-kill_df["Frame Span"] = kill_df["Frame End"] - kill_df["Frame Start"]
-
 
 
 # %%
-
-
-# 條件：視角變化 < 5°
-threshold = 5
-highlight_idx_groups = []
-
-for i, row in angle_diffs_df.iterrows():
-    if (row["Angle_Diff_To_Prev_Minima (°)"] < threshold or
-        row["Angle_Diff_To_Next_Minima (°)"] < threshold):
-        # 對應的是 final_minima_idx[i] 以及它的前後
-        if 0 < i < len(final_minima_idx) - 1:
-            group = [
-                final_minima_idx[i - 1],
-                final_minima_idx[i],
-                final_minima_idx[i + 1]
-            ]
-            highlight_idx_groups.append(group)
-
-# 將 highlight 群組展平成單一 index 集合
-highlight_indices = sorted(set([idx for group in highlight_idx_groups for idx in group]))
-
-# 取得這些 index 對應的 X, Y
-highlight_x = df["X"].iloc[highlight_indices]
-highlight_y = df["Y"].iloc[highlight_indices]
-
-# 原始所有最小值點
-all_minima_x = df["X"].iloc[final_minima_idx]
-all_minima_y = df["Y"].iloc[final_minima_idx]
-
-# === 繪圖 ===
-plt.figure(figsize=(10, 8))
-plt.scatter(df["X"], df["Y"], alpha=0.3, s=5, label="All Points")
-plt.scatter(all_minima_x, all_minima_y, color='blue', s=40, label="Z Minima")
-
-# 圈出 XY 差異小的點群
-plt.scatter(highlight_x, highlight_y, facecolors='none', edgecolors='red',
-            s=120, linewidths=2, label="Minima with small view angle")
-
-plt.xlabel("X Position (mm)")
-plt.ylabel("Y Position (mm)")
-plt.title("Z 最小值與小角度變化的點群標記")
-plt.grid(True)
-plt.axis("equal")
-plt.legend()
-plt.show()
-
-
-
-# %%
-
 
 # 將必要欄位轉為 NumPy 陣列
 angle_array = angle_diffs_df[["Frame", 
                               "Angle_Diff_To_Prev_Minima (°)", 
                               "Angle_Diff_To_Next_Minima (°)"]].to_numpy()
 
+# 找出第一次擊發，以及最後一次擊發的位置，利用視角差當成閾值
 grouped_frames = []
 angle_merge_threshold = 5  # 視角差閾值
 i = 0
@@ -445,7 +363,7 @@ grouped_df = pd.DataFrame({
 })
 grouped_df["Frame Span"] = grouped_df["Frame End"] - grouped_df["Frame Start"]
 
-
+# 計算初始角度
 initial_angles = []
 
 for _, row in grouped_df.iterrows():
@@ -498,25 +416,23 @@ for _, row in grouped_df.iterrows():
 # === 存回 grouped_df ===
 grouped_df["Initial Move Angle (°)"] = initial_angles
 
-
-
 # === 預備資料（視角單位）===
-all_minima_deg_x = df["cum_yaw_deg"].iloc[final_minima_idx]
-all_minima_deg_y = df["cum_pitch_deg"].iloc[final_minima_idx]
+all_minima_deg_x = df["cum_pitch_deg"].iloc[final_minima_idx]
+all_minima_deg_y = df["cum_yaw_deg"].iloc[final_minima_idx]
 
 # === 繪圖開始 ===
 plt.figure(figsize=(10, 8))
 
 # 背景點（全視角軌跡）
-plt.scatter(df["cum_yaw_deg"], df["cum_pitch_deg"], alpha=0.3, s=5, label="All Points")
+plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"] , alpha=0.3, s=5, label="All Points")
 
 # 所有最小值點
 plt.scatter(all_minima_deg_x, all_minima_deg_y, color='blue', s=40, label="Z Minima")
 
 # ✅ 使用 grouped_frames 分群畫圓（轉為視角單位）
 for group in grouped_frames:
-    group_x = df["cum_yaw_deg"].iloc[group]
-    group_y = df["cum_pitch_deg"].iloc[group]
+    group_x = df["cum_pitch_deg"].iloc[group]
+    group_y = df["cum_yaw_deg"].iloc[group]
     plt.scatter(group_x, group_y, facecolors='none', edgecolors='red',
                 s=120, linewidths=2)
 
@@ -529,21 +445,6 @@ plt.grid(True)
 plt.axis("equal")
 plt.legend()
 plt.show()
-# %%
-yaw_center = (df["cum_yaw_deg"].max() + df["cum_yaw_deg"].min()) / 2
-pitch_center = (df["cum_pitch_deg"].max() + df["cum_pitch_deg"].min()) / 2
-
-yaw_range = 10   # 水平方向 ±10°
-pitch_range = 10  # 垂直方向 ±10°
-
-central_minima_frames = []
-
-for idx in final_minima_idx:
-    yaw = df["cum_yaw_deg"].iloc[idx]
-    pitch = df["cum_pitch_deg"].iloc[idx]
-    
-    if (abs(yaw - yaw_center) <= yaw_range) and (abs(pitch - pitch_center) <= pitch_range):
-        central_minima_frames.append(idx)
 
 
 # %%
@@ -589,30 +490,19 @@ for idx in range(len(grouped_df)):
             
 cen_grouped_df = grouped_df.iloc[cen_idx, :].reset_index(drop=True)
 
-# === b. Mouse Speed (°/s) ===
-max_angle_speed = max(df["angle_speed_dps"])
-mean_angle_speed = np.mean(df["angle_speed_dps"])
-# === c. Initial Move Angle: ===
-# 多做一個統計 去掉outline
+
+# 修正 不應該使用初始角度作為區分
+
 # 排除所有初始角度大於45度的trial    
 final_grouped_df = cen_grouped_df[(cen_grouped_df["Initial Move Angle (°)"] <= 45) \
                                   & (cen_grouped_df["Frame Span"] > 20)].reset_index(drop=True)
+# 多做一個統計 去掉outline
 
-mean_initial_move_angle = np.mean(cen_grouped_df["Initial Move Angle (°)"]\
-                                  [cen_grouped_df["Initial Move Angle (°)"] <= 45])
-# === d. Full Path Time (單位 Second)===
-path_time = np.mean(cen_grouped_df["Frame Span"])\
-    /descriptions['motion info']['frame_rate']
-
-# === e. Reaction Time ===
-# 只計算從中心出發，並且 initial move angle 小於 45 度
-
-# === x. 量化速度 ===
 # 將每一筆資料都標準化成固定長度
 target_length = 101
 standardized_data = pd.DataFrame(np.zeros([target_length,
                                                len(final_grouped_df)]))
-
+direction_labels = []  # 用來儲存象限
 for idx in range(len(final_grouped_df)):
     # 取出路徑
     # 從速度為正值在開始取
@@ -630,18 +520,79 @@ for idx in range(len(final_grouped_df)):
         interp_func = interp1d(x_original, sequence, kind='cubic', fill_value="extrapolate")
         standardized_data.iloc[:, idx] = interp_func(x_target).tolist()
     # 計算速度方向，並區分為四個象限，新增註記
-    # vel_x = signal_trial.loc[signal_trial.index.stop-1, "X"] - \
-    #     signal_trial.loc[0, "X"]
-    # vel_y = signal_trial.loc[signal_trial.index.stop-1, "Y"] - \
-    #     signal_trial.loc[0, "Y"]
-    # if vel_x > 0 and vel_y > 0:
-    #     return 'Quadrant I'
-    # elif vel_x < 0 and vel_y > 0:
-    #     return 'Quadrant II'
-    # elif vel_x < 0 and vel_y < 0:
-    #     return 'Quadrant III'
-    # elif vel_x > 0 and vel_y < 0:
-    #     return 'Quadrant IV'
+    # --- 計算速度方向 ΔX, ΔY ---
+    start_x = signal_trial["X"].iloc[0]
+    start_y = signal_trial["Y"].iloc[0]
+    end_x = signal_trial["X"].iloc[-1]
+    end_y = signal_trial["Y"].iloc[-1]
+    delta_x = end_x - start_x
+    delta_y = end_y - start_y
+
+    # --- 分象限 ---
+    if delta_x > 0 and delta_y > 0:
+        direction = "Q1"
+    elif delta_x < 0 and delta_y > 0:
+        direction = "Q2"
+    elif delta_x < 0 and delta_y < 0:
+        direction = "Q3"
+    elif delta_x > 0 and delta_y < 0:
+        direction = "Q4"
+    else:
+        direction = "Undefined"
+
+    direction_labels.append(direction)
+
+# 新增欄位至 final_grouped_df
+final_grouped_df["Direction Quadrant"] = direction_labels
+
+plt.figure(figsize=(10, 8))
+
+# 背景點（全視角軌跡）
+plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.3, s=5, label="All Points")
+
+# 所有最小值點
+plt.scatter(all_minima_deg_x, all_minima_deg_y, color='blue', s=40, label="Z Minima")
+
+
+# ✅ 使用 final_grouped_df 分群畫圓（轉為視角單位）
+for group in final_grouped_df["Frames"]:
+    print(group)
+    group_x = df["cum_pitch_deg"].iloc[group]
+    group_y = df["cum_yaw_deg"].iloc[group]
+    plt.scatter(group_x, group_y, facecolors='none', edgecolors='red',
+                s=120, linewidths=2)
+
+
+# === 圖例與標籤 ===
+plt.xlabel("Yaw Angle (°)")
+plt.ylabel("Pitch Angle (°)")
+plt.title("Z 最小值分群視覺化（以視角為單位）")
+plt.grid(True)
+plt.axis("equal")
+plt.legend()
+plt.show()
+
+
+
+# === b. Mouse Speed (°/s) ===
+max_angle_speed = max(df["angle_speed_dps"])
+mean_angle_speed = np.mean(df["angle_speed_dps"])
+# === c. Initial Move Angle: ===
+
+
+mean_initial_move_angle = np.mean(cen_grouped_df["Initial Move Angle (°)"]\
+                                  [cen_grouped_df["Initial Move Angle (°)"] <= 45])
+# === d. Full Path Time (單位 Second)===
+path_time = np.mean(cen_grouped_df["Frame Span"])\
+    /descriptions['motion info']['frame_rate']
+
+# === e. Reaction Time ===
+# 只計算從中心出發，並且 initial move angle 小於 45 度
+
+# === x. 量化速度 ===
+
+
+
     
 
 # === k. Mouse Travel Efficiency
