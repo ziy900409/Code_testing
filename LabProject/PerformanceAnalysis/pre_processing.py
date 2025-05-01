@@ -106,8 +106,9 @@ combine_dict, descriptions = func.read_c3d(data_path,
     1.3. 加入最小 frame 間隔條件 or 兩Z軸局部最小值差異超過閾值
             min_frame_gap = 8, min_z_diff = 0.2
 """
-def find_Zaxis_min(combine_dict, order=5, min_frame_gap =8,
-                   min_z_diff=0.2, threshold=0.05, show=True):
+def find_Zaxis_min(df, order=5, min_frame_gap=8,
+                   min_z_diff=0.2, threshold=0.05,
+                   show=True, showVel=True):
     """
     根據 Z 軸資料找出局部最小值點，並根據時間間隔與 Z 值變化篩選有效點
 
@@ -125,7 +126,7 @@ def find_Zaxis_min(combine_dict, order=5, min_frame_gap =8,
     """
     # z_values = combine_dict["markers"]["R.I.Finger3"][:, 2]
     # 從指定 marker 中擷取 Z 軸資料（第3維）
-    z_values = combine_dict["markers"]["R.I.Finger3"][:, 2]
+    z_values = df["Z"].values
     # 計算 Z 軸平均值並定義 threshold 門檻
     z_mean = np.mean(z_values)
     threshold = z_mean - threshold
@@ -182,6 +183,10 @@ def find_Zaxis_min(combine_dict, order=5, min_frame_gap =8,
     
     # 顯示篩選後的數據
     # print(filtered_minima_data.head())
+    
+    # 7️⃣ 取得篩選過的 Z 軸局部最小值對應的視角位置
+    filtered_yaw = df.loc[final_minima_idx, "cum_yaw_deg"]
+    filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
     if show:
     # 繪製 Z 軸數據與篩選後的局部最小值
         plt.figure(figsize=(12, 5))
@@ -193,11 +198,47 @@ def find_Zaxis_min(combine_dict, order=5, min_frame_gap =8,
         plt.title("Filtered Local Minima of Z-Axis")
         plt.legend()
         plt.show()
-    return final_minima_idx, filtered_minima_data
+
+    
+    # 8️⃣ 若 show=True，畫出基本視角軌跡圖（紅色標出最小值）
+    if show:
+    # === 視角軌跡圖（逆時針旋轉視角等價於畫 pitch vs yaw）===
+        plt.figure(figsize=(8, 8))
+        plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=5, label="View Angle Trajectory")
+        plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20, label="Final Local Minima", zorder=3)
+        plt.colorbar(label="Frame Index")
+        plt.xlabel("Pitch Angle (Vertical) °")
+        plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
+        plt.title("視角軌跡轉換後的 Z 軸局部最小值分析")
+        plt.legend()
+        plt.show()
+        
+    # 9️⃣ 若 showVel=True，畫出以滑鼠速度作為顏色的視角軌跡圖
+    if showVel:
+        # === 取得局部最小值對應的視角資料 ===
+        filtered_yaw   = df.loc[final_minima_idx, "cum_yaw_deg"]
+        filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
+
+        # === 繪圖：以視角軌跡繪圖，使用滑鼠速度作為顏色依據 ===
+        plt.figure(figsize=(8, 8))
+        sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
+                         c=df["speed"], cmap="plasma", alpha=0.7, s=5,
+                         label="View Angle Trajectory")
+        # 標記篩選後的局部最小值
+        plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20,
+                    label="Final Local Minima", zorder=3)
+
+        # 以滑鼠速度 (mm/s) 作為 colorbar 的標示
+        plt.colorbar(sc, label="Mouse Speed (mm/s)")
+        plt.xlabel("Pitch Angle (Vertical) °")
+        plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
+        plt.title("View Angle Trajectory Colored by Mouse Speed")
+        plt.legend()
+        plt.show()
+    return filtered_minima_data
 # %%
-def ConverUnit2Angle(combine_dict, descriptions, final_minima_idx,
-                     DPI=800, sens=1, yaw=0.022,
-                     show=True, showVel=True):
+def ConverUnit2Angle(combine_dict, descriptions,
+                     DPI=800, sens=1, yaw=0.022):
     """
     將食指的 3D Marker 資料（單位 mm）轉換為滑鼠視角變化（°），
     並計算其速度、繪製視覺化軌跡（選擇性）。
@@ -244,46 +285,6 @@ def ConverUnit2Angle(combine_dict, descriptions, final_minima_idx,
     df["angle_speed_dps"] = np.sqrt(df["yaw_speed_dps"]**2 + \
                                        df["pitch_speed_dps"]**2)  # 合成角速度
     
-    # 7️⃣ 取得篩選過的 Z 軸局部最小值對應的視角位置
-    filtered_yaw = df.loc[final_minima_idx, "cum_yaw_deg"]
-    filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
-    
-    # 8️⃣ 若 show=True，畫出基本視角軌跡圖（紅色標出最小值）
-    if show:
-    # === 視角軌跡圖（逆時針旋轉視角等價於畫 pitch vs yaw）===
-        plt.figure(figsize=(8, 8))
-        plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=5, label="View Angle Trajectory")
-        plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20, label="Final Local Minima", zorder=3)
-        plt.colorbar(label="Frame Index")
-        plt.xlabel("Pitch Angle (Vertical) °")
-        plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-        plt.title("視角軌跡轉換後的 Z 軸局部最小值分析")
-        plt.legend()
-        plt.show()
-        
-    # 9️⃣ 若 showVel=True，畫出以滑鼠速度作為顏色的視角軌跡圖
-    if showVel:
-        # === 取得局部最小值對應的視角資料 ===
-        filtered_yaw   = df.loc[final_minima_idx, "cum_yaw_deg"]
-        filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
-
-        # === 繪圖：以視角軌跡繪圖，使用滑鼠速度作為顏色依據 ===
-        plt.figure(figsize=(8, 8))
-        sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
-                         c=df["speed"], cmap="plasma", alpha=0.7, s=5,
-                         label="View Angle Trajectory")
-        # 標記篩選後的局部最小值
-        plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20,
-                    label="Final Local Minima", zorder=3)
-
-        # 以滑鼠速度 (mm/s) 作為 colorbar 的標示
-        plt.colorbar(sc, label="Mouse Speed (mm/s)")
-        plt.xlabel("Pitch Angle (Vertical) °")
-        plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-        plt.title("View Angle Trajectory Colored by Mouse Speed")
-        plt.legend()
-        plt.show()
-   
     return df
 # %%
 
@@ -430,7 +431,7 @@ def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
             # === 計算夾角 ===
             cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
     
-            # 若夾角小於 90 度，接受此向量
+            # (沒有設置)若夾角小於 90 度，接受此向量 
             if cos_theta:
                 angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
                 initial_angles.append(angle_deg)
@@ -446,6 +447,28 @@ def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
     
     # === 存回 grouped_df ===
     grouped_df["Initial Move Angle (°)"] = initial_angles
+    
+    # === 加入四象限方向分類 ===
+    def classify_quadrant(dx, dy):
+        if dx > 0 and dy > 0:
+            return "Q1"
+        elif dx < 0 and dy > 0:
+            return "Q2"
+        elif dx < 0 and dy < 0:
+            return "Q3"
+        elif dx > 0 and dy < 0:
+            return "Q4"
+        else:
+            return "Center/Undefined"
+    
+    quadrants = []
+    for _, row in grouped_df.iterrows():
+        start_idx = int(row["Frame Start"])
+        end_idx = int(row["Frame End"])
+        dx = df["cum_yaw_deg"].iloc[end_idx] - df["cum_yaw_deg"].iloc[start_idx]
+        dy = df["cum_pitch_deg"].iloc[end_idx] - df["cum_pitch_deg"].iloc[start_idx]
+        quadrants.append(classify_quadrant(dx, dy))
+    grouped_df["Direction Quadrant"] = quadrants
     
     # === [7] 視覺化整體擊殺視角分群 ===
     all_minima_deg_x = df["cum_pitch_deg"].iloc[final_minima_idx]
@@ -479,17 +502,317 @@ def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
     return grouped_df
 
 # %%
+
+def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
+    """
+    
+    根據 Z 軸局部最小值列表，自動分群擊殺動作，
+    並提供最佳擊殺起始點 (NEW Frame Start)、初始移動角度、視角象限分類，
+    最後以滑鼠速度著色顯示視角軌跡。
+    
+    parameters:
+        df (pd.DataFrame): 含 X, Y, Z 及折算後視角欄位 (cum_yaw_deg, cum_pitch_deg, speed)
+        final_minima_idx (list[int]): 已過濾的 Z 軸局部最小值 frame 索引
+        angle_merge_threshold (float): 合併視角群組閾值 (°)
+        show (bool): 是否顯示最終速度著色軌跡圖
+    
+    return:
+        grouped_df (pd.DataFrame): 包含下列欄位的擊殺群組資訊
+            - Group ID
+            - Frames
+            - Shot Count
+            - Frame Start / End / Span
+            - Initial Move Angle (°)
+            - NEW Frame Start
+            - Direction Quadrant
+    """
+
+    # --- 工具函數: 使用滑動視窗計算滑鼠移動方向起始點 ---
+    def find_directional_start(df, frame_start, frame_end,
+                                window_size=3, angle_threshold=45, min_magnitude=0.5):
+        # 計算目標向量 (start -> end)
+        goal_vec = np.array([
+            df["X"].iloc[frame_end] - df["X"].iloc[frame_start],
+            df["Y"].iloc[frame_end] - df["Y"].iloc[frame_start]
+        ])
+        if norm(goal_vec) == 0:
+            return frame_start  # 若無移動則回傳原始起點
+        # 滑動視窗: 從 start+1 開始檢查
+        for offset in range(1, frame_end - frame_start - window_size):
+            p0 = df[["X", "Y"]].iloc[frame_start + offset].values
+            # 取 moving window length 的平均
+            p1 = np.mean(df[["X", "Y"]].iloc[frame_start + offset + window_size].values, axis=0)
+            init_vec = p1 - p0
+            # 忽略太小的抖動
+            if norm(init_vec) < min_magnitude: 
+                continue
+            # 計算兩個向量夾角
+            cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
+            angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
+
+            if angle_deg <= angle_threshold:
+                return frame_start + offset  # 找到符合條件的第一個起始 frame
+
+        return frame_start
+
+    # === [1] 計算前後角度差 ===
+    angle_diffs = []
+    for i in range(len(final_minima_idx)):
+        idx_curr = final_minima_idx[i]
+        yaw_curr = df["cum_yaw_deg"].iloc[idx_curr]
+        pitch_curr = df["cum_pitch_deg"].iloc[idx_curr]
+        diff_prev = np.nan if i == 0 else np.linalg.norm([
+            yaw_curr - df["cum_yaw_deg"].iloc[final_minima_idx[i - 1]],
+            pitch_curr - df["cum_pitch_deg"].iloc[final_minima_idx[i - 1]]
+        ])
+        diff_next = np.nan if i == len(final_minima_idx) - 1 else np.linalg.norm([
+            yaw_curr - df["cum_yaw_deg"].iloc[final_minima_idx[i + 1]],
+            pitch_curr - df["cum_pitch_deg"].iloc[final_minima_idx[i + 1]]
+        ])
+        angle_diffs.append({
+            "Frame": idx_curr,
+            "Z Value": df["Z"].iloc[idx_curr],
+            "Angle_Diff_To_Prev_Minima (°)": diff_prev,
+            "Angle_Diff_To_Next_Minima (°)": diff_next
+        })
+    angle_array = pd.DataFrame(angle_diffs)[["Frame", "Angle_Diff_To_Prev_Minima (°)", "Angle_Diff_To_Next_Minima (°)"]].to_numpy()
+
+    # === [2] 合併視角差小於閾值的點 ===
+    grouped_frames = []
+    i = 0
+    last_frame = None
+    while i < len(angle_array) - 1:
+        current_group = []
+        if last_frame is not None:
+            current_group.append(last_frame)
+        current_group.append(angle_array[i][0])
+        j = i + 1
+        while j < len(angle_array):
+            if pd.isna(angle_array[j][1]) or angle_array[j][1] >= angle_merge_threshold:
+                break
+            current_group.append(angle_array[j][0])
+            j += 1
+        if len(current_group) > 1:
+            grouped_frames.append(current_group)
+            last_frame = current_group[-1]
+        else:
+            last_frame = angle_array[i][0]
+        i = j
+
+    # === [3] 建立 DataFrame ===
+    grouped_df = pd.DataFrame({
+        "Group ID": list(range(1, len(grouped_frames) + 1)),
+        "Frames": grouped_frames,
+        "Shot Count": [len(g) - 1 for g in grouped_frames],
+        "Frame Start": [min(g) for g in grouped_frames],
+        "Frame End": [max(g) for g in grouped_frames],
+    })
+    grouped_df["Frame Span"] = grouped_df["Frame End"] - grouped_df["Frame Start"]
+
+    # === [4] 初始移動角度與最佳起點 ===
+    new_starts, angles = [], []
+    for _, row in grouped_df.iterrows():
+        s, e = int(row["Frame Start"]), int(row["Frame End"])
+        new_s = find_directional_start(df, s, e)
+        new_starts.append(new_s)
+
+        goal_vec = np.array([df["X"].iloc[e] - df["X"].iloc[s], df["Y"].iloc[e] - df["Y"].iloc[s]])
+        max_len = e - s
+        found = False
+        for l in range(5, max_len + 1):
+            move = df.iloc[s:s + l]
+            init_vec = np.array([move["X"].iloc[-1] - move["X"].iloc[0], move["Y"].iloc[-1] - move["Y"].iloc[0]])
+            if norm(init_vec) == 0 or norm(goal_vec) == 0:
+                break
+            cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
+            if cos_theta:
+                angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
+                angles.append(angle_deg)
+                found = True
+                break
+        if not found:
+            angles.append(np.nan)
+    grouped_df["Initial Move Angle (°)"] = angles
+    grouped_df["NEW Frame Start"] = new_starts
+
+    # === [5] 象限分類 ===
+    def classify_quadrant(dx, dy):
+        if dx > 0 and dy > 0: return "Q1"
+        if dx < 0 and dy > 0: return "Q2"
+        if dx < 0 and dy < 0: return "Q3"
+        if dx > 0 and dy < 0: return "Q4"
+        return "Center/Undefined"
+    grouped_df["Direction Quadrant"] = grouped_df.apply(
+        lambda r: classify_quadrant(
+            df["cum_yaw_deg"].iloc[int(r["Frame End"])] - df["cum_yaw_deg"].iloc[int(r["Frame Start"])],
+            df["cum_pitch_deg"].iloc[int(r["Frame End"])] - df["cum_pitch_deg"].iloc[int(r["Frame Start"])],
+        ), axis=1)
+
+    # === [6] 視覺化 ===
+    if show:
+       plt.figure(figsize=(8, 8))
+       # 用 speed 決定顏色深淺
+       sc = plt.scatter(
+           df['cum_pitch_deg'], df['cum_yaw_deg'],
+           c=df['speed'], cmap='plasma', alpha=0.7, s=5,
+           label='View Angle Trajectory (colored by speed)'
+       )
+       plt.colorbar(sc, label='Mouse Speed (°/s)')  # 或 mm/s 依你的 speed 定義
+
+       # 標記所有 Z 軸局部最小值
+       minima_x = df['cum_pitch_deg'].iloc[final_minima_idx]
+       minima_y = df['cum_yaw_deg'].iloc[final_minima_idx]
+       plt.scatter(minima_x, minima_y,
+                   color='red', s=20, label='Z Minima', zorder=3)
+
+       plt.xlabel('Pitch Angle (°)')
+       plt.ylabel('Yaw Angle (°)')
+       plt.title('View Angle Trajectory Colored by Mouse Speed')
+       plt.grid(True)
+       plt.axis('equal')
+       plt.legend()
+       plt.show()
+
+    return grouped_df
+# %%
+
+def excludeCenter(df, filtered_minima_data, grouped_df,
+                  target_length = 101,
+                  show=True):
+    # === o. 篩選機制，只有從中心出發才會計算 ===
+    yaw_center = (df["cum_yaw_deg"].max() + df["cum_yaw_deg"].min()) / 2
+    pitch_center = (df["cum_pitch_deg"].max() + df["cum_pitch_deg"].min()) / 2
+    
+    yaw_range = 10   # 水平方向 ±10°
+    pitch_range = 10  # 垂直方向 ±10°
+    
+    filtered_minima_idx = filtered_minima_data["Frame"].tolist()
+    
+    central_minima_frames = []
+    
+    for idx in filtered_minima_idx:
+        yaw = df["cum_yaw_deg"].iloc[idx]
+        pitch = df["cum_pitch_deg"].iloc[idx]
+        
+        if (abs(yaw - yaw_center) <= yaw_range) and (abs(pitch - pitch_center) <= pitch_range):
+            central_minima_frames.append(idx)
+    
+    
+    # 1. central_minima_frames 本身就是一维的 frame 索引列表
+    central_flat = set(central_minima_frames)
+    
+    # 2. 只要该群组的第一帧不在 central_flat，就排除它
+    excludeCen_idx = []
+    for i, frames in enumerate(grouped_df["Frames"]):
+        first_frame = int(frames[0])
+        if first_frame not in central_flat:
+            excludeCen_idx.append(i)
+    
+    # 3. （可选）去重
+    excludeCen_idx = list(dict.fromkeys(excludeCen_idx))
+    
+    
+    excldueCen_grouped_df = grouped_df.iloc[excludeCen_idx, :].reset_index(drop=True)
+    
+    
+    standardized_data = pd.DataFrame(np.zeros([target_length,
+                                               len(grouped_df)]))
+    direction_labels = []  # 用來儲存象限
+    for idx in range(len(grouped_df)):
+        # 取出路徑
+        # 從速度為正值在開始取
+        start_frame = int(grouped_df["Frames"][idx][0])
+        end_frame = int(grouped_df["Frames"][idx][-1])
+        signal_trial = df.iloc[start_frame:end_frame, :]
+        
+        original_length = len(signal_trial["angle_speed_dps"])
+        sequence = signal_trial["angle_speed_dps"]
+        if original_length == target_length:
+            standardized_data.iloc[:, idx] = sequence
+        elif original_length > 1:
+            x_original = np.linspace(0, 1, original_length)
+            x_target = np.linspace(0, 1, target_length)
+            interp_func = interp1d(x_original, sequence, kind='cubic', fill_value="extrapolate")
+            standardized_data.iloc[:, idx] = interp_func(x_target).tolist()
+        # 計算速度方向，並區分為四個象限，新增註記
+        # --- 計算速度方向 ΔX, ΔY ---
+        start_x = signal_trial["X"].iloc[0]
+        start_y = signal_trial["Y"].iloc[0]
+        end_x = signal_trial["X"].iloc[-1]
+        end_y = signal_trial["Y"].iloc[-1]
+        delta_x = end_x - start_x
+        delta_y = end_y - start_y
+    
+        # --- 分象限 ---
+        if delta_x > 0 and delta_y > 0:
+            direction = "Q1"
+        elif delta_x < 0 and delta_y > 0:
+            direction = "Q2"
+        elif delta_x < 0 and delta_y < 0:
+            direction = "Q3"
+        elif delta_x > 0 and delta_y < 0:
+            direction = "Q4"
+        else:
+            direction = "Undefined"
+    
+        direction_labels.append(direction)
+    
+    # 新增欄位至 grouped_df
+    grouped_df["Direction Quadrant"] = direction_labels
+    
+    
+    if show:
+        excldueCen_minima_idx = excldueCen_grouped_df["Frames"].tolist()
+        """
+        這裡有問題，剛剛修改到這裡 2025.05.01 13:46
+        """
+        all_minima_deg_x = df["cum_pitch_deg"].iloc[excldueCen_minima_idx]
+        all_minima_deg_y = df["cum_yaw_deg"].iloc[excldueCen_minima_idx]
+        plt.figure(figsize=(10, 8))
+        
+        # 背景點（全視角軌跡）
+        plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.3, s=5, label="All Points")
+        
+        # 所有最小值點
+        plt.scatter(all_minima_deg_x, all_minima_deg_y, color='blue', s=40, label="Z Minima")
+        
+        
+        # ✅ 使用 grouped_df 分群畫圓（轉為視角單位）
+        for group in excldueCen_grouped_df["Frames"]:
+            print(group)
+            group_x = df["cum_pitch_deg"].iloc[group]
+            group_y = df["cum_yaw_deg"].iloc[group]
+            plt.scatter(group_x, group_y, facecolors='none', edgecolors='red',
+                        s=120, linewidths=2)
+        
+        
+        # === 圖例與標籤 ===
+        plt.xlabel("Yaw Angle (°)")
+        plt.ylabel("Pitch Angle (°)")
+        plt.title("Z 最小值分群視覺化（以視角為單位）")
+        plt.grid(True)
+        plt.axis("equal")
+        plt.legend()
+        plt.show()
+    return excldueCen_grouped_df
+
+# %%
+
+# 將單位從mm轉換成視角
+df = ConverUnit2Angle(combine_dict, descriptions)
 # 2.1. 找出每一次目標擊殺的開槍數 -> 找出Z axis local minimal
 # 2.1.1. 以滑鼠點擊次數計算，使用Z軸局部最小值，如果兩次Z軸局部最小值的視角差
 #         小於某個閾值，則視為仍在瞄準同一個目標
-filtered_minima_data = find_Zaxis_min(combine_dict, show=True)
-final_minima_idx = filtered_minima_data["Frame"]
-# 將單位從mm轉換成視角
-df = ConverUnit2Angle(combine_dict, descriptions, filtered_minima_data["Frame"])
+filtered_minima_data = find_Zaxis_min(df, show=True)
+filtered_minima_idx = filtered_minima_data["Frame"].tolist()
 # 2.1.2. 找出完成擊殺的 frame 以及上一個視角大於閾值的視角位置
-grouped_df = findZminGroup(df, final_minima_idx)
+"""
+仍然需要再加上依照速度方向的多重條件
+"""
+grouped_df = findZminGroup(df, filtered_minima_idx)
 # 2.2. 找出從中心出發的開槍軌跡
-2025.04.30 接下來從這邊開始
+# 2025.04.30 接下來從這邊開始
+excldueCen_grouped_df = excludeCenter(df, filtered_minima_data, grouped_df)
 
 
 
@@ -538,28 +861,7 @@ grouped_df = findZminGroup(df, final_minima_idx)
         2.2.2. 不同方向的計算: 全部方向綜合, 分四個方向 (四象限)
 """
 
-# === o. 篩選機制，只有從中心出發才會計算 ===
-yaw_center = (df["cum_yaw_deg"].max() + df["cum_yaw_deg"].min()) / 2
-pitch_center = (df["cum_pitch_deg"].max() + df["cum_pitch_deg"].min()) / 2
 
-yaw_range = 10   # 水平方向 ±10°
-pitch_range = 10  # 垂直方向 ±10°
-
-central_minima_frames = []
-
-for idx in final_minima_idx:
-    yaw = df["cum_yaw_deg"].iloc[idx]
-    pitch = df["cum_pitch_deg"].iloc[idx]
-    
-    if (abs(yaw - yaw_center) <= yaw_range) and (abs(pitch - pitch_center) <= pitch_range):
-        central_minima_frames.append(idx)
-cen_idx = []
-for idx in range(len(grouped_df)):
-    for num in range(len(central_minima_frames)):
-        if int(grouped_df["Frames"][idx][0]) == central_minima_frames[num]:
-            cen_idx.append(idx)
-            
-cen_grouped_df = grouped_df.iloc[cen_idx, :].reset_index(drop=True)
 
 
 # 修正 不應該使用初始角度作為區分
@@ -570,78 +872,7 @@ final_grouped_df = cen_grouped_df[(cen_grouped_df["Initial Move Angle (°)"] <= 
 # 多做一個統計 去掉outline
 
 # 將每一筆資料都標準化成固定長度
-target_length = 101
-standardized_data = pd.DataFrame(np.zeros([target_length,
-                                               len(final_grouped_df)]))
-direction_labels = []  # 用來儲存象限
-for idx in range(len(final_grouped_df)):
-    # 取出路徑
-    # 從速度為正值在開始取
-    start_frame = int(final_grouped_df["Frames"][idx][0])
-    end_frame = int(final_grouped_df["Frames"][idx][-1])
-    signal_trial = df.iloc[start_frame:end_frame, :]
-    
-    original_length = len(signal_trial["angle_speed_dps"])
-    sequence = signal_trial["angle_speed_dps"]
-    if original_length == target_length:
-        standardized_data.iloc[:, idx] = sequence
-    elif original_length > 1:
-        x_original = np.linspace(0, 1, original_length)
-        x_target = np.linspace(0, 1, target_length)
-        interp_func = interp1d(x_original, sequence, kind='cubic', fill_value="extrapolate")
-        standardized_data.iloc[:, idx] = interp_func(x_target).tolist()
-    # 計算速度方向，並區分為四個象限，新增註記
-    # --- 計算速度方向 ΔX, ΔY ---
-    start_x = signal_trial["X"].iloc[0]
-    start_y = signal_trial["Y"].iloc[0]
-    end_x = signal_trial["X"].iloc[-1]
-    end_y = signal_trial["Y"].iloc[-1]
-    delta_x = end_x - start_x
-    delta_y = end_y - start_y
 
-    # --- 分象限 ---
-    if delta_x > 0 and delta_y > 0:
-        direction = "Q1"
-    elif delta_x < 0 and delta_y > 0:
-        direction = "Q2"
-    elif delta_x < 0 and delta_y < 0:
-        direction = "Q3"
-    elif delta_x > 0 and delta_y < 0:
-        direction = "Q4"
-    else:
-        direction = "Undefined"
-
-    direction_labels.append(direction)
-
-# 新增欄位至 final_grouped_df
-final_grouped_df["Direction Quadrant"] = direction_labels
-
-plt.figure(figsize=(10, 8))
-
-# 背景點（全視角軌跡）
-plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.3, s=5, label="All Points")
-
-# 所有最小值點
-plt.scatter(all_minima_deg_x, all_minima_deg_y, color='blue', s=40, label="Z Minima")
-
-
-# ✅ 使用 final_grouped_df 分群畫圓（轉為視角單位）
-for group in final_grouped_df["Frames"]:
-    print(group)
-    group_x = df["cum_pitch_deg"].iloc[group]
-    group_y = df["cum_yaw_deg"].iloc[group]
-    plt.scatter(group_x, group_y, facecolors='none', edgecolors='red',
-                s=120, linewidths=2)
-
-
-# === 圖例與標籤 ===
-plt.xlabel("Yaw Angle (°)")
-plt.ylabel("Pitch Angle (°)")
-plt.title("Z 最小值分群視覺化（以視角為單位）")
-plt.grid(True)
-plt.axis("equal")
-plt.legend()
-plt.show()
 
 
 
