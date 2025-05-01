@@ -674,11 +674,418 @@ def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
        plt.show()
 
     return grouped_df
+
+# %%
+
+import pandas as pd
+import numpy as np
+from numpy.linalg import norm # 導入 norm 函數，方便計算向量長度
+import matplotlib.pyplot as plt # 導入繪圖庫
+
+def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
+    """
+    根據 Z 軸局部最小值列表 (通常代表射擊/點擊事件)，自動分群連續或接近的擊殺動作。
+    並為每個群組計算關鍵屬性，例如：
+    - 最佳化的擊殺起始幀 (NEW Frame Start)：排除初始微小抖動，找到真正開始移動的幀。
+    - 初始移動角度 (Initial Move Angle)：該擊殺動作開始時的移動方向與總體方向的夾角。
+    - 視角移動象限分類 (Direction Quadrant)：根據 Yaw 和 Pitch 的變化判斷主要移動方向。
+    最後，可以選擇性地以滑鼠速度 (speed) 為顏色，視覺化顯示整個視角移動軌跡及 Z 最小值點。
+
+    應用場景：常用於分析 FPS 遊戲玩家的瞄準和射擊模式。
+
+    Parameters:
+        df (pd.DataFrame): 包含以下欄位的 DataFrame：
+                           - 'X', 'Y', 'Z': 可能代表原始感測器數據或處理後的座標。
+                           - 'cum_yaw_deg', 'cum_pitch_deg': 累積計算的水平和垂直視角角度 (度)。
+                           - 'speed': 計算出的每個時間點的滑鼠移動速度。
+        final_minima_idx (list[int]): 經過濾篩選後的 Z 軸局部最小值點所在的幀 (frame) 索引列表。
+                                      這些點通常被視為射擊或關鍵操作的發生點。
+        angle_merge_threshold (float): 用於合併相鄰 Z 最小值點的角度閾值 (單位：度)。
+                                       如果兩個相鄰最小值點之間的視角變化小於此閾值，
+                                       它們可能被視為同一次連續擊殺動作的一部分。預設為 5 度。
+        show (bool): 是否顯示最終的速度著色軌跡圖。預設為 True。
+
+    Return:
+        grouped_df (pd.DataFrame): 包含分析後擊殺群組資訊的 DataFrame，欄位如下：
+            - Group ID: 群組的唯一識別碼 (從 1 開始)。
+            - Frames: 屬於該群組的所有原始 Z 最小值幀索引列表。
+            - Shot Count: 該群組包含的擊殺次數 (Z 最小值點數量 - 1，假設每個 Z min 是一個 shot)。
+            - Frame Start: 該群組中，第一個 Z 最小值點的幀索引。
+            - Frame End: 該群組中，最後一個 Z 最小值點的幀索引。
+            - Frame Span: 該群組的持續時間 (Frame End - Frame Start)。
+            - Initial Move Angle (°): 初始移動方向與群組總體移動方向的角度差。
+            - NEW Frame Start: 經過 `find_directional_start` 計算後，更精確的移動起始幀。
+            - Direction Quadrant: 根據 Yaw/Pitch 變化判斷的視角移動象限 (Q1-Q4)。
+    """
+
+    # --- 工具函數: 使用滑動視窗計算滑鼠移動方向起始點 ---
+    # 目標：找到從 frame_start 到 frame_end 這段移動中，真正開始"有方向性"移動的那個 frame
+    #       排除掉一開始可能存在的、方向不明顯的微小抖動 (micro-adjustment/jitter)
+    def find_directional_start(df, frame_start, frame_end,
+                               window_size=3, angle_threshold=45, min_magnitude=0.5):
+        """
+        使用滑動窗口，尋找一段軌跡中，初始移動方向與總體方向一致的起始點。
+
+        Parameters:
+            df (pd.DataFrame): 包含 'X', 'Y' 座標的 DataFrame。
+            frame_start (int): 分析範圍的起始幀索引。
+            frame_end (int): 分析範圍的結束幀索引。
+            window_size (int): 滑動窗口的大小，用於計算初始移動向量。
+            angle_threshold (float): 初始移動向量與總體目標向量之間的最大允許角度差 (度)。
+            min_magnitude (float): 初始移動向量的最小長度閾值，用於忽略過小的抖動。
+
+        Returns:
+            int: 找到的具有方向性的移動起始幀索引。如果找不到或無移動，返回原始 frame_start。
+        """
+        # 計算目標向量 (從 frame_start 指向 frame_end 的向量)
+        goal_vec = np.array([
+            df["X"].iloc[frame_end] - df["X"].iloc[frame_start], # X 方向位移
+            df["Y"].iloc[frame_end] - df["Y"].iloc[frame_start]  # Y 方向位移
+        ])
+        goal_norm = norm(goal_vec) # 計算目標向量的長度 (大小)
+
+        # 如果起點和終點相同 (沒有移動)，直接返回原始起點
+        if goal_norm == 0:
+            return frame_start
+
+        # 滑動視窗: 從 start+1 開始檢查，直到接近終點的位置
+        # offset 代表當前檢查的 "潛在" 起始點相對於 frame_start 的偏移量
+        # 檢查範圍是 [frame_start + 1, frame_end - window_size -1]
+        for offset in range(1, frame_end - frame_start - window_size):
+            # 當前檢查的幀索引
+            current_frame_idx = frame_start + offset
+            # 滑動窗口的起始點 (p0) 和結束點 (p1) 的座標
+            # 注意：這裡直接取 iloc[index] 的 .values，效率稍低於先取 series 再取 values
+            p0 = df[["X", "Y"]].iloc[current_frame_idx].values
+            # p1 使用窗口內點的平均值，或許可以考慮只用窗口末端點 p_end = df[["X", "Y"]].iloc[current_frame_idx + window_size].values
+            # 使用 mean 可以平滑掉一些噪點
+            p1 = np.mean(df[["X", "Y"]].iloc[current_frame_idx + 1 : current_frame_idx + window_size + 1].values, axis=0)
+
+            # 計算初始移動向量 (從 p0 指向 p1)
+            init_vec = p1 - p0
+            init_norm = norm(init_vec) # 計算初始移動向量的長度
+
+            # 如果初始移動向量太短 (可能是噪點或微小抖動)，則忽略，繼續下一個 offset
+            if init_norm < min_magnitude:
+                continue
+
+            # 計算初始移動向量 (init_vec) 與 總體目標向量 (goal_vec) 之間的夾角
+            # 使用向量內積公式: a · b = |a| |b| cos(theta)
+            # cos(theta) = (a · b) / (|a| |b|)
+            cos_theta = np.dot(init_vec, goal_vec) / (init_norm * goal_norm)
+            # 使用 np.clip 確保 cos_theta 在 [-1, 1] 範圍內，避免浮點數誤差導致 arccos 出錯
+            angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
+
+            # 如果夾角小於閾值，表示初始移動方向與總體方向大致一致
+            # 我們就認為 current_frame_idx 是真正的移動起始點
+            if angle_deg <= angle_threshold:
+                return current_frame_idx # 找到第一個符合條件的起始 frame，立即返回
+
+        # 如果遍歷完所有可能的 offset 都沒有找到符合條件的起始點，
+        # 則返回原始的 frame_start
+        return frame_start
+
+    # === [1] 計算每個 Z 最小值點與其前後相鄰 Z 最小值點之間的視角差 ===
+    # 目標：計算出用於後續分群的依據 - 相鄰射擊點之間的視角距離。
+    angle_diffs = [] # 用於儲存每個 Z 最小值點及其角度差資訊
+    num_minima = len(final_minima_idx)
+
+    # 提前提取需要的數據列為 NumPy 陣列，以加速後續訪問
+    all_indices = np.array(final_minima_idx)
+    yaw_values = df["cum_yaw_deg"].iloc[all_indices].values
+    pitch_values = df["cum_pitch_deg"].iloc[all_indices].values
+    z_values = df["Z"].iloc[all_indices].values # 也許會用到 Z 值，先提出來
+
+    for i in range(num_minima):
+        # 當前的 Z 最小值點的幀索引和視角座標
+        idx_curr = final_minima_idx[i] # 這裡仍用列表索引，但下方計算已用 NumPy 數組
+        yaw_curr = yaw_values[i]
+        pitch_curr = pitch_values[i]
+
+        # 計算與前一個 Z 最小值點的視角差 (歐氏距離)
+        # 第一個點沒有前一個點，設為 NaN
+        if i == 0:
+            diff_prev = np.nan
+        else:
+            # 計算 (yaw_curr - yaw_prev)^2 + (pitch_curr - pitch_prev)^2 的平方根
+            diff_prev = np.linalg.norm([yaw_curr - yaw_values[i - 1], pitch_curr - pitch_values[i - 1]])
+
+        # 計算與後一個 Z 最小值點的視角差 (歐氏距離)
+        # 最後一個點沒有後一個點，設為 NaN
+        if i == num_minima - 1:
+            diff_next = np.nan
+        else:
+            # 計算 (yaw_curr - yaw_next)^2 + (pitch_curr - pitch_next)^2 的平方根
+            diff_next = np.linalg.norm([yaw_curr - yaw_values[i + 1], pitch_curr - pitch_values[i + 1]])
+
+        # 將當前點的資訊和計算出的角度差存入列表
+        angle_diffs.append({
+            "Frame": idx_curr, # 原始幀索引
+            "Z Value": z_values[i], # 對應的 Z 值 (雖然這裡沒用到，但記錄下可能有用)
+            "Angle_Diff_To_Prev_Minima (°)": diff_prev, # 與前一個點的角度差
+            "Angle_Diff_To_Next_Minima (°)": diff_next  # 與後一個點的角度差
+        })
+
+    # 將包含角度差資訊的列表轉換為 Pandas DataFrame，再轉為 NumPy 陣列，方便後續索引
+    # 只選取需要的欄位: Frame, Angle_Diff_To_Prev_Minima (°), Angle_Diff_To_Next_Minima (°)
+    # angle_array 的結構: [[frame1, diff_prev1, diff_next1], [frame2, diff_prev2, diff_next2], ...]
+    angle_array = pd.DataFrame(angle_diffs)[["Frame", "Angle_Diff_To_Prev_Minima (°)", "Angle_Diff_To_Next_Minima (°)"]].to_numpy()
+
+    # === [2] 合併視角差小於閾值的點 ===
+    # 目標：根據步驟 [1] 計算出的 "與前一個點的角度差"，將角度差小的連續 Z 最小值點合併成一個群組。
+    #       這代表這些射擊點在視角上非常接近，可能屬於同一次瞄準/射擊動作。
+    grouped_frames = [] # 儲存最終分好的群組，每個群組是一個包含幀索引的列表
+    i = 0 # 當前處理的 angle_array 的索引
+    last_frame = None # 追蹤上一個被成功分組的最後一個 frame (這個變數命名和用途可能需要釐清，看似用於處理邊界)
+                      # 更新理解：last_frame 似乎沒有跨組傳遞信息，主要是在單次外層 while 循環中暫存。
+
+    while i < len(angle_array): # 遍歷所有 Z 最小值點 (或其角度差資訊)
+        current_group = [] # 初始化當前群組
+        # 這個檢查似乎多餘，因為 current_group 在每次循環開始時都重新初始化了
+        if last_frame is not None:
+            current_group.append(last_frame) # 似乎想把上一組的結尾加入下一組開頭？這邏輯可能需要確認
+
+        # 將當前點 (angle_array[i]) 的 frame 加入 current_group
+        # angle_array[i][0] 是 frame 索引
+        current_group.append(angle_array[i][0])
+
+        # 開始向後查找，看有多少個後續的點可以合併到 current_group
+        j = i + 1 # 從當前點的下一個點開始檢查
+        while j < len(angle_array):
+            # 檢查點 j 與其前一個點 (即點 j-1) 之間的角度差
+            # angle_array[j][1] 就是 "Angle_Diff_To_Prev_Minima (°)"
+            # 如果角度差是 NaN (例如第一個點) 或 大於等於合併閾值，則停止合併
+            if pd.isna(angle_array[j][1]) or angle_array[j][1] >= angle_merge_threshold:
+                break # 停止內層 while 循環，不再將點 j 加入 current_group
+
+            # 如果角度差小於閾值，則將點 j 的 frame 加入 current_group
+            current_group.append(angle_array[j][0])
+            j += 1 # 繼續檢查下一個點 (j+1)
+
+        # 內層 while 循環結束後，檢查 current_group 的大小
+        # 如果大小大於 1，表示至少有兩個點被合併成一個群組
+        if len(current_group) > 1:
+            grouped_frames.append(current_group) # 將這個有效群組加入最終結果列表
+            last_frame = current_group[-1] # 更新 last_frame 為此群組的最後一個 frame (這行似乎也沒實際作用於下次迭代)
+        else: # 如果 current_group 只有一個點 (沒有成功合併)
+            last_frame = angle_array[i][0] # 更新 last_frame 為這個單獨的點 (同樣，用途不明)
+
+        # 更新外層循環的索引 i
+        # 跳過所有已經被處理 (合併) 的點，直接從 j 開始下一次外層循環
+        i = j
+
+    # === [3] 建立包含群組資訊的 DataFrame ===
+    # 目標：將分好的群組 (grouped_frames) 整理成結構化的 DataFrame，並計算基本屬性。
+    if not grouped_frames: # 如果沒有找到任何群組 (例如 Z 最小值點太少或角度差都很大)
+        print("Warning: No groups were formed based on the angle threshold.")
+        # 返回一個空的或者包含特定結構的 DataFrame，避免後續代碼出錯
+        return pd.DataFrame(columns=[
+            "Group ID", "Frames", "Shot Count", "Frame Start", "Frame End",
+            "Frame Span", "Initial Move Angle (°)", "NEW Frame Start", "Direction Quadrant"
+        ])
+
+    grouped_df = pd.DataFrame({
+        "Group ID": list(range(1, len(grouped_frames) + 1)), # 群組 ID，從 1 開始
+        "Frames": grouped_frames,                            # 每個群組包含的幀列表
+        # Shot Count: 假設組內點數 n 代表 n-1 次射擊間隔，所以是 len(g)-1 次射擊
+        "Shot Count": [len(g) - 1 for g in grouped_frames],
+        "Frame Start": [min(g) for g in grouped_frames],      # 群組起始幀 (取組內最小幀)
+        "Frame End": [max(g) for g in grouped_frames],        # 群組結束幀 (取組內最大幀)
+    })
+    # 計算每個群組的持續時間 (幀數)
+    grouped_df["Frame Span"] = grouped_df["Frame End"] - grouped_df["Frame Start"]
+
+    # === [4] 計算每個群組的初始移動角度與最佳化起始點 (修改版) ===
+    new_starts = [] # 儲存每個群組計算出的 "NEW Frame Start"
+    angles = []     # 儲存每個群組計算出的 "Initial Move Angle (°)"
+    
+    # 提取群組的原始起始和結束幀為 NumPy 陣列
+    group_starts = grouped_df["Frame Start"].values.astype(int)
+    group_ends = grouped_df["Frame End"].values.astype(int)
+    
+    # 提前提取原始 DataFrame 中可能需要重複訪問的列為 NumPy 陣列
+    x_coords = df["X"].values
+    y_coords = df["Y"].values
+    
+    # 遍歷每個群組
+    for i in range(len(grouped_df)):
+        s, e = group_starts[i], group_ends[i] # 當前群組的原始起始和結束幀
+    
+        # --- 計算 NEW Frame Start ---
+        # 調用工具函數，找到這個群組 (s 到 e) 更精確的移動起始點
+        # *** 假設 find_directional_start 已經過優化或按原樣使用 ***
+        new_s = find_directional_start(df, s, e)
+        new_starts.append(new_s)
+    
+        # --- 計算 Initial Move Angle (使用 new_s 作為起點) ---
+        # 目標：找到從 new_s 開始的一小段初始移動 (長度 l)
+        #       計算其方向向量 (init_vec)
+        #       計算從 new_s 到 e 的總體移動方向向量 (goal_vec)
+        #       計算 init_vec 和 goal_vec 的夾角
+    
+        # 檢查 new_s 和 e 是否有效，以及它們之間是否能形成向量
+        if new_s >= e: # 如果找到的新起點等於或晚於結束點，無法計算角度
+            angles.append(np.nan)
+            continue
+    
+        # 計算總體目標向量 (從 new_s 指向 e)
+        goal_vec = np.array([x_coords[e] - x_coords[new_s], y_coords[e] - y_coords[new_s]])
+        goal_norm = norm(goal_vec)
+    
+        # 如果從 new_s 到 e 沒有移動，無法計算角度
+        if goal_norm == 0:
+            angles.append(np.nan)
+            continue
+    
+        # 定義初始移動段的最小長度 (至少需要2個點才能形成向量)
+        # 保持原來的 5 幀作為一個有意義的初始移動判斷標準
+        min_initial_length = 5
+        max_len_from_new_start = e - new_s # 從 new_s 開始的最大可能長度
+    
+        found = False # 標記是否找到了有效的初始移動角度
+    
+        # 如果從 new_s 開始的總長度不足以形成一個最小長度的初始移動段
+        if max_len_from_new_start < min_initial_length:
+             angles.append(np.nan) # 無法計算有意義的初始角度
+             continue # 處理下一個群組
+    
+        # 嘗試不同長度的初始移動段 (從 min_initial_length 到 max_len_from_new_start)
+        # 迭代的 l 代表從 new_s 開始的移動段包含的幀數 (點數)
+        for l in range(min_initial_length, max_len_from_new_start + 1):
+            # 提取初始移動段的數據 (從 new_s 到 new_s + l - 1)
+            # 切片範圍是 [new_s, new_s + l)
+            move_x = x_coords[new_s : new_s + l]
+            move_y = y_coords[new_s : new_s + l]
+    
+            # 確保切片有效 (理論上 range 保證 l >= min_initial_length >= 2)
+            if len(move_x) < 2: # 雙重檢查
+                 continue
+    
+            # 計算初始移動向量 (從第一個點 new_s 到最後一個點 new_s + l - 1)
+            init_vec = np.array([move_x[-1] - move_x[0], move_y[-1] - move_y[0]])
+            init_norm = norm(init_vec)
+    
+            # 如果初始移動向量長度為 0，則無法計算角度，繼續嘗試更長的片段
+            if init_norm == 0:
+                continue
+    
+            # 計算初始移動向量與 (從 new_s 開始的) 總體目標向量的夾角
+            # 分母 goal_norm 在前面已檢查不為 0, init_norm 在此處檢查不為 0
+            cos_theta = np.dot(init_vec, goal_vec) / (init_norm * goal_norm)
+            angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
+    
+            angles.append(angle_deg) # 將計算出的第一個有效角度加入列表
+            found = True             # 標記已找到
+            break # 找到第一個有效的初始移動角度後，停止內層循環
+    
+        # 如果遍歷完所有可能的初始移動長度 l，都沒有找到有效的角度
+        # (可能是因為所有初始片段的 init_norm 都為 0)
+        if not found:
+            angles.append(np.nan) # 添加 NaN
+    
+    # --- 後續代碼 ---
+    # 將計算結果添加回 grouped_df
+    grouped_df["Initial Move Angle (°)"] = angles
+    grouped_df["NEW Frame Start"] = new_starts # new_starts 列表在此賦值
+
+    # === [5] 象限分類 ===
+    # 目標：根據每個群組起始點到結束點的累積 Yaw 和 Pitch 變化，判斷主要移動方向屬於哪個象限。
+    def classify_quadrant(dx, dy):
+        """根據 X (Yaw) 和 Y (Pitch) 的變化量判斷象限"""
+        if dx > 0 and dy > 0: return "Q1" # 右上
+        if dx < 0 and dy > 0: return "Q2" # 左上
+        if dx < 0 and dy < 0: return "Q3" # 左下
+        if dx > 0 and dy < 0: return "Q4" # 右下
+        # 其他情況 (例如只在一個軸上移動，或沒有移動)
+        if dx == 0 and dy != 0: return "Vertical" # 垂直移動 (向上或向下)
+        if dx != 0 and dy == 0: return "Horizontal" # 水平移動 (向左或向右)
+        return "Center/Undefined" # 無明顯移動或起始結束點相同
+
+    # 提取群組起始和結束幀對應的 Yaw 和 Pitch 值 (使用 .loc 或 .iloc 配合索引列表)
+    # 確保索引是整數類型
+    start_indices = grouped_df["Frame Start"].values.astype(int)
+    end_indices = grouped_df["Frame End"].values.astype(int)
+
+    # 使用 .iloc 批量提取數據，比 apply 或 iterrows 快得多
+    start_yaw = df["cum_yaw_deg"].iloc[start_indices].values
+    end_yaw = df["cum_yaw_deg"].iloc[end_indices].values
+    start_pitch = df["cum_pitch_deg"].iloc[start_indices].values
+    end_pitch = df["cum_pitch_deg"].iloc[end_indices].values
+
+    # 計算 Yaw 和 Pitch 的變化量 (向量化操作)
+    delta_yaw = end_yaw - start_yaw     # 對應 dx
+    delta_pitch = end_pitch - start_pitch # 對應 dy
+
+    # 使用向量化的條件判斷 (例如 np.select) 來進行分類，避免使用 apply
+    conditions = [
+        (delta_yaw > 0) & (delta_pitch > 0), # Q1
+        (delta_yaw < 0) & (delta_pitch > 0), # Q2
+        (delta_yaw < 0) & (delta_pitch < 0), # Q3
+        (delta_yaw > 0) & (delta_pitch < 0), # Q4
+        (delta_yaw == 0) & (delta_pitch != 0),# Vertical
+        (delta_yaw != 0) & (delta_pitch == 0),# Horizontal
+    ]
+    choices = ["Q1", "Q2", "Q3", "Q4", "Vertical", "Horizontal"]
+    # np.select(條件列表, 選擇列表, 預設值)
+    grouped_df["Direction Quadrant"] = np.select(conditions, choices, default="Center/Undefined")
+
+    # === [6] 視覺化 ===
+    # 目標：如果 show=True，繪製視角軌跡圖，用顏色深淺表示滑鼠移動速度，並標記 Z 最小值點。
+    if show:
+        plt.figure(figsize=(8, 8)) # 設定圖表大小
+
+        # 繪製主要的視角軌跡散點圖
+        # x 軸是 Pitch (垂直視角)，y 軸是 Yaw (水平視角)
+        # c=df['speed'] 指定點的顏色由 'speed' 欄位決定
+        # cmap='plasma' 指定顏色映射方案
+        # alpha=0.7 設定透明度
+        # s=5 設定點的大小
+        sc = plt.scatter(
+            df['cum_pitch_deg'], df['cum_yaw_deg'], # X, Y 座標
+            c=df['speed'], cmap='plasma', alpha=0.7, s=5, # 顏色、透明度、大小
+            label='View Angle Trajectory (colored by speed)' # 圖例標籤
+        )
+        # 添加顏色條 (colorbar) 並標註其代表的意義 ('Mouse Speed')
+        plt.colorbar(sc, label='Mouse Speed (°/s or unit of speed column)')
+
+        # 在圖上特別標記出所有的 Z 軸局部最小值點 (通常是紅色)
+        # 提取這些點的 Pitch 和 Yaw 座標
+        # 這裡再次使用了 iloc，如果 final_minima_idx 很大，也可能稍慢，但通常可接受
+        minima_pitch = df['cum_pitch_deg'].iloc[final_minima_idx].values
+        minima_yaw = df['cum_yaw_deg'].iloc[final_minima_idx].values
+        plt.scatter(minima_pitch, minima_yaw,
+                    color='red', s=20, label='Z Minima', zorder=3) # zorder=3 讓紅點在最上層
+
+        # 設定圖表的標籤、標題、網格線和坐標軸比例
+        plt.xlabel('Pitch Angle (°)')
+        plt.ylabel('Yaw Angle (°)')
+        plt.title('View Angle Trajectory Colored by Mouse Speed with Z Minima')
+        plt.grid(True) # 顯示網格線
+        plt.axis('equal') # 讓 X 和 Y 軸具有相同的單位長度比例，避免角度變形
+        plt.legend() # 顯示圖例
+        plt.show() # 顯示圖表
+
+    # 返回最終處理好的包含群組資訊的 DataFrame
+    return grouped_df
 # %%
 
 def excludeCenter(df, filtered_minima_data, grouped_df,
                   target_length = 101,
                   show=True):
+    """
+   排除起點不在中央視角範圍的擊殺群組，並標記各群組的速度方向象限，
+   可視化剩餘群組的最終 Z 軸最小值與分群結果。
+
+   參數:
+       df (pd.DataFrame): 包含 X, Y, Z 與視角欄位(cum_yaw_deg, cum_pitch_deg, speed)
+       filtered_minima_data (pd.DataFrame): Z 軸最小值資料 (含 Frame 欄位)
+       grouped_df (pd.DataFrame): 原始分群結果 (含 Frames, Frame Start, End 等欄位)
+       target_length (int): 標準化速度序列的長度
+       show (bool): 是否繪製可視化圖
+
+   返回:
+       excldueCen_grouped_df (pd.DataFrame): 排除後的分群結果
+   """
     # === o. 篩選機制，只有從中心出發才會計算 ===
     yaw_center = (df["cum_yaw_deg"].max() + df["cum_yaw_deg"].min()) / 2
     pitch_center = (df["cum_pitch_deg"].max() + df["cum_pitch_deg"].min()) / 2
@@ -763,11 +1170,12 @@ def excludeCenter(df, filtered_minima_data, grouped_df,
     
     if show:
         excldueCen_minima_idx = excldueCen_grouped_df["Frames"].tolist()
+        last_values = [int(sublist[-1]) for sublist in excldueCen_minima_idx]
         """
         這裡有問題，剛剛修改到這裡 2025.05.01 13:46
         """
-        all_minima_deg_x = df["cum_pitch_deg"].iloc[excldueCen_minima_idx]
-        all_minima_deg_y = df["cum_yaw_deg"].iloc[excldueCen_minima_idx]
+        all_minima_deg_x = df["cum_pitch_deg"].iloc[last_values]
+        all_minima_deg_y = df["cum_yaw_deg"].iloc[last_values]
         plt.figure(figsize=(10, 8))
         
         # 背景點（全視角軌跡）
