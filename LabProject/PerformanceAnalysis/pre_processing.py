@@ -892,15 +892,161 @@ def excludeCenter_and_plot_separately(df: pd.DataFrame, grouped_df: pd.DataFrame
 
     # === 5. 返回結果 ===
     return filtered_grouped_df
+# %%
 
-# --- 使用範例 ---
-# 假設 df_data 和 initial_groups 已經準備好
-# final_groups = excludeCenter_and_plot_separately(df_data, initial_groups, yaw_range=10, pitch_range=10, show=True)
-# print(f"最終保留的群組數量: {len(final_groups)}")
 
-# --- 如何使用 ---
-# 假設 df 和 initial_grouped_df 已經準備好
-# final_filtered_groups = excludeCenter_with_arrow_plot(df, initial_grouped_df, yaw_range=15, pitch_range=15, show=True)
+
+def standardize_group_signals(df, filtered_grouped_df, signal_column_name,
+                              target_length=101,
+                              start_col='Frame Start', # 或 'NEW Frame Start'
+                              end_col='Frame End',
+                              group_id_col='Group ID'):
+    """
+    為 filtered_grouped_df 中的每個擊殺群組提取指定的信號時間序列，
+    並使用三次樣條插值 (cubic interpolation) 將其標準化為固定的長度。
+
+    參數 (Parameters):
+        df (pd.DataFrame): 包含原始時間序列數據的 DataFrame。
+                           必須包含 `signal_column_name` 指定的欄位以及幀索引。
+        filtered_grouped_df (pd.DataFrame): 經過濾後的群組 DataFrame (例如來自 excludeCenter)。
+                                            必須包含 `start_col`, `end_col`, 和 `group_id_col` 指定的欄位。
+        signal_column_name (str): 需要從 `df` 中提取並標準化的信號欄位名稱
+                                  (例如 'angle_speed_dps', 'speed', 'X', 'Y', 'Z',
+                                   'cum_yaw_deg', 'cum_pitch_deg')。
+        target_length (int): 標準化後的目標序列長度。預設為 101。
+        start_col (str): `filtered_grouped_df` 中代表群組起始幀的欄位名稱。
+                         預設為 'Frame Start'。可改為 'NEW Frame Start' 等。
+        end_col (str): `filtered_grouped_df` 中代表群組結束幀的欄位名稱。
+                       預設為 'Frame End'。
+        group_id_col (str): `filtered_grouped_df` 中代表群組唯一標識符的欄位名稱。
+                            預設為 'Group ID'。結果字典的鍵將使用此欄位的值。
+
+    返回 (Return):
+        dict: 一個字典，其中：
+              - 鍵 (key) 是每個群組的 ID (來自 `group_id_col`)。
+              - 值 (value) 是對應群組提取並標準化後的信號 (NumPy array, 長度為 `target_length`)。
+              如果某個群組的原始信號長度不足以進行插值 (少於2個點)，
+              或者發生其他錯誤，其對應的值可能為全 NaN 的 NumPy 陣列。
+
+    可能引發的錯誤 (Potential Errors):
+        - KeyError: 如果 `df` 或 `filtered_grouped_df` 中找不到指定的欄位名稱。
+        - IndexError: 如果 `start_col` 或 `end_col` 中的幀索引在 `df` 中無效。
+        - ValueError: 如果原始信號長度不足以支持所選的插值方法 (例如，cubic 需要至少4個點，但 interp1d 可能會自動降級或處理邊界)。
+
+    使用範例 (Example Usage):
+    # 假設 df 是原始數據, final_groups 是 excludeCenter 的輸出
+    # 標準化 'angle_speed_dps' 信號到 101 點
+    standardized_speeds = standardize_group_signals(
+        df=df,
+        filtered_grouped_df=final_groups,
+        signal_column_name='angle_speed_dps',
+        target_length=101,
+        start_col='NEW Frame Start', # 使用優化後的起始點
+        end_col='Frame End',
+        group_id_col='Group ID'
+    )
+
+    # 訪問第一個群組 (假設其 Group ID 是 1) 的標準化速度
+    # group_1_speed = standardized_speeds[1]
+    # print(group_1_speed.shape) # 應輸出 (101,)
+    """
+    standardized_signals = {} # 初始化結果字典
+
+    # 檢查必要欄位是否存在
+    required_df_cols = [signal_column_name]
+    required_grouped_cols = [start_col, end_col, group_id_col]
+    if not all(col in df.columns for col in required_df_cols):
+        raise KeyError(f"指定的 signal_column_name '{signal_column_name}' 不在 df 中。")
+    if not all(col in filtered_grouped_df.columns for col in required_grouped_cols):
+        raise KeyError(f"指定的欄位 ({start_col}, {end_col}, {group_id_col}) 並非全部存在於 filtered_grouped_df 中。")
+
+
+    print(f"開始標準化 '{signal_column_name}' 信號...")
+    # 遍歷過濾後的群組 DataFrame
+    for _, group_row in filtered_grouped_df.iterrows():
+        group_id = group_row[group_id_col]
+        try:
+            # 獲取起始和結束幀索引 (轉換為整數)
+            start_frame = int(group_row[start_col])
+            end_frame = int(group_row[end_col])
+
+            # --- 提取信號序列 ---
+            # 使用 .iloc 進行基於整數位置的切片
+            # 切片範圍 [start_frame, end_frame]，所以結束索引需要 +1
+            # 確保 start_frame 不大於 end_frame
+            if start_frame > end_frame:
+                 print(f"警告：群組 {group_id} 的起始幀 {start_frame} 晚於結束幀 {end_frame}，跳過此群組。")
+                 standardized_signals[group_id] = np.full(target_length, np.nan)
+                 continue
+
+            # 提取序列值
+            # 添加 .values 將 Pandas Series 轉換為 NumPy array
+            sequence = df[signal_column_name].iloc[start_frame : end_frame + 1].values
+
+            original_length = len(sequence)
+
+            # --- 處理邊界情況和插值 ---
+            standardized_sequence = np.full(target_length, np.nan) # 預設為 NaN
+
+            if original_length == target_length:
+                # 長度已符合，直接使用
+                standardized_sequence = sequence
+            elif original_length >= 2: # 至少需要2個點才能進行插值
+                # 創建原始數據和目標數據的 x 軸座標 (標準化到 0 到 1)
+                x_original = np.linspace(0, 1, original_length)
+                x_target = np.linspace(0, 1, target_length)
+
+                try:
+                    # 創建三次樣條插值函數
+                    # kind='cubic': 指定三次樣條插值
+                    # bounds_error=False: 允許插值目標超出原始數據範圍
+                    # fill_value="extrapolate": 對超出範圍的點進行外插 (可能有風險，取決於數據特性)
+                    #     如果不想外插，可設為 np.nan 或其他值
+                    interp_func = interp1d(x_original, sequence, kind='cubic',
+                                           bounds_error=False, fill_value="extrapolate")
+
+                    # 應用插值函數到目標 x 軸座標
+                    standardized_sequence = interp_func(x_target)
+
+                except ValueError as e_interp:
+                    # 如果 cubic 插值失敗 (例如點數不足4個，雖然 interp1d 可能會降級)
+                    print(f"警告：群組 {group_id} (長度 {original_length}) 進行 Cubic 插值時出錯: {e_interp}。嘗試 Linear 插值。")
+                    try:
+                       # 嘗試使用線性插值作為備選
+                       interp_func_linear = interp1d(x_original, sequence, kind='linear',
+                                                     bounds_error=False, fill_value="extrapolate")
+                       standardized_sequence = interp_func_linear(x_target)
+                    except Exception as e_linear:
+                       print(f"錯誤：群組 {group_id} 的 Linear 插值也失敗: {e_linear}。該群組結果將為 NaN。")
+                       # standardized_sequence 保持為 np.full(target_length, np.nan)
+
+            elif original_length == 1:
+                # 只有一個點，用該點的值填充
+                print(f"警告：群組 {group_id} 原始長度只有 1，使用該點的值填充目標序列。")
+                standardized_sequence = np.full(target_length, sequence[0])
+            else: # original_length == 0
+                print(f"警告：群組 {group_id} 提取到的序列長度為 0 (可能因 start={start_frame}, end={end_frame} 導致)，結果為 NaN。")
+                # standardized_sequence 保持為 np.full(target_length, np.nan)
+
+            # 儲存結果到字典
+            standardized_signals[group_id] = standardized_sequence
+
+        except KeyError:
+            # 處理在 df 中找不到 signal_column_name 的情況 (雖然前面檢查過，但以防萬一)
+            print(f"錯誤：無法在 df 中找到欄位 '{signal_column_name}'。")
+            standardized_signals[group_id] = np.full(target_length, np.nan) # 或拋出異常
+        except IndexError:
+            # 處理幀索引超出 df 範圍的情況
+            print(f"錯誤：群組 {group_id} 的幀索引 [{start_frame}, {end_frame}] 超出 df 的範圍。")
+            standardized_signals[group_id] = np.full(target_length, np.nan)
+        except Exception as e:
+            # 捕獲其他潛在錯誤
+            print(f"錯誤：處理群組 {group_id} 時發生未知錯誤: {e}")
+            standardized_signals[group_id] = np.full(target_length, np.nan)
+
+    print(f"標準化完成。共處理 {len(standardized_signals)} 個群組。")
+    return standardized_signals
+
 # %%
 
 # 將單位從mm轉換成視角
@@ -918,8 +1064,38 @@ excldueCen_grouped_df = excludeCenter_and_plot_separately(df, grouped_df, show=T
 
 """
 準備做標準化處理
+
 """
 
+# --- 如何使用 ---
+# 假設 df 是包含 'angle_speed_dps' 的原始數據 DataFrame
+# 假設 final_groups 是之前 excludeCenter 函數返回的 DataFrame
+final_groups = excldueCen_grouped_df
+# 檢查 final_groups 是否為空
+if not final_groups.empty:
+    try:
+        standardized_speeds = standardize_group_signals(
+            df=df,
+            filtered_grouped_df=final_groups,
+            signal_column_name='angle_speed_dps', # 指定要標準化的欄位
+            target_length=101,                   # 指定目標長度
+            start_col='Frame Start',             # 指定起始幀欄位
+            end_col='Frame End',                 # 指定結束幀欄位
+            group_id_col='Group ID'              # 指定群組ID欄位
+        )
+
+        # 查看第一個群組的標準化結果 (假設 Group ID 為 1 存在)
+        # if 1 in standardized_speeds:
+        #     print("第一個群組的標準化速度序列 (前10個點):")
+        #     print(standardized_speeds[1][:10])
+        #     print(f"序列長度: {len(standardized_speeds[1])}") # 應為 101
+
+    except KeyError as e:
+        print(f"執行標準化時出錯：{e}")
+    except ImportError:
+        print("錯誤：需要安裝 scipy 庫才能執行插值。請運行 pip install scipy")
+else:
+      print("沒有可供標準化的群組 (filtered_grouped_df is empty)。")
 
 
 # %%
@@ -1042,7 +1218,159 @@ plt.show()
 
 """
 
+# %%
 
+import matplotlib.pyplot as plt
+import numpy as np
+import math
+
+def _process_and_calculate_stats(signals_dict, target_length):
+    """(內部輔助函數) 處理信號字典並計算統計數據"""
+    if not signals_dict:
+        print("警告：提供的信號字典為空。")
+        return None, None, None, 0 # 返回 None 表示失敗
+
+    signals_list = list(signals_dict.values())
+    if not signals_list:
+        print("警告：未能從字典中提取任何有效的信號數組。")
+        return None, None, None, 0
+
+    # 過濾並堆疊信號
+    valid_signals = [s for s in signals_list if isinstance(s, np.ndarray) and s.shape == (target_length,)]
+    if not valid_signals:
+         print(f"警告：未能找到任何有效（NumPy 數組且長度為 {target_length}）的信號。")
+         return None, None, None, 0
+
+    try:
+        signals_array = np.stack(valid_signals, axis=1)
+        num_signals = signals_array.shape[1]
+    except Exception as e:
+        print(f"錯誤：數據準備過程中無法堆疊數組 (檢查長度是否均為 {target_length})：{e}")
+        return None, None, None, 0
+
+    # 計算統計數據 (忽略 NaN)
+    avg_signal = np.nanmean(signals_array, axis=1)
+    std_signal = np.nanstd(signals_array, axis=1)
+
+    # 檢查計算結果是否有效 (例如，如果所有輸入都是 NaN)
+    if np.all(np.isnan(avg_signal)) or np.all(np.isnan(std_signal)):
+        print(f"警告：計算得到的平均值或標準差全部為 NaN (可能所有輸入信號都無效或全為 NaN)。")
+        return None, None, None, num_signals # 即使計算失敗也返回信號數量
+
+    lower_bound = avg_signal - std_signal
+    upper_bound = avg_signal + std_signal
+
+    return avg_signal, lower_bound, upper_bound, num_signals
+
+def plot_standardized_signals_cloud_compare(
+        signals_dict1,             # 第一個數據集 (必需)
+        target_length,             # 信號的標準化長度 (必需)
+        signals_dict2=None,        # 第二個數據集 (可選)
+        title="Comparison of Mean ± Std Dev Clouds",
+        xlabel="Normalized Time (%)",
+        ylabel="Signal Value (°/s or other units)",
+        label1='Dataset 1',      # 第一個數據集的標籤
+        label2='Dataset 2',      # 第二個數據集的標籤
+        color_index1=0,            # 第一個數據集的顏色索引
+        color_index2=1             # 第二個數據集的顏色索引
+    ):
+    """
+    在同一張圖上繪製一個或兩個標準化信號數據集的平均值和標準差範圍圖。
+
+    參數 (Parameters):
+        signals_dict1 (dict):      第一個包含標準化信號的字典 (鍵: ID, 值: 1D NumPy array)。
+        target_length (int):       標準化信號的長度。兩個數據集必須相同。
+        signals_dict2 (dict, optional): 第二個包含標準化信號的字典。預設為 None。
+        title (str):               圖表的標題。
+        xlabel (str):              x 軸的標籤。
+        ylabel (str):              y 軸的標籤。
+        label1 (str):              第一個數據集在圖例中的標籤。
+        label2 (str):              第二個數據集在圖例中的標籤 (如果提供 signals_dict2)。
+        color_index1 (int):        第一個數據集使用的 'Set1' 調色板顏色索引。
+        color_index2 (int):        第二個數據集使用的 'Set1' 調色板顏色索引。
+    """
+
+    # --- 創建圖表和 x 軸 ---
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    iters = np.linspace(0, 100, target_length) # x 軸：0% 到 100%
+    palette = plt.get_cmap('Set1')
+
+    plot_success_count = 0
+
+    # --- 處理和繪製第一個數據集 ---
+    print(f"處理數據集 1 ({label1})...")
+    avg1, lower1, upper1, count1 = _process_and_calculate_stats(signals_dict1, target_length)
+
+    if avg1 is not None: # 確保數據處理和計算成功
+        color1 = palette(color_index1 % palette.N)
+        ax.plot(iters, avg1, color=color1, label=f'{label1} (n={count1})', linewidth=2)
+        ax.fill_between(iters, lower1, upper1, color=color1, alpha=0.2)
+        plot_success_count += 1
+    else:
+        print(f"未能成功處理或計算數據集 1 ({label1}) 的統計數據。")
+
+
+    # --- 處理和繪製第二個數據集 (如果存在) ---
+    if signals_dict2 is not None:
+        print(f"\n處理數據集 2 ({label2})...")
+        avg2, lower2, upper2, count2 = _process_and_calculate_stats(signals_dict2, target_length)
+
+        if avg2 is not None: # 確保數據處理和計算成功
+            color2 = palette(color_index2 % palette.N)
+            # 確保顏色不同
+            if color_index1 == color_index2:
+                print(f"警告：數據集 1 和 2 的顏色索引相同 ({color_index1})。將嘗試使用下一個顏色。")
+                color2 = palette((color_index2 + 1) % palette.N)
+
+            ax.plot(iters, avg2, color=color2, label=f'{label2} (n={count2})', linewidth=2)
+            ax.fill_between(iters, lower2, upper2, color=color2, alpha=0.2)
+            plot_success_count += 1
+        else:
+           print(f"未能成功處理或計算數據集 2 ({label2}) 的統計數據。")
+
+    # --- 圖表格式設定 ---
+    if plot_success_count > 0: # 只有成功繪製了至少一個數據集才進行格式化
+        ax.set_title(title, fontsize=14)
+        ax.legend(loc="best")
+        ax.grid(True, linestyle='-.')
+        ax.set_xlabel(xlabel, fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=12)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("\n沒有成功繪製任何數據集，圖表未顯示。")
+        plt.close(fig) # 關閉空的圖表窗口
+
+
+# --- 如何使用 ---
+# 假設 standardized_speeds1 和 standardized_speeds2 是兩個包含標準化速度信號的字典
+# 假設 target_length = 101
+standardized_speeds1 = standardized_speeds
+# 示例 1: 只繪製一個數據集
+if standardized_speeds1:
+      plot_standardized_signals_cloud_compare(
+          signals_dict1=standardized_speeds1,
+          target_length=101,
+          title="數據集 1 的平均速度 ± 標準差",
+          label1='實驗組 A',
+          ylabel="速度 (°/s)"
+      )
+
+# 示例 2: 繪製兩個數據集進行比較
+# if standardized_speeds1 and standardized_speeds2:
+#      plot_standardized_signals_cloud_compare(
+#          signals_dict1=standardized_speeds1,
+#          target_length=101,
+#          signals_dict2=standardized_speeds2, # 提供第二個字典
+#          title="比較兩個數據集的平均速度 ± 標準差",
+#          label1='實驗組 A',
+#          label2='實驗組 B',        # 為第二個數據集提供標籤
+#          ylabel="速度 (°/s)",
+#          color_index1=0,         # 第一個用顏色 0
+#          color_index2=1          # 第二個用顏色 1
+#      )
+# else:
+#      print("至少需要一個有效的標準化信號字典才能繪圖。")
 
 
 
