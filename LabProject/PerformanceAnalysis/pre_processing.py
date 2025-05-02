@@ -286,403 +286,12 @@ def ConverUnit2Angle(combine_dict, descriptions,
                                        df["pitch_speed_dps"]**2)  # 合成角速度
     
     return df
-# %%
 
-def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
-    """
-    根據 Z 軸局部最小值列表，計算其與前後點的視角差，並將視角變化小的點群視為同一擊殺動作。
-    最後以視角空間視覺化結果並回傳每個擊殺群的 frame 資訊與初始移動角度。
-
-    parameters:
-        df : pd.DataFrame
-            包含 X/Y/Z 與視角欄位（cum_yaw_deg, cum_pitch_deg）的完整資料。
-        final_minima_idx : list[int]
-            經過篩選後的 Z 軸局部最小值的 frame 編號。
-        angle_merge_threshold = 5 
-            若與前一點視角差 < 5°，視為同一組
-        show : bool
-            是否顯示視覺化圖。
-
-    return:
-        grouped_df : pd.DataFrame
-            分群後的擊殺點資料，每組包含 frame 範圍與初始角度。
-    """
-    # === [1] 計算每個局部最小值與「前一個/後一個」的視角差（歐氏距離）===
-    angle_diffs = []
-    for i in range(len(final_minima_idx)):
-        idx_curr = final_minima_idx[i]
-    
-        yaw_curr = df["cum_yaw_deg"].iloc[idx_curr]
-        pitch_curr = df["cum_pitch_deg"].iloc[idx_curr]
-    
-        # 計算與前一個的角度差
-        if i == 0:
-            diff_prev = np.nan  # 沒有前一筆
-        else:
-            idx_prev = final_minima_idx[i - 1]
-            yaw_prev = df["cum_yaw_deg"].iloc[idx_prev]
-            pitch_prev = df["cum_pitch_deg"].iloc[idx_prev]
-            diff_prev = np.linalg.norm([yaw_curr - yaw_prev, pitch_curr - pitch_prev])
-    
-        # 計算與後一個的角度差
-        if i == len(final_minima_idx) - 1:
-            diff_next = np.nan  # 沒有下一筆
-        else:
-            idx_next = final_minima_idx[i + 1]
-            yaw_next = df["cum_yaw_deg"].iloc[idx_next]
-            pitch_next = df["cum_pitch_deg"].iloc[idx_next]
-            diff_next = np.linalg.norm([yaw_curr - yaw_next, pitch_curr - pitch_next])
-        # 儲存至 dict
-        angle_diffs.append({
-            "Frame": idx_curr,
-            "Z Value": df["Z"].iloc[idx_curr],
-            "Angle_Diff_To_Prev_Minima (°)": diff_prev,
-            "Angle_Diff_To_Next_Minima (°)": diff_next
-        })
-    # === [2] 輸出 DataFrame 並儲存為 CSV ===
-    angle_diffs_df = pd.DataFrame(angle_diffs)
-    # angle_diffs_df.to_csv("Z_Minima_ViewAngle_Comparison.csv", index=False)
-    print(angle_diffs_df.head())
-    
-    # === [3] 將結果轉成 numpy array 便於處理 ===
-    angle_array = angle_diffs_df[["Frame", 
-                                  "Angle_Diff_To_Prev_Minima (°)", 
-                                  "Angle_Diff_To_Next_Minima (°)"]].to_numpy()
-    
-    # === [4] 根據與前一筆的角度差進行「點群合併」 ===
-    # 找出第一次擊發，以及最後一次擊發的位置，利用視角差當成閾值
-    grouped_frames = []
-   
-    i = 0
-    last_frame = None  # 記錄上一組的最後一筆
-    
-    while i < len(angle_array) - 1:
-        current_group = []
-        
-        # 新群組要接上上一組結尾（若有）
-        if last_frame is not None:
-            current_group.append(last_frame)  # 接續上一組的結尾
-            
-        # 加入目前起點 frame
-        current_group.append(angle_array[i][0])  # 加入目前起點 frame
-        j = i + 1
-    
-        # 接下來的點若與前一點差值 < 閾值，繼續合併    
-        while j < len(angle_array):
-            angle_diff = angle_array[j][1]  # Angle_Diff_To_Prev_Minima (°)
-        
-            if pd.isna(angle_diff) or angle_diff >= angle_merge_threshold:
-                break
-        
-            current_group.append(angle_array[j][0])
-            j += 1
-            
-        # 若點數大於 1，視為有效群組
-        if len(current_group) > 1:
-            grouped_frames.append(current_group)
-            last_frame = current_group[-1]  # 更新本輪最後 frame
-        else:
-            last_frame = angle_array[i][0]  # 還是更新這筆（即使沒成群）
-    
-        i = j  # 繼續從下一個起點開始
-    # === [5] 建立分群結果的 DataFrame ===
-    grouped_df = pd.DataFrame({
-        "Group ID": list(range(1, len(grouped_frames) + 1)),
-        "Frames": grouped_frames,
-        "Shot Count": [len(g) - 1 for g in grouped_frames],
-        "Frame Start": [min(g) for g in grouped_frames],
-        "Frame End": [max(g) for g in grouped_frames],
-    })
-    grouped_df["Frame Span"] = grouped_df["Frame End"] - grouped_df["Frame Start"]
-    
-    # === [6] 計算每組起始方向與目標方向的夾角 ===
-    initial_angles = []
-    
-    for _, row in grouped_df.iterrows():
-        start_idx = int(row["Frame Start"])
-        end_idx = int(row["Frame End"])
-    
-        # === 目標向量：start → end ===
-        goal_vec = np.array([
-            df["X"].iloc[end_idx] - df["X"].iloc[start_idx],
-            df["Y"].iloc[end_idx] - df["Y"].iloc[start_idx]
-        ])
-    
-        max_len = end_idx - start_idx
-        found_valid = False
-        current_len = 5  # 起始向量初始長度
-    
-        while current_len <= max_len:
-            move_range = df.iloc[start_idx : start_idx + current_len]
-    
-            if len(move_range) < 2:
-                break  # 無法構成向量
-    
-            # === 計算初始向量（首尾） ===
-            init_vec = np.array([
-                move_range["X"].iloc[-1] - move_range["X"].iloc[0],
-                move_range["Y"].iloc[-1] - move_range["Y"].iloc[0]
-            ])
-    
-            # === 若 init_vec 或 goal_vec 長度為 0，略過 ===
-            if norm(init_vec) == 0 or norm(goal_vec) == 0:
-                break
-    
-            # === 計算夾角 ===
-            cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
-    
-            # (沒有設置)若夾角小於 90 度，接受此向量 
-            if cos_theta:
-                angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
-                initial_angles.append(angle_deg)
-                found_valid = True
-                break
-    
-            # 否則繼續加長
-            current_len += 1
-    
-        # 如果找不到符合條件的向量（全部都 > 45°）
-        if not found_valid:
-            initial_angles.append(np.nan)
-    
-    # === 存回 grouped_df ===
-    grouped_df["Initial Move Angle (°)"] = initial_angles
-    
-    # === 加入四象限方向分類 ===
-    def classify_quadrant(dx, dy):
-        if dx > 0 and dy > 0:
-            return "Q1"
-        elif dx < 0 and dy > 0:
-            return "Q2"
-        elif dx < 0 and dy < 0:
-            return "Q3"
-        elif dx > 0 and dy < 0:
-            return "Q4"
-        else:
-            return "Center/Undefined"
-    
-    quadrants = []
-    for _, row in grouped_df.iterrows():
-        start_idx = int(row["Frame Start"])
-        end_idx = int(row["Frame End"])
-        dx = df["cum_yaw_deg"].iloc[end_idx] - df["cum_yaw_deg"].iloc[start_idx]
-        dy = df["cum_pitch_deg"].iloc[end_idx] - df["cum_pitch_deg"].iloc[start_idx]
-        quadrants.append(classify_quadrant(dx, dy))
-    grouped_df["Direction Quadrant"] = quadrants
-    
-    # === [7] 視覺化整體擊殺視角分群 ===
-    all_minima_deg_x = df["cum_pitch_deg"].iloc[final_minima_idx]
-    all_minima_deg_y = df["cum_yaw_deg"].iloc[final_minima_idx]
-    if show:
-        # === 繪圖開始 ===
-        plt.figure(figsize=(8, 8))
-        
-        # 背景點（全視角軌跡）
-        plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"] , alpha=0.3, s=5, label="All Points")
-        
-        # 所有最小值點
-        plt.scatter(all_minima_deg_x, all_minima_deg_y, color='blue', s=40, label="Z Minima")
-        
-        # ✅ 使用 grouped_frames 分群畫圓（轉為視角單位）
-        for group in grouped_frames:
-            group_x = df["cum_pitch_deg"].iloc[group]
-            group_y = df["cum_yaw_deg"].iloc[group]
-            plt.scatter(group_x, group_y, facecolors='none', edgecolors='red',
-                        s=120, linewidths=2)
-        
-        
-        # === 圖例與標籤 ===
-        plt.xlabel("Yaw Angle (°)")
-        plt.ylabel("Pitch Angle (°)")
-        plt.title("Z 最小值分群視覺化（以視角為單位）")
-        plt.grid(True)
-        plt.axis("equal")
-        plt.legend()
-        plt.show()
-    return grouped_df
 
 # %%
 
-def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
-    """
-    
-    根據 Z 軸局部最小值列表，自動分群擊殺動作，
-    並提供最佳擊殺起始點 (NEW Frame Start)、初始移動角度、視角象限分類，
-    最後以滑鼠速度著色顯示視角軌跡。
-    
-    parameters:
-        df (pd.DataFrame): 含 X, Y, Z 及折算後視角欄位 (cum_yaw_deg, cum_pitch_deg, speed)
-        final_minima_idx (list[int]): 已過濾的 Z 軸局部最小值 frame 索引
-        angle_merge_threshold (float): 合併視角群組閾值 (°)
-        show (bool): 是否顯示最終速度著色軌跡圖
-    
-    return:
-        grouped_df (pd.DataFrame): 包含下列欄位的擊殺群組資訊
-            - Group ID
-            - Frames
-            - Shot Count
-            - Frame Start / End / Span
-            - Initial Move Angle (°)
-            - NEW Frame Start
-            - Direction Quadrant
-    """
 
-    # --- 工具函數: 使用滑動視窗計算滑鼠移動方向起始點 ---
-    def find_directional_start(df, frame_start, frame_end,
-                                window_size=3, angle_threshold=45, min_magnitude=0.5):
-        # 計算目標向量 (start -> end)
-        goal_vec = np.array([
-            df["X"].iloc[frame_end] - df["X"].iloc[frame_start],
-            df["Y"].iloc[frame_end] - df["Y"].iloc[frame_start]
-        ])
-        if norm(goal_vec) == 0:
-            return frame_start  # 若無移動則回傳原始起點
-        # 滑動視窗: 從 start+1 開始檢查
-        for offset in range(1, frame_end - frame_start - window_size):
-            p0 = df[["X", "Y"]].iloc[frame_start + offset].values
-            # 取 moving window length 的平均
-            p1 = np.mean(df[["X", "Y"]].iloc[frame_start + offset + window_size].values, axis=0)
-            init_vec = p1 - p0
-            # 忽略太小的抖動
-            if norm(init_vec) < min_magnitude: 
-                continue
-            # 計算兩個向量夾角
-            cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
-            angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
-
-            if angle_deg <= angle_threshold:
-                return frame_start + offset  # 找到符合條件的第一個起始 frame
-
-        return frame_start
-
-    # === [1] 計算前後角度差 ===
-    angle_diffs = []
-    for i in range(len(final_minima_idx)):
-        idx_curr = final_minima_idx[i]
-        yaw_curr = df["cum_yaw_deg"].iloc[idx_curr]
-        pitch_curr = df["cum_pitch_deg"].iloc[idx_curr]
-        diff_prev = np.nan if i == 0 else np.linalg.norm([
-            yaw_curr - df["cum_yaw_deg"].iloc[final_minima_idx[i - 1]],
-            pitch_curr - df["cum_pitch_deg"].iloc[final_minima_idx[i - 1]]
-        ])
-        diff_next = np.nan if i == len(final_minima_idx) - 1 else np.linalg.norm([
-            yaw_curr - df["cum_yaw_deg"].iloc[final_minima_idx[i + 1]],
-            pitch_curr - df["cum_pitch_deg"].iloc[final_minima_idx[i + 1]]
-        ])
-        angle_diffs.append({
-            "Frame": idx_curr,
-            "Z Value": df["Z"].iloc[idx_curr],
-            "Angle_Diff_To_Prev_Minima (°)": diff_prev,
-            "Angle_Diff_To_Next_Minima (°)": diff_next
-        })
-    angle_array = pd.DataFrame(angle_diffs)[["Frame", "Angle_Diff_To_Prev_Minima (°)", "Angle_Diff_To_Next_Minima (°)"]].to_numpy()
-
-    # === [2] 合併視角差小於閾值的點 ===
-    grouped_frames = []
-    i = 0
-    last_frame = None
-    while i < len(angle_array) - 1:
-        current_group = []
-        if last_frame is not None:
-            current_group.append(last_frame)
-        current_group.append(angle_array[i][0])
-        j = i + 1
-        while j < len(angle_array):
-            if pd.isna(angle_array[j][1]) or angle_array[j][1] >= angle_merge_threshold:
-                break
-            current_group.append(angle_array[j][0])
-            j += 1
-        if len(current_group) > 1:
-            grouped_frames.append(current_group)
-            last_frame = current_group[-1]
-        else:
-            last_frame = angle_array[i][0]
-        i = j
-
-    # === [3] 建立 DataFrame ===
-    grouped_df = pd.DataFrame({
-        "Group ID": list(range(1, len(grouped_frames) + 1)),
-        "Frames": grouped_frames,
-        "Shot Count": [len(g) - 1 for g in grouped_frames],
-        "Frame Start": [min(g) for g in grouped_frames],
-        "Frame End": [max(g) for g in grouped_frames],
-    })
-    grouped_df["Frame Span"] = grouped_df["Frame End"] - grouped_df["Frame Start"]
-
-    # === [4] 初始移動角度與最佳起點 ===
-    new_starts, angles = [], []
-    for _, row in grouped_df.iterrows():
-        s, e = int(row["Frame Start"]), int(row["Frame End"])
-        new_s = find_directional_start(df, s, e)
-        new_starts.append(new_s)
-
-        goal_vec = np.array([df["X"].iloc[e] - df["X"].iloc[s], df["Y"].iloc[e] - df["Y"].iloc[s]])
-        max_len = e - s
-        found = False
-        for l in range(5, max_len + 1):
-            move = df.iloc[s:s + l]
-            init_vec = np.array([move["X"].iloc[-1] - move["X"].iloc[0], move["Y"].iloc[-1] - move["Y"].iloc[0]])
-            if norm(init_vec) == 0 or norm(goal_vec) == 0:
-                break
-            cos_theta = np.dot(init_vec, goal_vec) / (norm(init_vec) * norm(goal_vec))
-            if cos_theta:
-                angle_deg = np.degrees(np.arccos(np.clip(cos_theta, -1, 1)))
-                angles.append(angle_deg)
-                found = True
-                break
-        if not found:
-            angles.append(np.nan)
-    grouped_df["Initial Move Angle (°)"] = angles
-    grouped_df["NEW Frame Start"] = new_starts
-
-    # === [5] 象限分類 ===
-    def classify_quadrant(dx, dy):
-        if dx > 0 and dy > 0: return "Q1"
-        if dx < 0 and dy > 0: return "Q2"
-        if dx < 0 and dy < 0: return "Q3"
-        if dx > 0 and dy < 0: return "Q4"
-        return "Center/Undefined"
-    grouped_df["Direction Quadrant"] = grouped_df.apply(
-        lambda r: classify_quadrant(
-            df["cum_yaw_deg"].iloc[int(r["Frame End"])] - df["cum_yaw_deg"].iloc[int(r["Frame Start"])],
-            df["cum_pitch_deg"].iloc[int(r["Frame End"])] - df["cum_pitch_deg"].iloc[int(r["Frame Start"])],
-        ), axis=1)
-
-    # === [6] 視覺化 ===
-    if show:
-       plt.figure(figsize=(8, 8))
-       # 用 speed 決定顏色深淺
-       sc = plt.scatter(
-           df['cum_pitch_deg'], df['cum_yaw_deg'],
-           c=df['speed'], cmap='plasma', alpha=0.7, s=5,
-           label='View Angle Trajectory (colored by speed)'
-       )
-       plt.colorbar(sc, label='Mouse Speed (°/s)')  # 或 mm/s 依你的 speed 定義
-
-       # 標記所有 Z 軸局部最小值
-       minima_x = df['cum_pitch_deg'].iloc[final_minima_idx]
-       minima_y = df['cum_yaw_deg'].iloc[final_minima_idx]
-       plt.scatter(minima_x, minima_y,
-                   color='red', s=20, label='Z Minima', zorder=3)
-
-       plt.xlabel('Pitch Angle (°)')
-       plt.ylabel('Yaw Angle (°)')
-       plt.title('View Angle Trajectory Colored by Mouse Speed')
-       plt.grid(True)
-       plt.axis('equal')
-       plt.legend()
-       plt.show()
-
-    return grouped_df
-
-# %%
-
-import pandas as pd
-import numpy as np
-from numpy.linalg import norm # 導入 norm 函數，方便計算向量長度
-import matplotlib.pyplot as plt # 導入繪圖庫
-
-def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
+def findZminGroup(df, final_minima_idx, angle_merge_threshold=10, show=True):
     """
     根據 Z 軸局部最小值列表 (通常代表射擊/點擊事件)，自動分群連續或接近的擊殺動作。
     並為每個群組計算關鍵屬性，例如：
@@ -1069,141 +678,229 @@ def findZminGroup(df, final_minima_idx, angle_merge_threshold=5, show=True):
     return grouped_df
 # %%
 
-def excludeCenter(df, filtered_minima_data, grouped_df,
-                  target_length = 101,
-                  show=True):
+
+def excludeCenter_and_plot_separately(df: pd.DataFrame, grouped_df: pd.DataFrame,
+                                      yaw_range: float = 10, pitch_range: float = 10,
+                                      show: bool = True) -> pd.DataFrame:
     """
-   排除起點不在中央視角範圍的擊殺群組，並標記各群組的速度方向象限，
-   可視化剩餘群組的最終 Z 軸最小值與分群結果。
+    過濾擊殺動作群組，僅保留結束點位於視角中心區域之外的群組。
+    如果 show=True，則會分別顯示兩張視覺化圖表：
+    1. 點分佈圖：顯示所有點、保留的群組點及中心排除區域。
+    2. 箭頭圖：顯示保留群組的移動方向箭頭 (從起始幀到結束幀)。
 
-   參數:
-       df (pd.DataFrame): 包含 X, Y, Z 與視角欄位(cum_yaw_deg, cum_pitch_deg, speed)
-       filtered_minima_data (pd.DataFrame): Z 軸最小值資料 (含 Frame 欄位)
-       grouped_df (pd.DataFrame): 原始分群結果 (含 Frames, Frame Start, End 等欄位)
-       target_length (int): 標準化速度序列的長度
-       show (bool): 是否繪製可視化圖
+    Args:
+        df (pd.DataFrame): 包含原始數據的 DataFrame ('cum_yaw_deg', 'cum_pitch_deg')。
+        grouped_df (pd.DataFrame): 預先計算好的擊殺群組 DataFrame (包含 'Frames' 列表)。
+        yaw_range (float): 中心區域的水平半徑 (度)。
+        pitch_range (float): 中心區域的垂直半徑 (度)。
+        show (bool): 是否顯示視覺化圖表。
 
-   返回:
-       excldueCen_grouped_df (pd.DataFrame): 排除後的分群結果
-   """
-    # === o. 篩選機制，只有從中心出發才會計算 ===
-    yaw_center = (df["cum_yaw_deg"].max() + df["cum_yaw_deg"].min()) / 2
-    pitch_center = (df["cum_pitch_deg"].max() + df["cum_pitch_deg"].min()) / 2
-    
-    yaw_range = 10   # 水平方向 ±10°
-    pitch_range = 10  # 垂直方向 ±10°
-    
-    filtered_minima_idx = filtered_minima_data["Frame"].tolist()
-    
-    central_minima_frames = []
-    
-    for idx in filtered_minima_idx:
-        yaw = df["cum_yaw_deg"].iloc[idx]
-        pitch = df["cum_pitch_deg"].iloc[idx]
-        
-        if (abs(yaw - yaw_center) <= yaw_range) and (abs(pitch - pitch_center) <= pitch_range):
-            central_minima_frames.append(idx)
-    
-    
-    # 1. central_minima_frames 本身就是一维的 frame 索引列表
-    central_flat = set(central_minima_frames)
-    
-    # 2. 只要该群组的第一帧不在 central_flat，就排除它
-    excludeCen_idx = []
-    for i, frames in enumerate(grouped_df["Frames"]):
-        first_frame = int(frames[0])
-        if first_frame not in central_flat:
-            excludeCen_idx.append(i)
-    
-    # 3. （可选）去重
-    excludeCen_idx = list(dict.fromkeys(excludeCen_idx))
-    
-    
-    excldueCen_grouped_df = grouped_df.iloc[excludeCen_idx, :].reset_index(drop=True)
-    
-    
-    standardized_data = pd.DataFrame(np.zeros([target_length,
-                                               len(grouped_df)]))
-    direction_labels = []  # 用來儲存象限
-    for idx in range(len(grouped_df)):
-        # 取出路徑
-        # 從速度為正值在開始取
-        start_frame = int(grouped_df["Frames"][idx][0])
-        end_frame = int(grouped_df["Frames"][idx][-1])
-        signal_trial = df.iloc[start_frame:end_frame, :]
-        
-        original_length = len(signal_trial["angle_speed_dps"])
-        sequence = signal_trial["angle_speed_dps"]
-        if original_length == target_length:
-            standardized_data.iloc[:, idx] = sequence
-        elif original_length > 1:
-            x_original = np.linspace(0, 1, original_length)
-            x_target = np.linspace(0, 1, target_length)
-            interp_func = interp1d(x_original, sequence, kind='cubic', fill_value="extrapolate")
-            standardized_data.iloc[:, idx] = interp_func(x_target).tolist()
-        # 計算速度方向，並區分為四個象限，新增註記
-        # --- 計算速度方向 ΔX, ΔY ---
-        start_x = signal_trial["X"].iloc[0]
-        start_y = signal_trial["Y"].iloc[0]
-        end_x = signal_trial["X"].iloc[-1]
-        end_y = signal_trial["Y"].iloc[-1]
-        delta_x = end_x - start_x
-        delta_y = end_y - start_y
-    
-        # --- 分象限 ---
-        if delta_x > 0 and delta_y > 0:
-            direction = "Q1"
-        elif delta_x < 0 and delta_y > 0:
-            direction = "Q2"
-        elif delta_x < 0 and delta_y < 0:
-            direction = "Q3"
-        elif delta_x > 0 and delta_y < 0:
-            direction = "Q4"
-        else:
-            direction = "Undefined"
-    
-        direction_labels.append(direction)
-    
-    # 新增欄位至 grouped_df
-    grouped_df["Direction Quadrant"] = direction_labels
-    
-    
+    Returns:
+        pd.DataFrame: 經過濾後的 DataFrame，僅包含結束點不在中心的群組。
+    """
+
+    # === 1. 定義視角中心區域 ===
+    # (這裡繼續使用中位數，你可根據需要更改為 mean 或 min/max 中點)
+    try:
+        yaw_center = df["cum_yaw_deg"].median()
+        pitch_center = df["cum_pitch_deg"].median()
+        print(f"【基於中位數】視角中心計算結果: Yaw={yaw_center:.2f}°, Pitch={pitch_center:.2f}°")
+        print(f"中心區域定義: Yaw ±{yaw_range}°, Pitch ±{pitch_range}°")
+    except KeyError as e:
+        print(f"錯誤：輸入的 df 缺少必要的欄位 {e}")
+        return pd.DataFrame() # 返回空的 DataFrame 或拋出異常
+
+    # === 2. 向量化過濾 ===
+    temp_grouped = grouped_df.copy()
+
+    def get_last_frame(frames_list):
+        if isinstance(frames_list, list) and len(frames_list) > 0:
+             # 確保幀索引是有效的數值類型，並處理可能的錯誤
+             try:
+                 return int(frames_list[-1])
+             except (ValueError, TypeError):
+                 return np.nan # 如果轉換失敗，返回 NaN
+        return np.nan
+
+    if 'Frames' not in temp_grouped.columns:
+        print("錯誤：grouped_df 缺少 'Frames' 欄位")
+        return pd.DataFrame()
+
+    temp_grouped['last_frame'] = temp_grouped['Frames'].apply(get_last_frame)
+
+    # 檢查必要的座標欄位是否存在
+    if 'cum_yaw_deg' not in df.columns or 'cum_pitch_deg' not in df.columns:
+        print("錯誤：df 缺少 'cum_yaw_deg' 或 'cum_pitch_deg' 欄位")
+        return pd.DataFrame()
+
+    yaw_map = df['cum_yaw_deg']
+    pitch_map = df['cum_pitch_deg']
+
+    temp_grouped['last_yaw'] = temp_grouped['last_frame'].map(yaw_map)
+    temp_grouped['last_pitch'] = temp_grouped['last_frame'].map(pitch_map)
+
+    valid_coords_mask = temp_grouped['last_yaw'].notna() & temp_grouped['last_pitch'].notna()
+
+    is_in_center_mask = pd.Series(False, index=temp_grouped.index)
+    # 僅在有效座標上計算是否在中心
+    if valid_coords_mask.any():
+        is_in_center_mask.loc[valid_coords_mask] = (
+            (abs(temp_grouped.loc[valid_coords_mask, 'last_yaw'] - yaw_center) <= yaw_range) &
+            (abs(temp_grouped.loc[valid_coords_mask, 'last_pitch'] - pitch_center) <= pitch_range)
+        )
+
+    # 保留條件：座標有效 且 不在中心
+    keep_mask = valid_coords_mask & (~is_in_center_mask)
+    filtered_grouped_df = grouped_df.loc[keep_mask].reset_index(drop=True)
+
+    # === 3. 計算與報告排除數量 ===
+    original_count = len(grouped_df)
+    filtered_count = len(filtered_grouped_df)
+    excluded_count = original_count - filtered_count
+    print(f"原始群組數量: {original_count}")
+    print(f"因 **結束點在中心區域** 或 **資料無效/缺失** 而被排除的群組數量: {excluded_count}")
+    print(f"過濾後剩餘群組數量: {filtered_count}")
+
+    # === 4. 視覺化 (明確分為兩張圖) ===
     if show:
-        excldueCen_minima_idx = excldueCen_grouped_df["Frames"].tolist()
-        last_values = [int(sublist[-1]) for sublist in excldueCen_minima_idx]
-        """
-        這裡有問題，剛剛修改到這裡 2025.05.01 13:46
-        """
-        all_minima_deg_x = df["cum_pitch_deg"].iloc[last_values]
-        all_minima_deg_y = df["cum_yaw_deg"].iloc[last_values]
-        plt.figure(figsize=(10, 8))
-        
-        # 背景點（全視角軌跡）
-        plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.3, s=5, label="All Points")
-        
-        # 所有最小值點
-        plt.scatter(all_minima_deg_x, all_minima_deg_y, color='blue', s=40, label="Z Minima")
-        
-        
-        # ✅ 使用 grouped_df 分群畫圓（轉為視角單位）
-        for group in excldueCen_grouped_df["Frames"]:
-            print(group)
-            group_x = df["cum_pitch_deg"].iloc[group]
-            group_y = df["cum_yaw_deg"].iloc[group]
-            plt.scatter(group_x, group_y, facecolors='none', edgecolors='red',
-                        s=120, linewidths=2)
-        
-        
-        # === 圖例與標籤 ===
-        plt.xlabel("Yaw Angle (°)")
-        plt.ylabel("Pitch Angle (°)")
-        plt.title("Z 最小值分群視覺化（以視角為單位）")
-        plt.grid(True)
-        plt.axis("equal")
-        plt.legend()
-        plt.show()
-    return excldueCen_grouped_df
+        if filtered_grouped_df.empty:
+            print("沒有可供顯示的過濾後群組。")
+        else:
+            # --- 圖 1: 點分佈與中心區域 ---
+            try:
+                plt.figure(figsize=(10, 8))
+                ax1 = plt.gca()
+                # 背景點
+                ax1.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.1, s=5, color='gray', label="所有數據點")
+                # 保留群組的所有點
+                all_retained_frames_plot1 = [frame for frames_list in filtered_grouped_df["Frames"] for frame in frames_list if isinstance(frames_list, list)]
+                # 過濾掉無效的幀索引 (例如 NaN 或非數字)
+                valid_frame_indices = [f for f in all_retained_frames_plot1 if pd.notna(f) and isinstance(f, (int, float))]
+                valid_retained_frames_plot1 = df.index.intersection(valid_frame_indices)
 
+                if not valid_retained_frames_plot1.empty:
+                     ax1.scatter(df.loc[valid_retained_frames_plot1, "cum_pitch_deg"], df.loc[valid_retained_frames_plot1, "cum_yaw_deg"],
+                                 color='blue', s=20, alpha=0.6, label="保留群組的點", zorder=3)
+                # 繪製每個被保留群組的範圍
+                for idx, row in filtered_grouped_df.iterrows(): # 使用 idx 避免與 plt 變數衝突
+                    group_frames = row["Frames"]
+                    if not group_frames: continue
+
+                    try:
+                        group_pitch = df["cum_pitch_deg"].loc[group_frames]
+                        group_yaw = df["cum_yaw_deg"].loc[group_frames]
+                        # 使用半透明紅色邊框標記群組
+                        plt.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red',
+                                    s=80, linewidths=1.5, alpha=0.7, label="保留的群組範圍" if idx == 0 else "", zorder=2)
+                    except KeyError:
+                        print(f"警告：繪製群組 {idx} 時無法在 df 中找到部分幀索引，該群組可能未完整繪製。")
+                
+                # 中心區域框
+                rect_pitch = [pitch_center - pitch_range, pitch_center + pitch_range, pitch_center + pitch_range, pitch_center - pitch_range, pitch_center - pitch_range]
+                rect_yaw = [yaw_center - yaw_range, yaw_center - yaw_range, yaw_center + yaw_range, yaw_center + yaw_range, yaw_center - yaw_range]
+                ax1.plot(rect_pitch, rect_yaw, color='green', linestyle='--', linewidth=2, label="中心區域 (排除用)")
+                # 圖表元素
+                ax1.set_xlabel("Pitch Angle (°)")
+                ax1.set_ylabel("Yaw Angle (°)")
+                ax1.set_title("過濾後的擊殺群組視覺化 (點分佈與排除區域)")
+                ax1.grid(True)
+                ax1.axis("equal")
+                handles, labels = ax1.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                ax1.legend(by_label.values(), by_label.keys())
+                plt.show() # 顯示第一張圖
+            except Exception as e:
+                print(f"繪製第一張圖時發生錯誤: {e}")
+
+
+            # --- 圖 2: 移動方向箭頭 ---
+            try:
+                plt.figure(figsize=(10, 8))
+                ax2 = plt.gca()
+                # 可選: 背景點
+                ax2.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.05, s=5, color='gray', label="所有數據點 (背景)")
+                # 可選: 保留群組的點
+                if not valid_retained_frames_plot1.empty: # 使用上面計算過的索引
+                     ax2.scatter(df.loc[valid_retained_frames_plot1, "cum_pitch_deg"], df.loc[valid_retained_frames_plot1, "cum_yaw_deg"],
+                                 color='blue', s=10, alpha=0.3, label="保留群組的點 (參考)", zorder=2)
+
+                arrow_drawn = False # 圖例標籤控制
+                # 遍歷繪製箭頭
+                for idx, row in filtered_grouped_df.iterrows():
+                    group_frames = row["Frames"]
+                    if isinstance(group_frames, list) and len(group_frames) >= 2:
+                        try:
+                            start_frame = int(group_frames[0])
+                            end_frame = int(group_frames[-1])
+
+                            # 獲取座標 (增加錯誤檢查)
+                            if start_frame not in df.index or end_frame not in df.index:
+                                print(f"警告：群組 {idx} 的開始幀 {start_frame} 或結束幀 {end_frame} 不在 df 的索引中。")
+                                continue
+
+                            pitch_start = df.loc[start_frame, "cum_pitch_deg"]
+                            yaw_start = df.loc[start_frame, "cum_yaw_deg"]
+                            pitch_end = df.loc[end_frame, "cum_pitch_deg"]
+                            yaw_end = df.loc[end_frame, "cum_yaw_deg"]
+
+                            # 檢查座標是否有效 (非 NaN)
+                            if pd.isna(pitch_start) or pd.isna(yaw_start) or pd.isna(pitch_end) or pd.isna(yaw_end):
+                                print(f"警告：群組 {idx} 的開始或結束座標無效 (NaN)。")
+                                continue
+
+                            # 繪製箭頭
+                            ax2.annotate(
+                                '', xy=(pitch_end, yaw_end), xytext=(pitch_start, yaw_start),
+                                arrowprops=dict(arrowstyle="->", color="lightsteelblue", lw=1, linestyle="--", shrinkA=5, shrinkB=5),
+                                zorder=3 )
+                            if not arrow_drawn:
+                                ax2.plot([], [], color='red', lw=1, label='擊殺動作方向 (開始->結束)')
+                                arrow_drawn = True
+                        except (KeyError, ValueError, TypeError) as frame_err:
+                             print(f"警告：處理群組 {idx} 的幀 {group_frames} 時出錯: {frame_err}")
+                             continue # 跳過這個群組的箭頭繪製
+                # 繪製每個被保留群組的範圍
+                for idx, row in filtered_grouped_df.iterrows(): # 使用 idx 避免與 plt 變數衝突
+                    group_frames = row["Frames"]
+                    if not group_frames: continue
+    
+                    try:
+                        group_pitch = df["cum_pitch_deg"].loc[group_frames]
+                        group_yaw = df["cum_yaw_deg"].loc[group_frames]
+                        # 使用半透明紅色邊框標記群組
+                        plt.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red',
+                                    s=80, linewidths=1.5, alpha=0.7, label="保留的群組範圍" if idx == 0 else "", zorder=2)
+                    except KeyError:
+                        print(f"警告：繪製群組 {idx} 時無法在 df 中找到部分幀索引，該群組可能未完整繪製。")
+        
+                # 中心區域框
+                rect_pitch = [pitch_center - pitch_range, pitch_center + pitch_range, pitch_center + pitch_range, pitch_center - pitch_range, pitch_center - pitch_range]
+                rect_yaw = [yaw_center - yaw_range, yaw_center - yaw_range, yaw_center + yaw_range, yaw_center + yaw_range, yaw_center - yaw_range]
+                ax2.plot(rect_pitch, rect_yaw, color='green', linestyle='--', linewidth=2, label="中心區域 (排除用)")
+                # 圖表元素
+                ax2.set_xlabel("Pitch Angle (°)")
+                ax2.set_ylabel("Yaw Angle (°)")
+                ax2.set_title("過濾後擊殺群組的移動方向箭頭")
+                ax2.grid(True)
+                ax2.axis("equal")
+                handles, labels = ax2.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                if by_label: ax2.legend(by_label.values(), by_label.keys())
+                plt.show() # 顯示第二張圖
+            except Exception as e:
+                print(f"繪製第二張圖時發生錯誤: {e}")
+
+    # === 5. 返回結果 ===
+    return filtered_grouped_df
+
+# --- 使用範例 ---
+# 假設 df_data 和 initial_groups 已經準備好
+# final_groups = excludeCenter_and_plot_separately(df_data, initial_groups, yaw_range=10, pitch_range=10, show=True)
+# print(f"最終保留的群組數量: {len(final_groups)}")
+
+# --- 如何使用 ---
+# 假設 df 和 initial_grouped_df 已經準備好
+# final_filtered_groups = excludeCenter_with_arrow_plot(df, initial_grouped_df, yaw_range=15, pitch_range=15, show=True)
 # %%
 
 # 將單位從mm轉換成視角
@@ -1214,13 +911,14 @@ df = ConverUnit2Angle(combine_dict, descriptions)
 filtered_minima_data = find_Zaxis_min(df, show=True)
 filtered_minima_idx = filtered_minima_data["Frame"].tolist()
 # 2.1.2. 找出完成擊殺的 frame 以及上一個視角大於閾值的視角位置
-"""
-仍然需要再加上依照速度方向的多重條件
-"""
 grouped_df = findZminGroup(df, filtered_minima_idx)
 # 2.2. 找出從中心出發的開槍軌跡
 # 2025.04.30 接下來從這邊開始
-excldueCen_grouped_df = excludeCenter(df, filtered_minima_data, grouped_df)
+excldueCen_grouped_df = excludeCenter_and_plot_separately(df, grouped_df, show=True)
+
+"""
+準備做標準化處理
+"""
 
 
 
@@ -1247,8 +945,6 @@ excldueCen_grouped_df = excludeCenter(df, filtered_minima_data, grouped_df)
 # delta_y_mm = df["Y"].diff().fillna(0)
 
 
-
-
 # %%
 """
     2.2. 計算
@@ -1269,19 +965,7 @@ excldueCen_grouped_df = excludeCenter(df, filtered_minima_data, grouped_df)
         2.2.2. 不同方向的計算: 全部方向綜合, 分四個方向 (四象限)
 """
 
-
-
-
-# 修正 不應該使用初始角度作為區分
-
-# 排除所有初始角度大於45度的trial    
-final_grouped_df = cen_grouped_df[(cen_grouped_df["Initial Move Angle (°)"] <= 45) \
-                                  & (cen_grouped_df["Frame Span"] > 20)].reset_index(drop=True)
-# 多做一個統計 去掉outline
-
 # 將每一筆資料都標準化成固定長度
-
-
 
 
 # === b. Mouse Speed (°/s) ===
@@ -1289,9 +973,8 @@ max_angle_speed = max(df["angle_speed_dps"])
 mean_angle_speed = np.mean(df["angle_speed_dps"])
 # === c. Initial Move Angle: ===
 
+mean_initial_move_angle = np.mean(excldueCen_grouped_df['Initial Move Angle (°)'])
 
-mean_initial_move_angle = np.mean(cen_grouped_df["Initial Move Angle (°)"]\
-                                  [cen_grouped_df["Initial Move Angle (°)"] <= 45])
 # === d. Full Path Time (單位 Second)===
 path_time = np.mean(cen_grouped_df["Frame Span"])\
     /descriptions['motion info']['frame_rate']
