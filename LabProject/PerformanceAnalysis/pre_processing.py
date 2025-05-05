@@ -43,199 +43,1112 @@ Created on Fri Apr 11 09:28:13 2025
 
 @author: Hsin.YH.Yang
 """
+
 import sys
 # 路徑改成你放自己code的資料夾
 sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import argrelextrema
+from scipy.signal import argrelextrema, savgol_filter, butter, filtfilt
 from numpy.linalg import norm
 from scipy.interpolate import interp1d
+import warnings
+import os
+from typing import Dict, Any, Optional, Tuple, List
+import ezc3d
 
 import Spider_function as func
 plt.rcParams['font.sans-serif'] = ['Noto Sans TC']  # 改為你實際有的
 plt.rcParams['axes.unicode_minus'] = False    # 避免座標軸負號亂碼
 
-# %%
+# %% Reading all of data path
+# using a recursive loop to traverse each folder
+# and find the file extension has .csv
+def Read_File(file_path, file_type, subfolder=None):
+    '''
+    Parameters
+    ----------
+    x : str
+        給予欲讀取資料之路徑.
+    y : str
+        給定欲讀取資料之副檔名.
+    subfolder : boolean, optional
+        是否子資料夾一起讀取. The default is 'None'.
 
-vicon2cortex = {'MOS1': 'M1',
-                'MOS2': 'M2',
-                'MOS3': 'M3',
-                'MOS4': 'M4',
-                'RHO': 'R.Shoulder',
-                'RSHO': 'R.Shoulder',
-                'RUEL': 'R.Elbow.Lat',
-                'RUEM': 'R.Elbow.Med',
-                'RUS': 'R.Wrist.Uln',
-                'RRS': 'R.Wrist.Rad',
-                'RTB1': 'R.Thumb1',
-                'RTB2': 'R.Thumb2',
-                'RTB3': 'R.Thumb3',
-                'RID1': 'R.I.Finger1',
-                'RID2': 'R.I.Finger2',
-                'RID3': 'R.I.Finger3',
-                'RMD1': 'R.M.Finger1',
-                'RMD2': 'R.M.Finger2',
-                'RMD3': 'R.M.Finger3',
-                'RRG1': 'R.R.Finger1',                
-                'RRG2': 'R.R.Finger2',
-                'RLT1': 'R.P.Finger1',
-                'RLT2': 'R.P.Finger2',                
+    Returns
+    -------
+    csv_file_list : list
+        回給所有路徑下的資料絕對路徑.
+
+    '''
+    # if subfolder = True, the function will run with subfolder
+
+    csv_file_list = []
+    
+    if subfolder:
+        file_list_1 = []
+        for dirPath, dirNames, fileNames in os.walk(file_path):
+            # file_list = os.walk(folder_name)
+            file_list_1.append(dirPath)
+        # need to change here [1:]
+        for ii in file_list_1[1:]:
+            file_list = os.listdir(ii)
+            for iii in file_list:
+                if os.path.splitext(iii)[1] == file_type:
+                    # replace "\\" to '/', due to MAC version
+                    file_list_name = ii + '\\' + iii
+                    csv_file_list.append(file_list_name)
+    else:
+        folder_list = os.listdir(file_path)                
+        for i in folder_list:
+            if os.path.splitext(i)[1] == file_type:
+                # replace "\\" to '/', due to MAC version
+                file_list_name = file_path + "\\" + i
+                csv_file_list.append(file_list_name)                
+        
+    return csv_file_list
+
+
+# %%
+# --- Main Function ---
+def read_c3d(path: str,
+             process_forceplate: bool = True, # Renamed for clarity
+             process_analog: bool = True,     # Renamed for clarity
+             prefix_to_remove: Optional[List[str]] = None,
+             rename_map: Optional[Dict[str, str]] = None,
+             marker_cutoff: Optional[float] = 10.0, # Default cutoff 10Hz for markers
+             analog_cutoff: Optional[float] = None, # Default no filter for general analog
+             fp_cutoff: Optional[float] = 20.0,     # Default cutoff 20Hz for force plates
+             filter_order: int = 4
+             ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Reads a C3D file, processes marker, force plate, and analog data,
+    including interpolation and optional low-pass filtering.
+
+    Args:
+        path (str): Path to the C3D file.
+        process_forceplate (bool): Whether to process force plate data.
+        process_analog (bool): Whether to process general analog data (excluding FP channels if processed separately).
+        prefix_to_remove (Optional[List[str]]): List of prefixes to remove from marker labels.
+        rename_map (Optional[Dict[str, str]]): Dictionary for renaming marker labels {old: new}.
+        marker_cutoff (Optional[float]): Cutoff frequency (Hz) for marker data filtering. Set to None or 0 to disable.
+        analog_cutoff (Optional[float]): Cutoff frequency (Hz) for general analog data filtering. Set to None or 0 to disable.
+        fp_cutoff (Optional[float]): Cutoff frequency (Hz) for force plate data (Force, Moment, COP) filtering. Set to None or 0 to disable.
+        filter_order (int): Order for the Butterworth filter.
+
+    Returns:
+        Tuple[Dict[str, Any], Dict[str, Any]]:
+            - combine_dict: Dictionary containing processed data ("markers", "FP", "analog").
+            - descriptions: Dictionary containing metadata ("motion_info", "analog_info", "fp_info").
+    """
+    # --- Helper Function for Filtering ---
+    def _lowpass_filter(data: np.ndarray, fs: float, cutoff: Optional[float], order: int = 4) -> np.ndarray:
+        """
+        Applies a zero-phase low-pass Butterworth filter to the data.
+
+        Args:
+            data (np.ndarray): Data to filter (1D or 2D, time along axis 0).
+            fs (float): Sampling frequency.
+            cutoff (Optional[float]): Cutoff frequency. If None or <= 0, no filtering is applied.
+            order (int): Filter order.
+
+        Returns:
+            np.ndarray: Filtered data or original data if filtering is skipped.
+        """
+        if cutoff is None or cutoff <= 0:
+            # print("Debug: Filtering skipped (cutoff is None or <= 0)")
+            return data # No filtering needed
+        if fs <= 0:
+            print(f"Warning: Invalid sampling frequency ({fs}Hz). Skipping filter.")
+            return data
+
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+
+        if normal_cutoff >= 1: # Cutoff frequency is too high
+             print(f"Warning: Cutoff frequency ({cutoff}Hz) is >= Nyquist frequency ({nyq}Hz). Skipping filter.")
+             return data
+        if normal_cutoff <= 0: # Cutoff frequency is too low
+            print(f"Warning: Cutoff frequency ({cutoff}Hz) results in non-positive normalized cutoff. Skipping filter.")
+            return data
+
+        try:
+            b, a = butter(order, normal_cutoff, btype='low', analog=False)
+        except ValueError as e:
+            print(f"Warning: Could not create Butterworth filter (fs={fs}, cutoff={cutoff}, order={order}). Error: {e}. Skipping filter.")
+            return data
+
+        # Apply filter column by column for 2D data (like markers [N_frames, 3] or FP components [N_frames, 3])
+        # Ensure data is float for filtering
+        data_float = data.astype(float)
+        filtered_data = np.zeros_like(data_float)
+
+        if data_float.ndim == 1:
+             # Avoid filtering if data length is less than padlen (default is 3 * max(len(a), len(b)))
+             padlen = 3 * max(len(b), len(a))
+             if len(data_float) <= padlen:
+                 print(f"Warning: Data length ({len(data_float)}) is too short for filter padlen ({padlen}). Skipping filter.")
+                 return data
+             filtered_data = filtfilt(b, a, data_float)
+        elif data_float.ndim == 2:
+             padlen = 3 * max(len(b), len(a))
+             if data_float.shape[0] <= padlen:
+                 print(f"Warning: Data length ({data_float.shape[0]}) is too short for filter padlen ({padlen}). Skipping filter.")
+                 return data
+             for i in range(data_float.shape[1]):
+                 filtered_data[:, i] = filtfilt(b, a, data_float[:, i])
+        else:
+             print("Warning: Filtering currently only supported for 1D or 2D data. Skipping filter.")
+             return data # Return original data if not 1D/2D
+
+        # print(f"Debug: Filtering applied with fs={fs}, cutoff={cutoff}")
+        return filtered_data
+
+    # --- Helper Function for Interpolation ---
+    def _interpolate_data(data: np.ndarray) -> np.ndarray:
+        """
+        Interpolates missing data (represented by 0 or NaN) using linear interpolation
+        followed by forward and backward fill.
+
+        Warning: Replaces ALL zeros with NaN before interpolation. This might be
+                 undesirable if zero is a valid data point.
+
+        Args:
+            data (np.ndarray): Input data array (time along axis 0).
+
+        Returns:
+            np.ndarray: Interpolated data array.
+        """
+        if data is None or data.size == 0:
+            return np.array([]) # Return empty if input is empty
+
+        df = pd.DataFrame(data)
+        # Warning: Replacing all zeros with NaN might affect valid zero data points.
+        df.replace(0, np.nan, inplace=True)
+
+        # Check if all values became NaN after replacing zeros
+        if df.isnull().all().all():
+             print("Warning: All data points became NaN after replacing zeros. Cannot interpolate.")
+             # Return original data (or perhaps zeros/NaNs based on desired behavior)
+             return data # Or df.fillna(0).values or data (which might be all zeros)
+
+        # Use linear interpolation first
+        df = df.interpolate(method='cubic', axis=0, limit_direction='both') # limit_direction helps with start/end NaNs
+
+        # Use ffill and bfill to handle any remaining NaNs (e.g., at the very start/end if limit_direction='both' wasn't enough)
+        df.ffill(inplace=True)
+        df.bfill(inplace=True)
+
+        # Final check if any NaNs persist (shouldn't happen with ffill/bfill, but as a safeguard)
+        if df.isnull().values.any():
+            print("Warning: NaNs remain after interpolation and fill. Filling with 0.")
+            df.fillna(0, inplace=True) # Fill any persistent NaNs with 0 as a last resort
+
+        return df.values
+
+    # --- Helper Function for Marker Processing ---
+    def _process_markers(c3d_data: ezc3d.c3d, marker_cutoff: Optional[float], filter_order: int,
+                         prefix_to_remove: Optional[List[str]], rename_map: Optional[Dict[str, str]]) -> Tuple[Dict[str, Any], Dict[str, Any], np.ndarray]:
+        """Processes marker data: extraction, renaming, interpolation, filtering."""
+        points_data = c3d_data['data']['points']
+        points_header = c3d_data['header']['points']
+        points_params = c3d_data['parameters']['POINT']
+
+        marker_labels = points_params.get('LABELS', {}).get('value', [])
+        marker_units = points_params.get('UNITS', {}).get('value', [""])[0] # Usually mm
+        fs = points_header.get('frame_rate', 0.0)
+        num_frames = points_data.shape[2]
+        num_markers = points_data.shape[1]
+
+        if len(marker_labels) != num_markers:
+            print(f"Warning: Number of marker labels ({len(marker_labels)}) does not match number of markers in data ({num_markers}). Using generic names.")
+            marker_labels = [f"Marker_{i+1}" for i in range(num_markers)]
+
+        # --- Label Handling (Prefix Removal & Renaming) ---
+        processed_labels = list(marker_labels) # Copy the list
+        if prefix_to_remove:
+            for prefix in prefix_to_remove:
+                processed_labels = [label.replace(prefix, "") for label in processed_labels]
+        if rename_map:
+            temp_labels = list(processed_labels) # Work on a copy
+            for original, new in rename_map.items():
+                temp_labels = [label.replace(original, new) for label in temp_labels]
+            processed_labels = temp_labels
+
+        # --- Data Extraction & Initial Dictionary Creation ---
+        marker_data_raw = {}
+        for i, marker_name in enumerate(processed_labels):
+            # Extract X, Y, Z coordinates. Data shape is (4, n_markers, n_frames)
+            # The 4th row is usually camera contribution/residual, we only need first 3
+            marker_data_raw[marker_name] = points_data[:3, i, :].T # Transpose to get (n_frames, 3)
+
+        # --- Interpolation ---
+        print("Interpolating marker data...")
+        marker_data_interp = {key: _interpolate_data(value) for key, value in marker_data_raw.items()}
+
+        # --- Filtering ---
+        print("Filtering marker data...")
+        marker_data_filt = {}
+        if fs > 0 and marker_cutoff is not None and marker_cutoff > 0:
+            for key, value in marker_data_interp.items():
+                if value.ndim == 2 and value.shape[1] == 3: # Ensure it's (N, 3)
+                     marker_data_filt[key] = _lowpass_filter(value, fs, marker_cutoff, order=filter_order)
+                else:
+                     print(f"Warning: Marker data '{key}' has unexpected shape {value.shape}. Skipping filter.")
+                     marker_data_filt[key] = value # Keep original if shape is wrong
+        else:
+            print("Skipping marker filtering (fs invalid or cutoff not specified).")
+            marker_data_filt = marker_data_interp # Use interpolated if not filtering
+
+        # --- Time Vector ---
+        last_frame_idx = points_header.get('last_frame', num_frames - 1) # Use actual last frame index if available
+        duration = (last_frame_idx - points_header.get('first_frame', 0)) / fs if fs > 0 else 0
+        # Ensure num matches the actual number of frames extracted
+        time_vector = np.linspace(0, duration, num=num_frames)
+        marker_data_filt["time"] = time_vector
+
+        # --- Motion Info Dictionary ---
+        motion_info = {
+            "frame_rate": fs,
+            "first_frame": points_header.get('first_frame', 0),
+            "last_frame": last_frame_idx,
+            "num_frames": num_frames,
+            "num_markers": num_markers,
+            "UNITS": marker_units,
+            "LABELS": processed_labels # Store the final processed labels
+        }
+
+        return marker_data_filt, motion_info, time_vector # Return time_vector separately for potential use
+
+    # --- Helper Function for Force Plate Processing ---
+    def _process_force_plates(c3d_data: ezc3d.c3d, analog_fs: float, fp_cutoff: Optional[float], filter_order: int) -> Optional[Dict[str, Any]]:
+        """Processes force plate data: extraction, unit conversion, filtering."""
+        if 'FORCE_PLATFORM' not in c3d_data['parameters'] or 'platform' not in c3d_data['data']:
+            print("No force plate parameter or data found.")
+            return None
+
+        fp_params = c3d_data['parameters']['FORCE_PLATFORM']
+        fp_data = c3d_data['data']['platform']
+        num_fp_used = fp_params.get('USED', {}).get('value', [0])[0]
+
+        if num_fp_used <= 0:
+            print("No force plates marked as 'used'.")
+            return None
+
+        print(f"Processing {num_fp_used} force plate(s)...")
+        fp_data_processed = {}
+        fp_info = {"num_plates": num_fp_used, "type": fp_params.get('TYPE', {}).get('value', [])}
+
+        for i in range(num_fp_used):
+            platform_idx = i # Assuming data corresponds directly to 'used' index
+            if platform_idx >= len(fp_data):
+                 print(f"Warning: Mismatch between 'used' count ({num_fp_used}) and available platform data ({len(fp_data)}). Skipping FP {i+1}.")
+                 continue
+
+            pf_label = f'FP{i+1}'
+            platform = fp_data[platform_idx]
+
+            # Extract raw data (transpose to get [N_frames, 3])
+            force_raw = platform.get('force', np.array([])).T
+            moment_raw = platform.get('moment', np.array([])).T
+            cop_raw = platform.get('center_of_pressure', np.array([])).T
+
+            # --- Unit Conversion (as per original comments, verify correctness for your system) ---
+            # Force: N (assuming input is N)
+            force_converted = force_raw
+            # Moment: Nmm -> Nm (divide by 1000)
+            moment_converted = moment_raw / 1000.0
+            # COP: mm -> mm (No conversion needed if target unit is mm)
+            # Original code divided by 10 (mm -> cm?), keeping it but it seems unusual.
+            # If target is meters, divide by 1000. If target is mm, keep as is.
+            cop_converted = cop_raw # / 10.0 # Uncomment and adjust if unit conversion is desired
+
+            # --- Filtering ---
+            # Warning: Filtering COP directly can be problematic. It's often better to
+            # filter forces/moments and recalculate COP if high accuracy is needed.
+            force_filt = _lowpass_filter(force_converted, analog_fs, fp_cutoff, filter_order)
+            moment_filt = _lowpass_filter(moment_converted, analog_fs, fp_cutoff, filter_order)
+            cop_filt = _lowpass_filter(cop_converted, analog_fs, fp_cutoff, filter_order) # Filter calculated COP
+
+            fp_data_processed[pf_label] = {
+                # Store corners if needed, transpose for easier interpretation [4, 3]
+                "corners": fp_params.get('CORNERS', {}).get('value', np.array([]))[:, :, i].T if fp_params.get('CORNERS', {}).get('value', np.array([])).size > 0 else np.array([]),
+                "force": force_filt,
+                "moment": moment_filt,
+                "cop": cop_filt
+            }
+            # Add origin info if available
+            if 'ORIGIN' in fp_params and fp_params['ORIGIN']['value'].shape[1] > i:
+                 fp_data_processed[pf_label]["origin"] = fp_params['ORIGIN']['value'][:, i]
+
+
+        fp_info.update({
+                "caution": "Units based on typical C3D export; verify for your system.",
+                "Force_unit": "N",
+                "Moment_unit": "Nm", # After conversion from Nmm
+                "COP_unit": "mm" # Or 'cm' if divided by 10, or 'm' if divided by 1000
+            })
+
+        return {"data": fp_data_processed, "info": fp_info}
+
+    # --- Helper Function for Analog Processing ---
+    def _process_analog_data(c3d_data: ezc3d.c3d, analog_fs: float, analog_cutoff: Optional[float], filter_order: int) -> Optional[Dict[str, Any]]:
+        """Processes general analog data: extraction, filtering."""
+        if 'ANALOG' not in c3d_data['parameters'] or 'analogs' not in c3d_data['data']:
+            print("No analog parameter or data found.")
+            return None
+
+        analog_params = c3d_data['parameters']['ANALOG']
+        analog_data = c3d_data['data']['analogs'] # Shape (1, n_channels, n_analog_frames)
+        num_analog_channels = analog_data.shape[1]
+        analog_labels = analog_params.get('LABELS', {}).get('value', [])
+        analog_units = analog_params.get('UNITS', {}).get('value', [])
+        analog_scales = analog_params.get('SCALE', {}).get('value', np.ones(num_analog_channels))
+        analog_offsets = analog_params.get('OFFSET', {}).get('value', np.zeros(num_analog_channels))
+
+        if len(analog_labels) != num_analog_channels:
+            print(f"Warning: Number of analog labels ({len(analog_labels)}) does not match number of channels ({num_analog_channels}). Using generic names.")
+            analog_labels = [f"Analog_{i+1}" for i in range(num_analog_channels)]
+        if len(analog_units) != num_analog_channels:
+            analog_units = ["Unknown"] * num_analog_channels
+        if len(analog_scales) != num_analog_channels:
+            analog_scales = np.ones(num_analog_channels)
+        if len(analog_offsets) != num_analog_channels:
+             analog_offsets = np.zeros(num_analog_channels)
+
+
+        print(f"Processing {num_analog_channels} analog channel(s)...")
+        analog_data_processed = {}
+        analog_info = {"labels": [], "units": []}
+
+        for i, label in enumerate(analog_labels):
+            # Extract data for the channel, apply scale factor and offset
+            # Data shape is (1, n_channels, n_frames), so access [0, i, :]
+            channel_data_raw = analog_data[0, i, :]
+            # Apply scale and offset: final = (raw + offset) * scale
+            # Note: ezc3d might apply this automatically depending on version/settings, verify if needed.
+            # Assuming ezc3d provides raw data:
+            channel_data_scaled = (channel_data_raw + analog_offsets[i]) * analog_scales[i]
+
+
+            # --- Filtering ---
+            channel_data_filt = _lowpass_filter(channel_data_scaled, analog_fs, analog_cutoff, filter_order)
+
+            analog_data_processed[label] = channel_data_filt
+            analog_info["labels"].append(label)
+            analog_info["units"].append(analog_units[i])
+
+        return {"data": analog_data_processed, "info": analog_info}
+    # ------ main function Logic Start ------------
+    print(f"Reading C3D file: {path}")
+    try:
+        # extract_forceplat_data=True helps ezc3d parse FP specific parameters
+        c = ezc3d.c3d(path, extract_forceplat_data=True)
+    except FileNotFoundError:
+        print(f"Error: C3D file not found at {path}")
+        return {}, {}
+    except Exception as e:
+        print(f"Error reading C3D file {path}: {e}")
+        return {}, {}
+
+    # === 1. Basic Information ===
+    descriptions = {
+        # "c3d_header": c.get("header", {}), # Store the whole header for reference
+        # "c3d_parameters": c.get("parameters", {}) # Store parameters for reference
+    }
+    marker_fs = c.get("header", {}).get("points", {}).get("frame_rate", 0.0)
+    analog_fs = c.get("header", {}).get("analogs", {}).get("frame_rate", 0.0)
+    # Check if frequencies are valid
+    if marker_fs <= 0:
+        print("Warning: Invalid marker frame rate in C3D header.")
+    if analog_fs <= 0:
+        print("Warning: Invalid analog frame rate in C3D header.")
+
+
+    # === 2. Process Motion Data ===
+    print("\n--- Processing Motion Data ---")
+    markers_processed, motion_info, time_vector = _process_markers(
+        c, marker_cutoff, filter_order, prefix_to_remove, rename_map
+    )
+    descriptions["motion_info"] = motion_info
+
+    # === 3. Process Force Plate Data ===
+    fp_processed_data = None
+    if process_forceplate:
+        print("\n--- Processing Force Plate Data ---")
+        if analog_fs <= 0:
+             print("Skipping Force Plate processing due to invalid analog frame rate.")
+        else:
+            fp_result = _process_force_plates(c, analog_fs, fp_cutoff, filter_order)
+            if fp_result:
+                fp_processed_data = fp_result["data"]
+                descriptions["fp_info"] = fp_result["info"]
+    else:
+        print("\nSkipping Force Plate processing as requested.")
+
+
+    # === 4. Process Analog Data ===
+    analog_processed_data = None
+    analog_channel_info = None
+    if process_analog:
+        print("\n--- Processing Analog Data ---")
+        if analog_fs <= 0:
+             print("Skipping Analog processing due to invalid analog frame rate.")
+        else:
+            analog_result = _process_analog_data(c, analog_fs, analog_cutoff, filter_order)
+            if analog_result:
+                analog_processed_data = analog_result["data"]
+                analog_channel_info = analog_result["info"] # Store labels/units
+                # Add general analog info from header
+                descriptions["analog_info"] = {
+                    "frame_rate": analog_fs,
+                    "num_channels": c.get("header", {}).get("analogs", {}).get("nb_channels", 0),
+                    "samples_per_frame": c.get("header", {}).get("analogs", {}).get("ratio", 0),
+                    "channel_details": analog_channel_info # Add specific labels/units
                 }
 
-# === 參數設定 ===
-DPI = 800
-sensitivity = 1.0
-yaw = 0.022  # CS2 預設值
+    else:
+        print("\nSkipping Analog processing as requested.")
+        # Still add basic analog info from header if available
+        if "analogs" in c.get("header", {}):
+             descriptions["analog_info"] = {
+                 "frame_rate": analog_fs,
+                 "num_channels": c.get("header", {}).get("analogs", {}).get("nb_channels", 0),
+                 "samples_per_frame": c.get("header", {}).get("analogs", {}).get("ratio", 0),
+             }
+
+
+    # === 5. Combine Results ===
+    combine_dict = {"markers": markers_processed} # Markers are always processed
+    if fp_processed_data is not None:
+        combine_dict["FP"] = fp_processed_data
+    if analog_processed_data is not None:
+        # Optional: Exclude FP channels from general analog if they were processed separately
+        # This requires knowing the mapping from FP labels (FP1_Fx etc.) to analog channel labels
+        # For simplicity now, we include all processed analog channels.
+        combine_dict["analog"] = analog_processed_data
+
+    print("\n--- C3D Processing Complete ---")
+    return combine_dict, descriptions
+
+
+# %% analysis spider shot
+# """
+# 1. 找出所有的Z軸局部最小值
+#     1.1.  scipy.signal.argrelextrema 找出資料中的局部極值點（最大值或最小值）
+#             order = 5
+#     1.2. 小於 (平均值 - 0.05) 的點才視為局部最小值
+#             small than 0.05
+#     1.3. 加入最小 frame 間隔條件 or 兩Z軸局部最小值差異超過閾值
+#             min_frame_gap = 8, min_z_diff = 0.2
+# """
+# def find_Zaxis_min(df, order=5, min_frame_gap=8,
+#                     min_z_diff=0.2, threshold=0.05,
+#                     show=True, showVel=True):
+#     """
+#     根據 Z 軸資料找出局部最小值點，並根據時間間隔與 Z 值變化篩選有效點
+
+#     paremeters：
+#         data: dict，包含 marker 資料的結構，例如 data["markers"]["R.I.Finger3"]
+#         order: int，局部最小值搜尋的視窗大小（預設為 5）
+#         min_frame_gap: int，兩個最小值點之間的最小 Frame 間距（預設為 8）
+#         min_z_diff: float，當 frame 間距不夠，Z 值需大於此差異才保留（預設 0.2）
+#         threshold: float，用來計算是否夠低（平均值 - threshold），預設為 0.05
+#         show: bool，是否繪製視覺化結果
+    
+#     return：
+#         final_minima_idx: list，篩選後有效的 Z 軸局部最小值 index
+#         filtered_minima_data: 包含 Z 軸局部最小值點對應視角資訊的 DataFrame
+#     """
+#     # z_values = combine_dict["markers"]["R.I.Finger3"][:, 2]
+#     # 從指定 marker 中擷取 Z 軸資料（第3維）
+#     z_values = df["Z"].values
+#     # 計算 Z 軸平均值並定義 threshold 門檻
+#     z_mean = np.mean(z_values)
+#     threshold = z_mean - threshold
+    
+#     # 使用 scipy 的 argrelextrema 尋找局部最小值
+#     local_minima_idx = argrelextrema(z_values, np.less, order=order)[0]
+    
+#     # 篩選出 Z 值必須低於門檻的極小值
+#     filtered_minima_idx = [idx for idx in local_minima_idx if z_values[idx] < threshold]
+    
+#     # === # 接著加入條件：兩點間距不能太短，或差異要夠大 ===
+#     final_minima_idx = []
+    
+#     for idx in filtered_minima_idx:
+#         # 第一次直接加入
+#         if not final_minima_idx:
+#             final_minima_idx.append(idx)
+#             continue
+#         # 計算與上一個最小值的 frame 差
+#         last_idx = final_minima_idx[-1]
+#         frame_diff = idx - last_idx
+    
+#         if frame_diff >= min_frame_gap:
+#             # 相隔夠遠，直接加入
+#             final_minima_idx.append(idx)  
+#         else:
+#             z_diff = abs(z_values[idx] - z_values[last_idx])
+#             if z_diff < min_z_diff:
+#                 # 差異小 → 只保留 Z 值較小者
+#                 if z_values[idx] < z_values[last_idx]:
+#                     final_minima_idx[-1] = idx  # 替換
+#                 # 否則不做任何處理（保留原來的）
+#             else:
+#                 # 雖然近，但差異夠大 → 一起保留
+#                 final_minima_idx.append(idx) 
+#     # === 匯出包含視角資料的最小值 ===
+#     filtered_minima_data = pd.DataFrame({
+#         "Frame": final_minima_idx,
+#         "Z Value": df["Z"][final_minima_idx],
+#         "Yaw Angle (°)": df["cum_yaw_deg"].iloc[final_minima_idx].values,
+#         "Pitch Angle (°)": df["cum_pitch_deg"].iloc[final_minima_idx].values
+#     })
+#     print(filtered_minima_data)
+#     # filtered_minima_data.to_csv("Filtered_Local_Minima_Final_ViewAngle.csv", index=False)
+    
+#     # 輸出篩選後的局部最小值數據
+#     # filtered_minima_data = pd.DataFrame({
+#     #     "Frame": filtered_minima_idx,
+#     #     "Z Value": z_values[filtered_minima_idx]
+#     # })
+    
+#     # # 存成 CSV
+#     # filtered_minima_data.to_csv("Filtered_Local_Minima.csv", index=False)
+    
+#     # 顯示篩選後的數據
+#     # print(filtered_minima_data.head())
+    
+#     # 7️⃣ 取得篩選過的 Z 軸局部最小值對應的視角位置
+#     filtered_yaw = df.loc[final_minima_idx, "cum_yaw_deg"]
+#     filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
+#     if show:
+#     # 繪製 Z 軸數據與篩選後的局部最小值
+#         plt.figure(figsize=(12, 5))
+#         plt.plot(z_values, label='Z-Axis', color='b', alpha=0.7)
+#         plt.scatter(final_minima_idx, z_values[final_minima_idx], color='r', label='Filtered Local Minima', zorder=3)
+#         plt.axhline(threshold, color='g', linestyle='--', label=f'Threshold ({threshold:.2f})')
+#         plt.xlabel("Frame")
+#         plt.ylabel("Z Value")
+#         plt.title("Filtered Local Minima of Z-Axis")
+#         plt.legend()
+#         plt.show()
+
+    
+#     # 8️⃣ 若 show=True，畫出基本視角軌跡圖（紅色標出最小值）
+#     if show:
+#     # === 視角軌跡圖（逆時針旋轉視角等價於畫 pitch vs yaw）===
+#         plt.figure(figsize=(8, 8))
+#         plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=5, label="View Angle Trajectory")
+#         plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20, label="Final Local Minima", zorder=3)
+#         plt.colorbar(label="Frame Index")
+#         plt.xlabel("Pitch Angle (Vertical) °")
+#         plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
+#         plt.title("視角軌跡轉換後的 Z 軸局部最小值分析")
+#         plt.legend()
+#         plt.show()
+        
+#     # 9️⃣ 若 showVel=True，畫出以滑鼠速度作為顏色的視角軌跡圖
+#     if showVel:
+#         # === 取得局部最小值對應的視角資料 ===
+#         filtered_yaw   = df.loc[final_minima_idx, "cum_yaw_deg"]
+#         filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
+
+#         # === 繪圖：以視角軌跡繪圖，使用滑鼠速度作為顏色依據 ===
+#         plt.figure(figsize=(8, 8))
+#         sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
+#                           c=df["speed"], cmap="plasma", alpha=0.7, s=5,
+#                           label="View Angle Trajectory")
+#         # 標記篩選後的局部最小值
+#         plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20,
+#                     label="Final Local Minima", zorder=3)
+
+#         # 以滑鼠速度 (mm/s) 作為 colorbar 的標示
+#         plt.colorbar(sc, label="Mouse Speed (mm/s)")
+#         plt.xlabel("Pitch Angle (Vertical) °")
+#         plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
+#         plt.title("View Angle Trajectory Colored by Mouse Speed")
+#         plt.legend()
+#         plt.show()
+#     return filtered_minima_data
+# %%
+
+# def find_Zaxis_min_with_baseline( # Function name kept for consistency with last step
+#         df,
+#         # --- Baseline Removal Params ---
+#         use_baseline_removal=True,
+#         baseline_window_length=51,
+#         baseline_polyorder=3,
+#         # --- Original Params (Threshold logic modified) ---
+#         order=5,
+#         min_frame_gap=8,
+#         min_z_diff=0.2,
+#         # --- New Threshold Param ---
+#         z_processed_threshold=None,
+#         # --- Output Params ---
+#         show=True,
+#         showVel=True):
+#     """
+#     Finds local minima in Z-axis data, optionally using Savitzky-Golay baseline removal,
+#     and filters them based on time interval and Z value changes.
+
+#     Parameters：
+#         df: DataFrame, containing 'Z' column and optionally 'cum_yaw_deg', 'cum_pitch_deg', 'speed' for plotting.
+#         use_baseline_removal: bool, whether to enable baseline removal.
+#         baseline_window_length: int, window size for Savitzky-Golay filter.
+#         baseline_polyorder: int, polynomial order for Savitzky-Golay filter.
+#         order: int, window size for local minima search (default 5).
+#         min_frame_gap: int, minimum frame gap between minima (default 8).
+#         min_z_diff: float, minimum Z difference required if frame gap is insufficient (default 0.2).
+#         z_processed_threshold: float or None, threshold for filtering processed Z values. Only points below are kept.
+#         show: bool, whether to plot visualization results.
+#         showVel: bool, whether to show velocity-colored view angle trajectory plot.
+
+#     Return：
+#         final_minima_idx: list, indices of the filtered valid Z-axis local minima (0-based).
+#         filtered_minima_data: DataFrame containing information about the filtered minima points.
+#     """
+#     # --- 1. Get Raw Z Values ---
+#     if 'Z' not in df.columns:
+#         print("Error: DataFrame is missing the 'Z' column.")
+#         return [], pd.DataFrame()
+#     z_values_raw = df["Z"].values.copy()
+#     data_length = len(z_values_raw)
+#     z_baseline = np.zeros_like(z_values_raw)
+
+#     # --- 2. Baseline Removal (Optional) ---
+#     if use_baseline_removal:
+#         print(f"Step 1: Applying Savitzky-Golay baseline removal (window={baseline_window_length}, order={baseline_polyorder})")
+#         # Validate window length
+#         if baseline_window_length >= data_length:
+#             original_wl = baseline_window_length
+#             baseline_window_length = data_length // 2 * 2 + 1
+#             if baseline_window_length < 3: baseline_window_length = 3
+#             if baseline_window_length <= baseline_polyorder:
+#                   baseline_window_length = baseline_polyorder + 1 if baseline_polyorder % 2 == 0 else baseline_polyorder + 2
+#             print(f"  Warning: baseline_window_length ({original_wl}) >= data length ({data_length}). Auto-adjusted to {baseline_window_length}")
+
+#         try:
+#             z_baseline = savgol_filter(z_values_raw, baseline_window_length, baseline_polyorder)
+#             z_values_processed = z_values_raw - z_baseline # Processed Z = Detrended Z
+#             print("  Baseline removal completed.")
+#         except Exception as e:
+#             print(f"  Error: Baseline removal failed: {e}. Using raw Z values for subsequent processing.")
+#             z_values_processed = z_values_raw # Fallback to raw Z
+#             use_baseline_removal = False # Update flag
+#     else:
+#         print("Step 1: Skipping baseline removal.")
+#         z_values_processed = z_values_raw # Processed Z = Raw Z
+
+#     # --- 3. Find Initial Local Minima (using argrelextrema) ---
+#     print(f"Step 2: Finding initial local minima using argrelextrema (order={order})")
+#     try:
+#         local_minima_idx = argrelextrema(z_values_processed, np.less, order=order)[0]
+#         print(f"  Found {len(local_minima_idx)} initial points.")
+#     except Exception as e:
+#         print(f"  Error: argrelextrema execution failed: {e}")
+#         local_minima_idx = np.array([], dtype=int)
+
+#     # --- 4. Filter by Processed Z Value Threshold (Optional) ---
+#     filtered_minima_idx_step4 = local_minima_idx
+#     if z_processed_threshold is not None:
+#         print(f"Step 3: Filtering points with processed Z value below {z_processed_threshold:.4f}")
+#         if len(local_minima_idx) > 0:
+#             threshold_mask = z_values_processed[local_minima_idx] < z_processed_threshold
+#             filtered_minima_idx_step4 = local_minima_idx[threshold_mask]
+#             print(f"  --> Points remaining after Z threshold filter: {len(filtered_minima_idx_step4)}")
+#         else:
+#               print("  --> No initial points to filter.")
+#     else:
+#         print("Step 3: Skipping processed Z value threshold filter.")
+
+#     # --- 5. Custom Filtering: Gap and Difference ---
+#     print(f"Step 4: Applying custom filter (min_gap={min_frame_gap}, min_z_diff={min_z_diff})")
+#     final_minima_idx = []
+#     if len(filtered_minima_idx_step4) > 0:
+#         sorted_indices = np.sort(filtered_minima_idx_step4)
+#         final_minima_idx.append(sorted_indices[0])
+#         for i in range(1, len(sorted_indices)):
+#             idx = sorted_indices[i]
+#             last_idx = final_minima_idx[-1]
+#             frame_diff = idx - last_idx
+#             if frame_diff >= min_frame_gap:
+#                 final_minima_idx.append(idx)
+#             else:
+#                 # Compare using processed Z value
+#                 z_diff = abs(z_values_processed[idx] - z_values_processed[last_idx])
+#                 if z_diff < min_z_diff:
+#                     if z_values_processed[idx] < z_values_processed[last_idx]:
+#                         final_minima_idx[-1] = idx # Replace
+#                     # else: keep the original one
+#                 else:
+#                     final_minima_idx.append(idx) # Keep both if difference is large
+#         print(f"  --> Points remaining after custom filter: {len(final_minima_idx)}")
+#     else:
+#         print("  --> No points to apply custom filter to.")
+
+#     # --- 6. Prepare Output DataFrame ---
+#     print("Step 5: Preparing output DataFrame")
+#     required_view_cols = ['cum_yaw_deg', 'cum_pitch_deg']
+#     has_view_data = all(col in df.columns for col in required_view_cols)
+
+#     if final_minima_idx and len(final_minima_idx) > 0:
+#         output_data = {
+#             "Frame": final_minima_idx,
+#             "Z Value Raw": z_values_raw[final_minima_idx],
+#             "Z Processed": z_values_processed[final_minima_idx]
+#         }
+#         if has_view_data:
+#               output_data["Yaw Angle (°)"] = df["cum_yaw_deg"].iloc[final_minima_idx].values
+#               output_data["Pitch Angle (°)"] = df["cum_pitch_deg"].iloc[final_minima_idx].values
+#         else:
+#               warnings.warn("Missing angle columns, output DataFrame will not include angle information.")
+
+#         filtered_minima_data = pd.DataFrame(output_data)
+#         print("  Final filtered minima points (first few):")
+#         print(filtered_minima_data.head())
+#     else:
+#         print("  No final minima points found meeting all criteria.")
+#         cols = ["Frame", "Z Value Raw", "Z Processed"]
+#         if has_view_data: cols.extend(["Yaw Angle (°)", "Pitch Angle (°)"])
+#         filtered_minima_data = pd.DataFrame(columns=cols)
+
+#     # --- 7. Plotting ---
+#     if show:
+#         print("Step 6: Generating plots")
+#         plt.style.use('seaborn-v0_8-paper')
+#         fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+        
+
+#         # Subplot 1: Raw Z, Baseline, Final Minima
+#         axes[0].set_facecolor('white')
+#         axes[0].plot(z_values_raw, label='Raw Z Value', color='gray', alpha=0.7, linewidth=1)
+#         if use_baseline_removal:
+#             axes[0].plot(z_baseline, label=f'Baseline (window={baseline_window_length}, order={baseline_polyorder})', color='orange', linestyle='--', linewidth=1.5)
+#         if final_minima_idx and len(final_minima_idx) > 0:
+#             axes[0].scatter(final_minima_idx, z_values_raw[final_minima_idx], color='red', label=f'Final Minima ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
+#         axes[0].set_title("Raw Z Value, Baseline, and Final Minima Points")
+#         axes[0].set_ylabel("Raw Z Value")
+#         axes[0].legend()
+#         axes[0].grid(True, which='major', axis='both', linestyle='--', linewidth=0.5)
+
+#         # Subplot 2: Processed Z, Threshold, Final Minima
+#         plot_label = 'Processed Z Value' + (' (Detrended)' if use_baseline_removal else ' (Raw)')
+#         axes[1].plot(z_values_processed, label=plot_label, color='blue', alpha=0.8, linewidth=1)
+#         if z_processed_threshold is not None:
+#             axes[1].axhline(z_processed_threshold, color='cyan', linestyle=':', label=f'Z Threshold ({z_processed_threshold:.2f})', linewidth=1.5)
+#         if final_minima_idx and len(final_minima_idx) > 0:
+#             axes[1].scatter(final_minima_idx, z_values_processed[final_minima_idx], color='red', label=f'Final Minima ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
+#         axes[1].set_title("Processed Z Value and Final Minima Points")
+#         axes[1].set_ylabel("Processed Z Value")
+#         axes[1].set_xlabel("Frame")
+#         axes[1].legend()
+#         axes[1].grid(True, which='both', linestyle='--', linewidth=0.5)
+
+#         plt.tight_layout()
+#         plt.show()
+
+#         # --- View Angle Plots (English Labels) ---
+#         if has_view_data:
+#             if final_minima_idx and len(final_minima_idx) > 0:
+#                 filtered_yaw = df["cum_yaw_deg"].iloc[final_minima_idx].values
+#                 filtered_pitch = df["cum_pitch_deg"].iloc[final_minima_idx].values
+#             else:
+#                 filtered_yaw, filtered_pitch = [], []
+
+#             # Plot 8: Basic Trajectory
+#             plt.figure(figsize=(8, 8))
+#             plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=10, label="View Angle Trajectory (by Frame)")
+#             plt.scatter(filtered_pitch, filtered_yaw, color="red", s=50, label="Final Minima", zorder=3, marker='x')
+#             plt.colorbar(label="Frame Index")
+#             plt.xlabel("Pitch Angle (Vertical) °")
+#             plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
+#             plt.title("View Angle Trajectory with Final Z-Axis Minima")
+#             plt.legend()
+#             plt.grid(True, linestyle='--', linewidth=0.5)
+#             plt.show()
+
+#             # Plot 9: Velocity Colored Trajectory
+#             if showVel and 'speed' in df.columns:
+#                 plt.figure(figsize=(8, 8))
+#                 sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
+#                                   c=df["speed"], cmap="plasma", alpha=0.7, s=10,
+#                                   label="View Angle Trajectory (by Speed)")
+#                 plt.scatter(filtered_pitch, filtered_yaw, color="red", s=50,
+#                             label="Final Minima", zorder=3, marker='x')
+#                 plt.colorbar(sc, label="Speed (unit unknown)")
+#                 plt.xlabel("Pitch Angle (Vertical) °")
+#                 plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
+#                 plt.title("View Angle Trajectory (Colored by Speed) with Final Z-Axis Minima")
+#                 plt.legend()
+#                 plt.grid(True, linestyle='--', linewidth=0.5)
+#                 plt.show()
+#             elif showVel and 'speed' not in df.columns:
+#                   warnings.warn("DataFrame is missing the 'speed' column, cannot generate velocity-colored plot.")
+#         else:
+#               print("Skipping view angle plots due to missing angle columns.")
+
+#     print("--- Analysis Finished ---")
+#     return final_minima_idx, filtered_minima_data
 
 # %%
 
-data_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
 
-combine_dict, descriptions = func.read_c3d(data_path,
-                                      prefix="S06", rename=vicon2cortex)
 
-# %% analysis spider shot
-"""
-1. 找出所有的Z軸局部最小值
-    1.1.  scipy.signal.argrelextrema 找出資料中的局部極值點（最大值或最小值）
-            order = 5
-    1.2. 小於 (平均值 - 0.05) 的點才視為局部最小值
-            small than 0.05
-    1.3. 加入最小 frame 間隔條件 or 兩Z軸局部最小值差異超過閾值
-            min_frame_gap = 8, min_z_diff = 0.2
-"""
-def find_Zaxis_min(df, order=5, min_frame_gap=8,
-                   min_z_diff=0.2, threshold=0.05,
-                   show=True, showVel=True):
+def find_Zaxis_min_with_baseline( # Function name kept for consistency with last step
+        df,
+        # --- Baseline Removal Params ---
+        use_baseline_removal=True,
+        baseline_window_length=51,
+        baseline_polyorder=3,
+        # --- Original Params (Threshold logic modified) ---
+        order=5,
+        min_frame_gap=8,
+        min_z_diff=0.2,
+        # --- New Threshold Param ---
+        z_processed_threshold=None,
+        # --- Output Params ---
+        show=True,
+        showVel=True):
     """
-    根據 Z 軸資料找出局部最小值點，並根據時間間隔與 Z 值變化篩選有效點
+    Finds local minima in Z-axis data, optionally using Savitzky-Golay baseline removal,
+    and filters them based on time interval and Z value changes.
+    
+    Parameters：
+        df: DataFrame, containing 'Z' column and optionally 'cum_yaw_deg', 'cum_pitch_deg', 'speed' for plotting.
+        use_baseline_removal: bool, whether to enable baseline removal.
+        baseline_window_length: int, window size for Savitzky-Golay filter.
+        baseline_polyorder: int, polynomial order for Savitzky-Golay filter.
+        order: int, window size for local minima search (default 5).
+        min_frame_gap: int, minimum frame gap between minima (default 8).
+        min_z_diff: float, minimum Z difference required if frame gap is insufficient (default 0.2).
+        z_processed_threshold: float or None, threshold for filtering processed Z values. Only points below are kept.
+        show: bool, whether to plot visualization results.
+        showVel: bool, whether to show velocity-colored view angle trajectory plot.
 
-    paremeters：
-        data: dict，包含 marker 資料的結構，例如 data["markers"]["R.I.Finger3"]
-        order: int，局部最小值搜尋的視窗大小（預設為 5）
-        min_frame_gap: int，兩個最小值點之間的最小 Frame 間距（預設為 8）
-        min_z_diff: float，當 frame 間距不夠，Z 值需大於此差異才保留（預設 0.2）
-        threshold: float，用來計算是否夠低（平均值 - threshold），預設為 0.05
-        show: bool，是否繪製視覺化結果
-    
-    return：
-        final_minima_idx: list，篩選後有效的 Z 軸局部最小值 index
-        filtered_minima_data: 包含 Z 軸局部最小值點對應視角資訊的 DataFrame
-    """
-    # z_values = combine_dict["markers"]["R.I.Finger3"][:, 2]
-    # 從指定 marker 中擷取 Z 軸資料（第3維）
-    z_values = df["Z"].values
-    # 計算 Z 軸平均值並定義 threshold 門檻
-    z_mean = np.mean(z_values)
-    threshold = z_mean - threshold
-    
-    # 使用 scipy 的 argrelextrema 尋找局部最小值
-    local_minima_idx = argrelextrema(z_values, np.less, order=order)[0]
-    
-    # 篩選出 Z 值必須低於門檻的極小值
-    filtered_minima_idx = [idx for idx in local_minima_idx if z_values[idx] < threshold]
-    
-    # === # 接著加入條件：兩點間距不能太短，或差異要夠大 ===
-    final_minima_idx = []
-    
-    for idx in filtered_minima_idx:
-        # 第一次直接加入
-        if not final_minima_idx:
-            final_minima_idx.append(idx)
-            continue
-        # 計算與上一個最小值的 frame 差
-        last_idx = final_minima_idx[-1]
-        frame_diff = idx - last_idx
-    
-        if frame_diff >= min_frame_gap:
-            # 相隔夠遠，直接加入
-            final_minima_idx.append(idx)  
+    Return：
+        final_minima_idx: list, indices of the filtered valid Z-axis local minima (0-based).
+        filtered_minima_data: DataFrame containing information about the filtered minima points.
+        """
+    # --- 1. Get Raw Z Values ---
+    if 'Z' not in df.columns:
+        print("Error: DataFrame is missing the 'Z' column.")
+        return [], pd.DataFrame()
+    z_values_raw = df["Z"].values.copy()
+    data_length = len(z_values_raw)
+    z_baseline = np.zeros_like(z_values_raw)
+
+    # --- 2. Baseline Removal (Optional) ---
+    if use_baseline_removal:
+        print(f"Step 1: Applying Savitzky-Golay baseline removal (window={baseline_window_length}, order={baseline_polyorder})")
+        if baseline_window_length >= data_length:
+            original_wl = baseline_window_length
+            baseline_window_length = data_length // 2 * 2 + 1
+            if baseline_window_length < 3: baseline_window_length = 3
+            if baseline_window_length <= baseline_polyorder:
+                  baseline_window_length = baseline_polyorder + 1 if baseline_polyorder % 2 == 0 else baseline_polyorder + 2
+            print(f"  Warning: baseline_window_length ({original_wl}) >= data length ({data_length}). Auto-adjusted to {baseline_window_length}")
+        try:
+            z_baseline = savgol_filter(z_values_raw, baseline_window_length, baseline_polyorder)
+            z_values_processed = z_values_raw - z_baseline
+            print("  Baseline removal completed.")
+        except Exception as e:
+            print(f"  Error: Baseline removal failed: {e}. Using raw Z values for subsequent processing.")
+            z_values_processed = z_values_raw
+            use_baseline_removal = False
+    else:
+        print("Step 1: Skipping baseline removal.")
+        z_values_processed = z_values_raw
+
+    # --- 3. Find Initial Local Minima (using argrelextrema) ---
+    print(f"Step 2: Finding initial local minima using argrelextrema (order={order})")
+    try:
+        local_minima_idx = argrelextrema(z_values_processed, np.less, order=order)[0]
+        print(f"  Found {len(local_minima_idx)} initial points.")
+    except Exception as e:
+        print(f"  Error: argrelextrema execution failed: {e}")
+        local_minima_idx = np.array([], dtype=int)
+
+    # --- 4. Filter by Processed Z Value Threshold (Optional) ---
+    filtered_minima_idx_step4 = local_minima_idx
+    if z_processed_threshold is not None:
+        print(f"Step 3: Filtering points with processed Z value below {z_processed_threshold:.4f}")
+        if len(local_minima_idx) > 0:
+            threshold_mask = z_values_processed[local_minima_idx] < z_processed_threshold
+            filtered_minima_idx_step4 = local_minima_idx[threshold_mask]
+            print(f"  --> Points remaining after Z threshold filter: {len(filtered_minima_idx_step4)}")
         else:
-            z_diff = abs(z_values[idx] - z_values[last_idx])
-            if z_diff < min_z_diff:
-                # 差異小 → 只保留 Z 值較小者
-                if z_values[idx] < z_values[last_idx]:
-                    final_minima_idx[-1] = idx  # 替換
-                # 否則不做任何處理（保留原來的）
+              print("  --> No initial points to filter.")
+    else:
+        print("Step 3: Skipping processed Z value threshold filter.")
+
+    # --- 5. Custom Filtering: Gap and Difference ---
+    print(f"Step 4: Applying custom filter (min_gap={min_frame_gap}, min_z_diff={min_z_diff})")
+    final_minima_idx = []
+    if len(filtered_minima_idx_step4) > 0:
+        sorted_indices = np.sort(filtered_minima_idx_step4)
+        final_minima_idx.append(sorted_indices[0])
+        for i in range(1, len(sorted_indices)):
+            idx = sorted_indices[i]
+            last_idx = final_minima_idx[-1]
+            frame_diff = idx - last_idx
+            if frame_diff >= min_frame_gap:
+                final_minima_idx.append(idx)
             else:
-                # 雖然近，但差異夠大 → 一起保留
-                final_minima_idx.append(idx) 
-    # === 匯出包含視角資料的最小值 ===
-    filtered_minima_data = pd.DataFrame({
-        "Frame": final_minima_idx,
-        "Z Value": df["Z"][final_minima_idx],
-        "Yaw Angle (°)": df["cum_yaw_deg"].iloc[final_minima_idx].values,
-        "Pitch Angle (°)": df["cum_pitch_deg"].iloc[final_minima_idx].values
-    })
-    print(filtered_minima_data)
-    # filtered_minima_data.to_csv("Filtered_Local_Minima_Final_ViewAngle.csv", index=False)
-    
-    # 輸出篩選後的局部最小值數據
-    # filtered_minima_data = pd.DataFrame({
-    #     "Frame": filtered_minima_idx,
-    #     "Z Value": z_values[filtered_minima_idx]
-    # })
-    
-    # # 存成 CSV
-    # filtered_minima_data.to_csv("Filtered_Local_Minima.csv", index=False)
-    
-    # 顯示篩選後的數據
-    # print(filtered_minima_data.head())
-    
-    # 7️⃣ 取得篩選過的 Z 軸局部最小值對應的視角位置
-    filtered_yaw = df.loc[final_minima_idx, "cum_yaw_deg"]
-    filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
+                z_diff = abs(z_values_processed[idx] - z_values_processed[last_idx])
+                if z_diff < min_z_diff:
+                    if z_values_processed[idx] < z_values_processed[last_idx]:
+                        final_minima_idx[-1] = idx
+                else:
+                    final_minima_idx.append(idx)
+        print(f"  --> Points remaining after custom filter: {len(final_minima_idx)}")
+    else:
+        print("  --> No points to apply custom filter to.")
+
+    # --- 6. Prepare Output DataFrame ---
+    print("Step 5: Preparing output DataFrame")
+    required_view_cols = ['cum_yaw_deg', 'cum_pitch_deg']
+    has_view_data = all(col in df.columns for col in required_view_cols)
+    if final_minima_idx and len(final_minima_idx) > 0:
+        output_data = {
+            "Frame": final_minima_idx,
+            "Z Value Raw": z_values_raw[final_minima_idx],
+            "Z Processed": z_values_processed[final_minima_idx]
+        }
+        if has_view_data:
+              output_data["Yaw Angle (°)"] = df["cum_yaw_deg"].iloc[final_minima_idx].values
+              output_data["Pitch Angle (°)"] = df["cum_pitch_deg"].iloc[final_minima_idx].values
+        else:
+              warnings.warn("Missing angle columns, output DataFrame will not include angle information.")
+        filtered_minima_data = pd.DataFrame(output_data)
+        print("  Final filtered minima points (first few):")
+        print(filtered_minima_data.head())
+    else:
+        print("  No final minima points found meeting all criteria.")
+        cols = ["Frame", "Z Value Raw", "Z Processed"]
+        if has_view_data: cols.extend(["Yaw Angle (°)", "Pitch Angle (°)"])
+        filtered_minima_data = pd.DataFrame(columns=cols)
+
+    # --- 7. Plotting ---
     if show:
-    # 繪製 Z 軸數據與篩選後的局部最小值
-        plt.figure(figsize=(12, 5))
-        plt.plot(z_values, label='Z-Axis', color='b', alpha=0.7)
-        plt.scatter(final_minima_idx, z_values[final_minima_idx], color='r', label='Filtered Local Minima', zorder=3)
-        plt.axhline(threshold, color='g', linestyle='--', label=f'Threshold ({threshold:.2f})')
-        plt.xlabel("Frame")
-        plt.ylabel("Z Value")
-        plt.title("Filtered Local Minima of Z-Axis")
-        plt.legend()
+        print("Step 6: Generating plots with custom style")
+
+        # --- Style setup function (optional helper) ---
+        def apply_custom_style(ax):
+            """Applies the requested style to an Axes object."""
+            ax.set_facecolor('white') # White background
+            ax.grid(True, which='major', axis='both', linestyle='--', linewidth=0.5, color='grey') # Grey dashed grid
+            # Black solid axis lines (spines)
+            for spine in ax.spines.values():
+                spine.set_edgecolor('black')
+                spine.set_linewidth(1.0) # Explicitly set linewidth (optional)
+                spine.set_linestyle('-') # Explicitly set linestyle to solid (optional, default)
+            # Black ticks and labels
+            ax.tick_params(axis='x', colors='black')
+            ax.tick_params(axis='y', colors='black')
+            ax.xaxis.label.set_color('black')
+            ax.yaxis.label.set_color('black')
+            ax.title.set_color('black')
+        # --- End of style setup function ---
+
+        fig, axes = plt.subplots(2, 1, figsize=(12, 8), dpi=300, sharex=True)
+
+        # Apply custom style to both subplots for Z values
+        for ax in axes:
+            apply_custom_style(ax)
+
+        # Subplot 1: Raw Z, Baseline, Final Minima
+        axes[0].plot(z_values_raw, label='Raw Z Value', color='gray', alpha=0.7, linewidth=1)
+        if use_baseline_removal:
+            axes[0].plot(z_baseline, label=f'Baseline (window={baseline_window_length}, order={baseline_polyorder})', color='orange', linestyle='--', linewidth=1.5)
+        if final_minima_idx and len(final_minima_idx) > 0:
+            axes[0].scatter(final_minima_idx, z_values_raw[final_minima_idx], color='red', label=f'Final Minima ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
+        axes[0].set_title("Raw Z Value, Baseline, and Final Minima Points")
+        axes[0].set_ylabel("Raw Z Value")
+        axes[0].legend()
+        # Style applied by loop
+
+        # Subplot 2: Processed Z, Threshold, Final Minima
+        plot_label = 'Processed Z Value' + (' (Detrended)' if use_baseline_removal else ' (Raw)')
+        axes[1].plot(z_values_processed, label=plot_label, color='blue', alpha=0.8, linewidth=1)
+        if z_processed_threshold is not None:
+            axes[1].axhline(z_processed_threshold, color='cyan', linestyle=':', label=f'Z Threshold ({z_processed_threshold:.2f})', linewidth=1.5)
+        if final_minima_idx and len(final_minima_idx) > 0:
+            axes[1].scatter(final_minima_idx, z_values_processed[final_minima_idx], color='red', label=f'Final Minima ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
+        axes[1].set_title("Processed Z Value and Final Minima Points")
+        axes[1].set_ylabel("Processed Z Value")
+        axes[1].set_xlabel("Frame")
+        axes[1].legend()
+        # Style applied by loop
+
+        plt.tight_layout()
         plt.show()
 
-    
-    # 8️⃣ 若 show=True，畫出基本視角軌跡圖（紅色標出最小值）
-    if show:
-    # === 視角軌跡圖（逆時針旋轉視角等價於畫 pitch vs yaw）===
-        plt.figure(figsize=(8, 8))
-        plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=5, label="View Angle Trajectory")
-        plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20, label="Final Local Minima", zorder=3)
-        plt.colorbar(label="Frame Index")
-        plt.xlabel("Pitch Angle (Vertical) °")
-        plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-        plt.title("視角軌跡轉換後的 Z 軸局部最小值分析")
-        plt.legend()
-        plt.show()
-        
-    # 9️⃣ 若 showVel=True，畫出以滑鼠速度作為顏色的視角軌跡圖
-    if showVel:
-        # === 取得局部最小值對應的視角資料 ===
-        filtered_yaw   = df.loc[final_minima_idx, "cum_yaw_deg"]
-        filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
+        # --- View Angle Plots (Apply similar styling) ---
+        if has_view_data:
+            if final_minima_idx and len(final_minima_idx) > 0:
+                filtered_yaw = df["cum_yaw_deg"].iloc[final_minima_idx].values
+                filtered_pitch = df["cum_pitch_deg"].iloc[final_minima_idx].values
+            else:
+                filtered_yaw, filtered_pitch = [], []
+                
+            padding_factor = 0.1 # 設定 10% 的邊距
+            pitch_min, pitch_max = df['cum_pitch_deg'].min(), df['cum_pitch_deg'].max()
+            yaw_min, yaw_max = df['cum_yaw_deg'].min(), df['cum_yaw_deg'].max()
+            pitch_range_val = pitch_max - pitch_min
+            yaw_range_val = yaw_max - yaw_min
+            
 
-        # === 繪圖：以視角軌跡繪圖，使用滑鼠速度作為顏色依據 ===
-        plt.figure(figsize=(8, 8))
-        sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
-                         c=df["speed"], cmap="plasma", alpha=0.7, s=5,
-                         label="View Angle Trajectory")
-        # 標記篩選後的局部最小值
-        plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20,
-                    label="Final Local Minima", zorder=3)
+            # Plot 8: Basic Trajectory
+            fig_traj, ax_traj = plt.subplots(figsize=(8, 8), dpi=300)
+            apply_custom_style(ax_traj) # Apply the style
+            ax_traj.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=10, label="View Angle Trajectory (by Frame)")
+            ax_traj.scatter(filtered_pitch, filtered_yaw, color="red", s=50, label="Final Minima", zorder=3, marker='x')
+            # Create invisible scatter for colorbar mapping if needed (might be optional depending on matplotlib version)
+            cbar_mappable = ax_traj.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0)
+            plt.colorbar(cbar_mappable, ax=ax_traj, label="Frame Index")
+            ax_traj.set_xlabel("Pitch Angle (Vertical) °")
+            ax_traj.set_ylabel("Yaw Angle (Horizontal, Rotated) °")
+            ax_traj.set_title("View Angle Trajectory with Final Z-Axis Minima")
+            ax_traj.legend()
+            # Grid and axis styles are applied by apply_custom_style
+            ax_traj.set_xlim(pitch_min - padding_factor * pitch_range_val, pitch_max + padding_factor * pitch_range_val)
+            ax_traj.set_ylim(yaw_min - padding_factor * yaw_range_val, yaw_max + padding_factor * yaw_range_val)
+            plt.show()
 
-        # 以滑鼠速度 (mm/s) 作為 colorbar 的標示
-        plt.colorbar(sc, label="Mouse Speed (mm/s)")
-        plt.xlabel("Pitch Angle (Vertical) °")
-        plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-        plt.title("View Angle Trajectory Colored by Mouse Speed")
-        plt.legend()
-        plt.show()
-    return filtered_minima_data
+            # Plot 9: Velocity Colored Trajectory
+            if showVel and 'speed' in df.columns:
+                fig_vel, ax_vel = plt.subplots(figsize=(8, 8), dpi=300)
+                apply_custom_style(ax_vel) # Apply the style
+                sc = ax_vel.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
+                                  c=df["speed"], cmap="plasma", alpha=0.7, s=10,
+                                  label="View Angle Trajectory (by Speed)")
+                ax_vel.scatter(filtered_pitch, filtered_yaw, color="red", s=50,
+                            label="Final Minima", zorder=3, marker='x')
+                plt.colorbar(sc, ax=ax_vel, label="Speed (unit unknown)")
+                ax_vel.set_xlabel("Pitch Angle (Vertical) °")
+                ax_vel.set_ylabel("Yaw Angle (Horizontal, Rotated) °")
+                ax_vel.set_title("View Angle Trajectory (Colored by Speed) with Final Z-Axis Minima")
+                ax_vel.legend()
+                # 設定邊距
+                
+                # Grid and axis styles are applied by apply_custom_style
+                ax_vel.set_xlim(pitch_min - padding_factor * pitch_range_val, pitch_max + padding_factor * pitch_range_val)
+                ax_vel.set_ylim(yaw_min - padding_factor * yaw_range_val, yaw_max + padding_factor * yaw_range_val)
+                plt.show()
+            elif showVel and 'speed' not in df.columns:
+                  warnings.warn("DataFrame is missing the 'speed' column, cannot generate velocity-colored plot.")
+        else:
+              print("Skipping view angle plots due to missing angle columns.")
+
+    print("--- Analysis Finished ---")
+    return final_minima_idx, filtered_minima_data
+
+# --- Example Usage (No changes needed here for style) ---
+# if __name__ == "__main__":
+#     # ... (Your example usage code) ...
 # %%
 def ConverUnit2Angle(combine_dict, descriptions,
                      DPI=800, sens=1, yaw=0.022):
@@ -276,7 +1189,7 @@ def ConverUnit2Angle(combine_dict, descriptions,
     
     
     # 6️⃣ 計算滑鼠速度（需知道取樣率）
-    sampling_rate = descriptions["motion info"]["frame_rate"]
+    sampling_rate = descriptions["motion_info"]["frame_rate"]
     dt = 1 / sampling_rate
     
     df["speed"] = np.sqrt((delta_x_mm / dt)**2 + (delta_y_mm / dt)**2)  # mm/s 實體速度
@@ -326,6 +1239,9 @@ def findZminGroup(df, final_minima_idx, angle_merge_threshold=10, show=True):
             - NEW Frame Start: 經過 `find_directional_start` 計算後，更精確的移動起始幀。
             - Direction Quadrant: 根據 Yaw/Pitch 變化判斷的視角移動象限 (Q1-Q4)。
     """
+    
+    
+    # final_minima_idx = final_indices
 
     # --- 工具函數: 使用滑動視窗計算滑鼠移動方向起始點 ---
     # 目標：找到從 frame_start 到 frame_end 這段移動中，真正開始"有方向性"移動的那個 frame
@@ -637,265 +1553,90 @@ def findZminGroup(df, final_minima_idx, angle_merge_threshold=10, show=True):
     choices = ["Q1", "Q2", "Q3", "Q4", "Vertical", "Horizontal"]
     # np.select(條件列表, 選擇列表, 預設值)
     grouped_df["Direction Quadrant"] = np.select(conditions, choices, default="Center/Undefined")
+    
+    
 
     # === [6] 視覺化 ===
+    # --- Style setup function (copied from previous response) ---
+    def apply_custom_style(ax):
+        """Applies the requested style to an Axes object."""
+        ax.set_facecolor('white') # White background
+        ax.grid(True, which='major', axis='both', linestyle='--', linewidth=0.5, color='grey') # Grey dashed grid
+        # Black solid axis lines (spines)
+        for spine in ax.spines.values():
+            spine.set_edgecolor('black')
+            spine.set_linewidth(1.0) # Explicitly set linewidth
+            spine.set_linestyle('-') # Explicitly set linestyle to solid
+        # Black ticks and labels
+        ax.tick_params(axis='x', colors='black')
+        ax.tick_params(axis='y', colors='black')
+        ax.xaxis.label.set_color('black')
+        ax.yaxis.label.set_color('black')
+        ax.title.set_color('black')
     # 目標：如果 show=True，繪製視角軌跡圖，用顏色深淺表示滑鼠移動速度，並標記 Z 最小值點。
     if show:
-        plt.figure(figsize=(8, 8)) # 設定圖表大小
-
-        # 繪製主要的視角軌跡散點圖
-        # x 軸是 Pitch (垂直視角)，y 軸是 Yaw (水平視角)
-        # c=df['speed'] 指定點的顏色由 'speed' 欄位決定
-        # cmap='plasma' 指定顏色映射方案
-        # alpha=0.7 設定透明度
-        # s=5 設定點的大小
-        sc = plt.scatter(
-            df['cum_pitch_deg'], df['cum_yaw_deg'], # X, Y 座標
-            c=df['speed'], cmap='plasma', alpha=0.7, s=5, # 顏色、透明度、大小
-            label='View Angle Trajectory (colored by speed)' # 圖例標籤
-        )
-        # 添加顏色條 (colorbar) 並標註其代表的意義 ('Mouse Speed')
-        plt.colorbar(sc, label='Mouse Speed (°/s or unit of speed column)')
-
-        # 在圖上特別標記出所有的 Z 軸局部最小值點 (通常是紅色)
-        # 提取這些點的 Pitch 和 Yaw 座標
-        # 這裡再次使用了 iloc，如果 final_minima_idx 很大，也可能稍慢，但通常可接受
-        minima_pitch = df['cum_pitch_deg'].iloc[final_minima_idx].values
-        minima_yaw = df['cum_yaw_deg'].iloc[final_minima_idx].values
-        plt.scatter(minima_pitch, minima_yaw,
-                    color='red', s=20, label='Z Minima', zorder=3) # zorder=3 讓紅點在最上層
-
-        # 設定圖表的標籤、標題、網格線和坐標軸比例
-        plt.xlabel('Pitch Angle (°)')
-        plt.ylabel('Yaw Angle (°)')
-        plt.title('View Angle Trajectory Colored by Mouse Speed with Z Minima')
-        plt.grid(True) # 顯示網格線
-        plt.axis('equal') # 讓 X 和 Y 軸具有相同的單位長度比例，避免角度變形
-        plt.legend() # 顯示圖例
-        plt.show() # 顯示圖表
+        # Create figure and axes objects
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=300) # Use subplots to get axes object
+    
+        # Apply the custom style to the axes
+        apply_custom_style(ax)
+    
+        # Ensure 'speed' column exists before using it for color
+        if 'speed' in df.columns:
+            # Plot the main view angle trajectory scatter plot using the axes object
+            sc = ax.scatter(
+                df['cum_pitch_deg'], df['cum_yaw_deg'], # X, Y coordinates
+                c=df['speed'], cmap='plasma', alpha=0.7, s=10, # Use s=10 for slightly larger points
+                label='View Angle Trajectory (colored by speed)' # Legend label
+            )
+            # Add colorbar, associating it with the axes object
+            plt.colorbar(sc, ax=ax, label='Mouse Speed (°/s or unit of speed column)')
+        else:
+            # Fallback if 'speed' column is missing: color by index
+            print("Warning: 'speed' column not found in DataFrame. Coloring by frame index instead.")
+            sc = ax.scatter(
+                df['cum_pitch_deg'], df['cum_yaw_deg'], # X, Y coordinates
+                c=df.index, cmap='viridis', alpha=0.7, s=10,
+                label='View Angle Trajectory (colored by frame)' # Updated label
+            )
+            plt.colorbar(sc, ax=ax, label='Frame Index')
+    
+    
+        # Mark the Z-axis local minima points on the plot
+        if final_minima_idx is not None and len(final_minima_idx) > 0:
+            # Ensure indices are valid before using iloc
+            valid_minima_idx = df.index.intersection(final_minima_idx)
+            if len(valid_minima_idx) > 0:
+                  minima_pitch = df.loc[valid_minima_idx, 'cum_pitch_deg'].values
+                  minima_yaw = df.loc[valid_minima_idx, 'cum_yaw_deg'].values
+                  ax.scatter(minima_pitch, minima_yaw,
+                            color='red', s=50, # Make minima markers larger
+                            label='Z Minima', zorder=3, marker='x') # Use 'x' marker
+            else:
+                  print("Warning: None of the final_minima_idx were found in the DataFrame index.")
+        # 設定邊距
+        padding_factor = 0.1 # 設定 10% 的邊距
+        pitch_min, pitch_max = df['cum_pitch_deg'].min(), df['cum_pitch_deg'].max()
+        yaw_min, yaw_max = df['cum_yaw_deg'].min(), df['cum_yaw_deg'].max()
+        pitch_range_val = pitch_max - pitch_min
+        yaw_range_val = yaw_max - yaw_min
+        ax.set_xlim(pitch_min - padding_factor * pitch_range_val, pitch_max + padding_factor * pitch_range_val)
+        ax.set_ylim(yaw_min - padding_factor * yaw_range_val, yaw_max + padding_factor * yaw_range_val)
+        # Set chart labels, title, and aspect ratio using the axes object
+        ax.set_xlabel('Pitch Angle (°)')
+        ax.set_ylabel('Yaw Angle (°)')
+        ax.set_title('View Angle Trajectory Colored by Mouse Speed with Z Minima')
+        # ax.axis('equal') # Ensure equal aspect ratio
+        ax.legend() # Show legend
+        # Grid and axis styles are already set by apply_custom_style
+    
+        plt.tight_layout() # Adjust layout
+        plt.show() # Display the plot
 
     # 返回最終處理好的包含群組資訊的 DataFrame
     return grouped_df
+
 # %%
-
-
-def excludeCenter_and_plot_separately(df: pd.DataFrame, grouped_df: pd.DataFrame,
-                                      yaw_range: float = 10, pitch_range: float = 10,
-                                      show: bool = True) -> pd.DataFrame:
-    """
-    過濾擊殺動作群組，僅保留結束點位於視角中心區域之外的群組。
-    如果 show=True，則會分別顯示兩張視覺化圖表：
-    1. 點分佈圖：顯示所有點、保留的群組點及中心排除區域。
-    2. 箭頭圖：顯示保留群組的移動方向箭頭 (從起始幀到結束幀)。
-
-    Args:
-        df (pd.DataFrame): 包含原始數據的 DataFrame ('cum_yaw_deg', 'cum_pitch_deg')。
-        grouped_df (pd.DataFrame): 預先計算好的擊殺群組 DataFrame (包含 'Frames' 列表)。
-        yaw_range (float): 中心區域的水平半徑 (度)。
-        pitch_range (float): 中心區域的垂直半徑 (度)。
-        show (bool): 是否顯示視覺化圖表。
-
-    Returns:
-        pd.DataFrame: 經過濾後的 DataFrame，僅包含結束點不在中心的群組。
-    """
-
-    # === 1. 定義視角中心區域 ===
-    # (這裡繼續使用中位數，你可根據需要更改為 mean 或 min/max 中點)
-    try:
-        yaw_center = df["cum_yaw_deg"].median()
-        pitch_center = df["cum_pitch_deg"].median()
-        print(f"【基於中位數】視角中心計算結果: Yaw={yaw_center:.2f}°, Pitch={pitch_center:.2f}°")
-        print(f"中心區域定義: Yaw ±{yaw_range}°, Pitch ±{pitch_range}°")
-    except KeyError as e:
-        print(f"錯誤：輸入的 df 缺少必要的欄位 {e}")
-        return pd.DataFrame() # 返回空的 DataFrame 或拋出異常
-
-    # === 2. 向量化過濾 ===
-    temp_grouped = grouped_df.copy()
-
-    def get_last_frame(frames_list):
-        if isinstance(frames_list, list) and len(frames_list) > 0:
-             # 確保幀索引是有效的數值類型，並處理可能的錯誤
-             try:
-                 return int(frames_list[-1])
-             except (ValueError, TypeError):
-                 return np.nan # 如果轉換失敗，返回 NaN
-        return np.nan
-
-    if 'Frames' not in temp_grouped.columns:
-        print("錯誤：grouped_df 缺少 'Frames' 欄位")
-        return pd.DataFrame()
-
-    temp_grouped['last_frame'] = temp_grouped['Frames'].apply(get_last_frame)
-
-    # 檢查必要的座標欄位是否存在
-    if 'cum_yaw_deg' not in df.columns or 'cum_pitch_deg' not in df.columns:
-        print("錯誤：df 缺少 'cum_yaw_deg' 或 'cum_pitch_deg' 欄位")
-        return pd.DataFrame()
-
-    yaw_map = df['cum_yaw_deg']
-    pitch_map = df['cum_pitch_deg']
-
-    temp_grouped['last_yaw'] = temp_grouped['last_frame'].map(yaw_map)
-    temp_grouped['last_pitch'] = temp_grouped['last_frame'].map(pitch_map)
-
-    valid_coords_mask = temp_grouped['last_yaw'].notna() & temp_grouped['last_pitch'].notna()
-
-    is_in_center_mask = pd.Series(False, index=temp_grouped.index)
-    # 僅在有效座標上計算是否在中心
-    if valid_coords_mask.any():
-        is_in_center_mask.loc[valid_coords_mask] = (
-            (abs(temp_grouped.loc[valid_coords_mask, 'last_yaw'] - yaw_center) <= yaw_range) &
-            (abs(temp_grouped.loc[valid_coords_mask, 'last_pitch'] - pitch_center) <= pitch_range)
-        )
-
-    # 保留條件：座標有效 且 不在中心
-    keep_mask = valid_coords_mask & (~is_in_center_mask)
-    filtered_grouped_df = grouped_df.loc[keep_mask].reset_index(drop=True)
-
-    # === 3. 計算與報告排除數量 ===
-    original_count = len(grouped_df)
-    filtered_count = len(filtered_grouped_df)
-    excluded_count = original_count - filtered_count
-    print(f"原始群組數量: {original_count}")
-    print(f"因 **結束點在中心區域** 或 **資料無效/缺失** 而被排除的群組數量: {excluded_count}")
-    print(f"過濾後剩餘群組數量: {filtered_count}")
-
-    # === 4. 視覺化 (明確分為兩張圖) ===
-    if show:
-        if filtered_grouped_df.empty:
-            print("沒有可供顯示的過濾後群組。")
-        else:
-            # --- 圖 1: 點分佈與中心區域 ---
-            try:
-                plt.figure(figsize=(10, 8))
-                ax1 = plt.gca()
-                # 背景點
-                ax1.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.1, s=5, color='gray', label="所有數據點")
-                # 保留群組的所有點
-                all_retained_frames_plot1 = [frame for frames_list in filtered_grouped_df["Frames"] for frame in frames_list if isinstance(frames_list, list)]
-                # 過濾掉無效的幀索引 (例如 NaN 或非數字)
-                valid_frame_indices = [f for f in all_retained_frames_plot1 if pd.notna(f) and isinstance(f, (int, float))]
-                valid_retained_frames_plot1 = df.index.intersection(valid_frame_indices)
-
-                if not valid_retained_frames_plot1.empty:
-                     ax1.scatter(df.loc[valid_retained_frames_plot1, "cum_pitch_deg"], df.loc[valid_retained_frames_plot1, "cum_yaw_deg"],
-                                 color='blue', s=20, alpha=0.6, label="保留群組的點", zorder=3)
-                # 繪製每個被保留群組的範圍
-                for idx, row in filtered_grouped_df.iterrows(): # 使用 idx 避免與 plt 變數衝突
-                    group_frames = row["Frames"]
-                    if not group_frames: continue
-
-                    try:
-                        group_pitch = df["cum_pitch_deg"].loc[group_frames]
-                        group_yaw = df["cum_yaw_deg"].loc[group_frames]
-                        # 使用半透明紅色邊框標記群組
-                        plt.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red',
-                                    s=80, linewidths=1.5, alpha=0.7, label="保留的群組範圍" if idx == 0 else "", zorder=2)
-                    except KeyError:
-                        print(f"警告：繪製群組 {idx} 時無法在 df 中找到部分幀索引，該群組可能未完整繪製。")
-                
-                # 中心區域框
-                rect_pitch = [pitch_center - pitch_range, pitch_center + pitch_range, pitch_center + pitch_range, pitch_center - pitch_range, pitch_center - pitch_range]
-                rect_yaw = [yaw_center - yaw_range, yaw_center - yaw_range, yaw_center + yaw_range, yaw_center + yaw_range, yaw_center - yaw_range]
-                ax1.plot(rect_pitch, rect_yaw, color='green', linestyle='--', linewidth=2, label="中心區域 (排除用)")
-                # 圖表元素
-                ax1.set_xlabel("Pitch Angle (°)")
-                ax1.set_ylabel("Yaw Angle (°)")
-                ax1.set_title("過濾後的擊殺群組視覺化 (點分佈與排除區域)")
-                ax1.grid(True)
-                ax1.axis("equal")
-                handles, labels = ax1.get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                ax1.legend(by_label.values(), by_label.keys())
-                plt.show() # 顯示第一張圖
-            except Exception as e:
-                print(f"繪製第一張圖時發生錯誤: {e}")
-
-
-            # --- 圖 2: 移動方向箭頭 ---
-            try:
-                plt.figure(figsize=(10, 8))
-                ax2 = plt.gca()
-                # 可選: 背景點
-                ax2.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.05, s=5, color='gray', label="所有數據點 (背景)")
-                # 可選: 保留群組的點
-                if not valid_retained_frames_plot1.empty: # 使用上面計算過的索引
-                     ax2.scatter(df.loc[valid_retained_frames_plot1, "cum_pitch_deg"], df.loc[valid_retained_frames_plot1, "cum_yaw_deg"],
-                                 color='blue', s=10, alpha=0.3, label="保留群組的點 (參考)", zorder=2)
-
-                arrow_drawn = False # 圖例標籤控制
-                # 遍歷繪製箭頭
-                for idx, row in filtered_grouped_df.iterrows():
-                    group_frames = row["Frames"]
-                    if isinstance(group_frames, list) and len(group_frames) >= 2:
-                        try:
-                            start_frame = int(group_frames[0])
-                            end_frame = int(group_frames[-1])
-
-                            # 獲取座標 (增加錯誤檢查)
-                            if start_frame not in df.index or end_frame not in df.index:
-                                print(f"警告：群組 {idx} 的開始幀 {start_frame} 或結束幀 {end_frame} 不在 df 的索引中。")
-                                continue
-
-                            pitch_start = df.loc[start_frame, "cum_pitch_deg"]
-                            yaw_start = df.loc[start_frame, "cum_yaw_deg"]
-                            pitch_end = df.loc[end_frame, "cum_pitch_deg"]
-                            yaw_end = df.loc[end_frame, "cum_yaw_deg"]
-
-                            # 檢查座標是否有效 (非 NaN)
-                            if pd.isna(pitch_start) or pd.isna(yaw_start) or pd.isna(pitch_end) or pd.isna(yaw_end):
-                                print(f"警告：群組 {idx} 的開始或結束座標無效 (NaN)。")
-                                continue
-
-                            # 繪製箭頭
-                            ax2.annotate(
-                                '', xy=(pitch_end, yaw_end), xytext=(pitch_start, yaw_start),
-                                arrowprops=dict(arrowstyle="->", color="lightsteelblue", lw=1, linestyle="--", shrinkA=5, shrinkB=5),
-                                zorder=3 )
-                            if not arrow_drawn:
-                                ax2.plot([], [], color='red', lw=1, label='擊殺動作方向 (開始->結束)')
-                                arrow_drawn = True
-                        except (KeyError, ValueError, TypeError) as frame_err:
-                             print(f"警告：處理群組 {idx} 的幀 {group_frames} 時出錯: {frame_err}")
-                             continue # 跳過這個群組的箭頭繪製
-                # 繪製每個被保留群組的範圍
-                for idx, row in filtered_grouped_df.iterrows(): # 使用 idx 避免與 plt 變數衝突
-                    group_frames = row["Frames"]
-                    if not group_frames: continue
-    
-                    try:
-                        group_pitch = df["cum_pitch_deg"].loc[group_frames]
-                        group_yaw = df["cum_yaw_deg"].loc[group_frames]
-                        # 使用半透明紅色邊框標記群組
-                        plt.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red',
-                                    s=80, linewidths=1.5, alpha=0.7, label="保留的群組範圍" if idx == 0 else "", zorder=2)
-                    except KeyError:
-                        print(f"警告：繪製群組 {idx} 時無法在 df 中找到部分幀索引，該群組可能未完整繪製。")
-        
-                # 中心區域框
-                rect_pitch = [pitch_center - pitch_range, pitch_center + pitch_range, pitch_center + pitch_range, pitch_center - pitch_range, pitch_center - pitch_range]
-                rect_yaw = [yaw_center - yaw_range, yaw_center - yaw_range, yaw_center + yaw_range, yaw_center + yaw_range, yaw_center - yaw_range]
-                ax2.plot(rect_pitch, rect_yaw, color='green', linestyle='--', linewidth=2, label="中心區域 (排除用)")
-                # 圖表元素
-                ax2.set_xlabel("Pitch Angle (°)")
-                ax2.set_ylabel("Yaw Angle (°)")
-                ax2.set_title("過濾後擊殺群組的移動方向箭頭")
-                ax2.grid(True)
-                ax2.axis("equal")
-                handles, labels = ax2.get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                if by_label: ax2.legend(by_label.values(), by_label.keys())
-                plt.show() # 顯示第二張圖
-            except Exception as e:
-                print(f"繪製第二張圖時發生錯誤: {e}")
-
-    # === 5. 返回結果 ===
-    return filtered_grouped_df
-# %%
-
-
-
 def standardize_group_signals(df, filtered_grouped_df, signal_column_name,
                               target_length=101,
                               start_col='Frame Start', # 或 'NEW Frame Start'
@@ -1049,328 +1790,372 @@ def standardize_group_signals(df, filtered_grouped_df, signal_column_name,
 
 # %%
 
-# 將單位從mm轉換成視角
-df = ConverUnit2Angle(combine_dict, descriptions)
-# 2.1. 找出每一次目標擊殺的開槍數 -> 找出Z axis local minimal
-# 2.1.1. 以滑鼠點擊次數計算，使用Z軸局部最小值，如果兩次Z軸局部最小值的視角差
-#         小於某個閾值，則視為仍在瞄準同一個目標
-filtered_minima_data = find_Zaxis_min(df, show=True)
-filtered_minima_idx = filtered_minima_data["Frame"].tolist()
-# 2.1.2. 找出完成擊殺的 frame 以及上一個視角大於閾值的視角位置
-grouped_df = findZminGroup(df, filtered_minima_idx)
-# 2.2. 找出從中心出發的開槍軌跡
-# 2025.04.30 接下來從這邊開始
-excldueCen_grouped_df = excludeCenter_and_plot_separately(df, grouped_df, show=True)
+def excludeCenter(df: pd.DataFrame, grouped_df: pd.DataFrame,
+                  yaw_range: float = 10, pitch_range: float = 10,
+                  show: bool = True) -> pd.DataFrame:
+    """
+    Filters kill action groups, retaining only those whose endpoint is outside the central view area.
+    If show=True, displays two separate visualizations:
+    1. Point Distribution Plot: Shows all points, retained group points, and the central exclusion zone.
+    2. Arrow Plot: Shows movement direction arrows (from start frame to end frame) for retained groups.
 
-"""
-準備做標準化處理
+    Args:
+        df (pd.DataFrame): DataFrame containing the original data ('cum_yaw_deg', 'cum_pitch_deg').
+        grouped_df (pd.DataFrame): Pre-calculated kill group DataFrame (must include 'Frames' list).
+        yaw_range (float): Horizontal radius of the central area (degrees).
+        pitch_range (float): Vertical radius of the central area (degrees).
+        show (bool): Whether to display the visualization plots.
 
-"""
+    Returns:
+        pd.DataFrame: Filtered DataFrame containing only groups whose endpoint is not in the center.
+    """
 
-# --- 如何使用 ---
-# 假設 df 是包含 'angle_speed_dps' 的原始數據 DataFrame
-# 假設 final_groups 是之前 excludeCenter 函數返回的 DataFrame
-final_groups = excldueCen_grouped_df
-# 檢查 final_groups 是否為空
-if not final_groups.empty:
+    # === 1. Define Central View Area ===
     try:
-        standardized_speeds = standardize_group_signals(
-            df=df,
-            filtered_grouped_df=final_groups,
-            signal_column_name='angle_speed_dps', # 指定要標準化的欄位
-            target_length=101,                   # 指定目標長度
-            start_col='Frame Start',             # 指定起始幀欄位
-            end_col='Frame End',                 # 指定結束幀欄位
-            group_id_col='Group ID'              # 指定群組ID欄位
+        # Using median as center calculation method
+        yaw_center = df["cum_yaw_deg"].median()
+        pitch_center = df["cum_pitch_deg"].median()
+        print(f"[Based on Median] View center calculated: Yaw={yaw_center:.2f}°, Pitch={pitch_center:.2f}°")
+        print(f"Central area defined: Yaw ±{yaw_range}°, Pitch ±{pitch_range}°")
+    except KeyError as e:
+        print(f"Error: Input df is missing required column {e}")
+        return pd.DataFrame() # Return empty DataFrame or raise exception
+
+    # === 2. Vectorized Filtering ===
+    temp_grouped = grouped_df.copy()
+
+    def get_last_frame(frames_list):
+        if isinstance(frames_list, list) and len(frames_list) > 0:
+            try:
+                return int(frames_list[-1])
+            except (ValueError, TypeError):
+                return np.nan # Return NaN if conversion fails
+        return np.nan
+
+    if 'Frames' not in temp_grouped.columns:
+        print("Error: grouped_df is missing the 'Frames' column")
+        return pd.DataFrame()
+
+    temp_grouped['last_frame'] = temp_grouped['Frames'].apply(get_last_frame)
+
+    # Check if necessary coordinate columns exist in df
+    if 'cum_yaw_deg' not in df.columns or 'cum_pitch_deg' not in df.columns:
+        print("Error: df is missing 'cum_yaw_deg' or 'cum_pitch_deg' column")
+        return pd.DataFrame()
+
+    # Use map for efficient lookup
+    yaw_map = df['cum_yaw_deg']
+    pitch_map = df['cum_pitch_deg']
+
+    temp_grouped['last_yaw'] = temp_grouped['last_frame'].map(yaw_map)
+    temp_grouped['last_pitch'] = temp_grouped['last_frame'].map(pitch_map)
+
+    # Mask for rows where coordinates could be successfully retrieved
+    valid_coords_mask = temp_grouped['last_yaw'].notna() & temp_grouped['last_pitch'].notna()
+
+    # Initialize mask for points within the center
+    is_in_center_mask = pd.Series(False, index=temp_grouped.index)
+    # Calculate 'is_in_center' only for rows with valid coordinates
+    if valid_coords_mask.any():
+        is_in_center_mask.loc[valid_coords_mask] = (
+            (abs(temp_grouped.loc[valid_coords_mask, 'last_yaw'] - yaw_center) <= yaw_range) &
+            (abs(temp_grouped.loc[valid_coords_mask, 'last_pitch'] - pitch_center) <= pitch_range)
         )
 
-        # 查看第一個群組的標準化結果 (假設 Group ID 為 1 存在)
-        # if 1 in standardized_speeds:
-        #     print("第一個群組的標準化速度序列 (前10個點):")
-        #     print(standardized_speeds[1][:10])
-        #     print(f"序列長度: {len(standardized_speeds[1])}") # 應為 101
+    # Keep rows that have valid coordinates AND are NOT in the center
+    keep_mask = valid_coords_mask & (~is_in_center_mask)
+    filtered_grouped_df = grouped_df.loc[keep_mask].reset_index(drop=True)
 
-    except KeyError as e:
-        print(f"執行標準化時出錯：{e}")
-    except ImportError:
-        print("錯誤：需要安裝 scipy 庫才能執行插值。請運行 pip install scipy")
-else:
-      print("沒有可供標準化的群組 (filtered_grouped_df is empty)。")
+    # === 3. Calculate and Report Excluded Count ===
+    original_count = len(grouped_df)
+    filtered_count = len(filtered_grouped_df)
+    excluded_count = original_count - filtered_count
+    print(f"Original group count: {original_count}")
+    print(f"Groups excluded due to **endpoint in center** or **invalid/missing data**: {excluded_count}")
+    print(f"Filtered group count remaining: {filtered_count}")
+
+    # === 4. Visualization (Clearly separated into two plots) ===
+    if show:
+        if filtered_grouped_df.empty:
+            print("No filtered groups available for plotting.")
+        else:
+            # --- Prepare plotting data (calculate only once if possible) ---
+            # Flatten list of lists, handle potential non-list entries or NaNs within lists
+            all_retained_frames_flat = []
+            for frames_list in filtered_grouped_df["Frames"]:
+                if isinstance(frames_list, list):
+                    all_retained_frames_flat.extend([f for f in frames_list if pd.notna(f) and isinstance(f, (int, float))])
+
+            # Get unique, valid frame indices that exist in the original DataFrame
+            valid_retained_frames_idx = df.index.intersection(pd.unique(all_retained_frames_flat))
+
+            # --- Plot 1: Point Distribution, Group Extents, and Center Area ---
+            try:
+                plt.figure(figsize=(10, 8))
+                ax1 = plt.gca()
+                # Background points
+                ax1.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.1, s=5, color='gray', label="All Data Points") # English Label
+
+                # Points belonging to retained groups (blue)
+                if not valid_retained_frames_idx.empty:
+                    ax1.scatter(df.loc[valid_retained_frames_idx, "cum_pitch_deg"], df.loc[valid_retained_frames_idx, "cum_yaw_deg"],
+                                color='blue', s=20, alpha=0.6, label="Retained Group Points", zorder=3) # English Label
+
+                # Optional: Mark retained group extents (red hollow circles)
+                red_circle_legend_added = False
+                for idx, row in filtered_grouped_df.iterrows():
+                    group_frames = row["Frames"]
+                    if not isinstance(group_frames, list) or not group_frames: continue
+                    valid_group_indices = [f for f in group_frames if pd.notna(f) and isinstance(f, (int, float))]
+                    group_indices_in_df = df.index.intersection(valid_group_indices)
+
+                    if group_indices_in_df.empty: continue
+
+                    try:
+                        group_pitch = df.loc[group_indices_in_df, "cum_pitch_deg"]
+                        group_yaw = df.loc[group_indices_in_df, "cum_yaw_deg"]
+                        # Mark group extent with semi-transparent red border
+                        ax1.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red',
+                                    s=80, linewidths=1.5, alpha=0.7,
+                                    label="Retained Group Extent" if not red_circle_legend_added else "", zorder=2) # English Label
+                        if not red_circle_legend_added: red_circle_legend_added = True
+                    except KeyError:
+                        warnings.warn(f"Could not find some frame indices {group_indices_in_df} in df when plotting red circle for group {idx}.") # Use warnings
+
+                # Central exclusion zone (green dashed rectangle)
+                rect_pitch = [pitch_center - pitch_range, pitch_center + pitch_range, pitch_center + pitch_range, pitch_center - pitch_range, pitch_center - pitch_range]
+                rect_yaw = [yaw_center - yaw_range, yaw_center - yaw_range, yaw_center + yaw_range, yaw_center + yaw_range, yaw_center - yaw_range]
+                ax1.plot(rect_pitch, rect_yaw, color='green', linestyle='--', linewidth=2, label="Central Zone (Excluded Endpoints)") # English Label
+
+                # Chart elements
+                ax1.set_xlabel("Pitch Angle (°)") # English Label
+                ax1.set_ylabel("Yaw Angle (°)")   # English Label
+                ax1.set_title("Filtered Kill Groups Visualization (Points, Extents & Exclusion Zone)") # English Title
+                ax1.grid(True)
+                ax1.axis("equal") # Maintain aspect ratio
+                # Consolidate legend
+                handles, labels = ax1.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles)) # Remove duplicate labels
+                ax1.legend(by_label.values(), by_label.keys())
+                plt.show() # Display the first plot
+            except Exception as e:
+                print(f"Error occurred during plotting (Plot 1): {e}")
 
 
+            # --- Plot 2: Movement Direction Arrows ---
+            try:
+                plt.figure(figsize=(10, 8))
+                ax2 = plt.gca()
+                # Optional: Background points
+                ax2.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.05, s=5, color='gray', label="All Data Points (Background)") # English Label
+                # Optional: Retained group points (blue, for reference)
+                if not valid_retained_frames_idx.empty:
+                    ax2.scatter(df.loc[valid_retained_frames_idx, "cum_pitch_deg"], df.loc[valid_retained_frames_idx, "cum_yaw_deg"],
+                                color='blue', s=10, alpha=0.3, label="Retained Group Points (Reference)", zorder=2) # English Label
+
+                arrow_drawn = False # Legend label control
+                # Iterate and draw arrows
+                for idx, row in filtered_grouped_df.iterrows():
+                    group_frames = row["Frames"]
+                    if isinstance(group_frames, list) and len(group_frames) >= 2:
+                        try:
+                            start_frame = int(group_frames[0])
+                            end_frame = int(group_frames[-1])
+
+                            # Get coordinates with error checking
+                            if start_frame not in df.index or end_frame not in df.index:
+                                warnings.warn(f"Start frame {start_frame} or end frame {end_frame} for group {idx} not in DataFrame index.") # Use warnings
+                                continue
+
+                            pitch_start = df.loc[start_frame, "cum_pitch_deg"]
+                            yaw_start = df.loc[start_frame, "cum_yaw_deg"]
+                            pitch_end = df.loc[end_frame, "cum_pitch_deg"]
+                            yaw_end = df.loc[end_frame, "cum_yaw_deg"]
+
+                            # Check for NaN coordinates
+                            if pd.isna(pitch_start) or pd.isna(yaw_start) or pd.isna(pitch_end) or pd.isna(yaw_end):
+                                warnings.warn(f"Start or end coordinates are NaN for group {idx}.") # Use warnings
+                                continue
+
+                            # Draw arrow (red dashed)
+                            ax2.annotate(
+                                '', xy=(pitch_end, yaw_end), xytext=(pitch_start, yaw_start),
+                                arrowprops=dict(arrowstyle="->", color="red", alpha=0.5,
+                                            linestyle="--", lw=1, shrinkA=5, shrinkB=5),
+                                zorder=3)
+                            if not arrow_drawn:
+                                # Add legend entry only once
+                                ax2.plot([], [], color='red', alpha=0.5,
+                                         linestyle="--",
+                                         lw=1.5, label='Kill Action Direction (Start->End)') # English Label
+                                arrow_drawn = True
+                        except (KeyError, ValueError, TypeError) as frame_err:
+                            warnings.warn(f"Error processing frames {group_frames} for group {idx}: {frame_err}") # Use warnings
+                            continue # Skip arrow for this group
+
+                # Chart elements
+                ax2.set_xlabel("Pitch Angle (°)") # English Label
+                ax2.set_ylabel("Yaw Angle (°)")   # English Label
+                ax2.set_title("Movement Direction Arrows of Filtered Kill Groups") # English Title
+                ax2.grid(True)
+                ax2.axis("equal") # Maintain aspect ratio
+                # Consolidate legend
+                handles, labels = ax2.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles)) # Remove duplicate labels
+                if by_label: # Only show legend if there's something to show
+                    ax2.legend(by_label.values(), by_label.keys())
+                plt.show() # Display the second plot
+            except Exception as e:
+                print(f"Error occurred during plotting (Plot 2): {e}")
+
+    # === 5. Return Result ===
+    return filtered_grouped_df
 # %%
-"""
-2. 計算
-    2.1. 找出每一次目標擊殺的開槍數 -> 找出Z axis local minimal
-        2.1.1. 以滑鼠點擊次數計算，使用Z軸局部最小值，如果兩次Z軸局部最小值的視角差
-                小於某個閾值，則視為仍在瞄準同一個目標
-        2.1.2. 找出完成擊殺的 frame 以及上一個視角大於閾值的視角位置
-                data format
-            	GroupID   Frames          Shot Count   Frame Start   Frame End   Frame Span
-                -------   --------------  -----------  ------------  ----------  -----------
-                1       [53.0, 71.0]          1           53.0         71.0        18.0
-    2.2. 找出從中心出發的開槍軌跡
-    2.3. 定義開槍軌跡: 多重條件
-        2.3.1. 只有速度方向往目標方向才算開始
-        2.3.2. 速度達到一定閾值？ 速度與目標方向的偏差角度？
-    2.4. 計算初始偏移角度
-"""
-
-# === 滑鼠移動轉視角（整段軌跡） ===
-# delta_x_mm = df["X"].diff().fillna(0)
-# delta_y_mm = df["Y"].diff().fillna(0)
-
-
-# %%
-"""
-    2.2. 計算
-        2.2.1. 指標
-            o. (廢棄)擊殺數, 命中率？
-            a. Throughput (Mouse Travel Efficiency): 
-            b. Mouse Speed (°/s): 找出整段時間內的最大值 or 平均值，單位換算成視角
-            c. Initial Move Angle: 初始 5 個 frame 的移動方向與最終擊殺目標位置的視角差
-                修改條件: 1. 排除所有Initial Move Angle大於45度的trial
-                         2. Frame Span 要大於 20
-            d. Full Path Time: 
-                使用 Frame Span/descriptions['motion info']['frame_rate']
-            e. Reaction Time: 從這次目標擊殺到某個 frame 移動速度超過一個閾值 
-                扣掉直接回中的反應時間
-            i. 一槍擊殺的次數, 二槍, 三槍...
-            j. 超過目標的次數， 還沒到目標就開槍的次數
-            k. Mouse Travel Efficiency: idea path/real path
-        2.2.2. 不同方向的計算: 全部方向綜合, 分四個方向 (四象限)
-"""
-
-# 將每一筆資料都標準化成固定長度
-
-
-# === b. Mouse Speed (°/s) ===
-max_angle_speed = max(df["angle_speed_dps"])
-mean_angle_speed = np.mean(df["angle_speed_dps"])
-# === c. Initial Move Angle: ===
-
-mean_initial_move_angle = np.mean(excldueCen_grouped_df['Initial Move Angle (°)'])
-
-# === d. Full Path Time (單位 Second)===
-path_time = np.mean(cen_grouped_df["Frame Span"])\
-    /descriptions['motion info']['frame_rate']
-
-# === e. Reaction Time ===
-# 只計算從中心出發，並且 initial move angle 小於 45 度
-
-# === x. 量化速度 ===
-
-
-
-    
-
-# === k. Mouse Travel Efficiency
-# Mouse Travel Efficiency: idea path/real path
-
-# %% mean std cloud
-palette = plt.get_cmap('Set1')
-fig, axs = plt.subplots(1, 1, figsize = (8, 6), sharex='col')
-
-# x, y = i - n*math.floor(abs(i)/n), math.floor(abs(i)/n)
-color = palette(0) # 設定顏色
-# 都改成100個點
-iters = list(np.linspace(0,
-                         len(standardized_data[0]),
-                         len(standardized_data[0])))
-# 設定計算資料
-avg1 = np.mean(standardized_data, axis=1) # 計算平均
-std1 = np.std(standardized_data, axis=1) # 計算標準差
-r1 = list(map(lambda x: x[0]-x[1], zip(avg1, std1))) # 畫一個標準差以內的線
-r2 = list(map(lambda x: x[0]+x[1], zip(avg1, std1)))
-axs.plot(iters, avg1, color=color, label='before', linewidth=3)
-axs.fill_between(iters, r1, r2, color=color, alpha=0.2)
-
-# 畫第二條線
-color = palette(1) # 設定顏色
-avg2 = np.mean(standardized_data, axis=1) # 計畫平均
-std2 = np.std(standardized_data, axis=1) # 計算標準差
-r1 = list(map(lambda x: x[0]-x[1], zip(avg2, std2))) # 畫一個標準差以內的線
-r2 = list(map(lambda x: x[0]+x[1], zip(avg2, std2)))
-
-axs.plot(iters, avg2, color=color, label='after', linewidth=3) # 畫平均線
-axs.fill_between(iters, r1, r2, color=color, alpha=0.2) # 塗滿一個正負標準差以內的區塊
-# 圖片的格式設定
-# axs.set_title(example_data.columns[i+1], fontsize=12)
-axs.legend(loc="lower left") # 圖例位置
-axs.grid(True, linestyle='-.')
-# 畫放箭時間
-# axs[x, y].set_xlim(-(release[0]), release[1])
-# axs.axvline(x=0, color = 'darkslategray', linewidth=1, linestyle = '--')
-    
-plt.suptitle(str("mean std cloud: "), fontsize=16)
-plt.tight_layout()
-fig.add_subplot(111, frameon=False)
-# hide tick and tick label of the big axes
-plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-plt.grid(False)
-plt.xlabel("time (%)", fontsize = 14)
-plt.ylabel("Velocity (°/s)", fontsize = 14)
-# plt.savefig(save, dpi=200, bbox_inches = "tight")
-plt.show()
-
-"""
-1. 待解決問題，分成四象限
-
-"""
-
-# %%
-
-import matplotlib.pyplot as plt
-import numpy as np
-import math
-
-def _process_and_calculate_stats(signals_dict, target_length):
-    """(內部輔助函數) 處理信號字典並計算統計數據"""
-    if not signals_dict:
-        print("警告：提供的信號字典為空。")
-        return None, None, None, 0 # 返回 None 表示失敗
-
-    signals_list = list(signals_dict.values())
-    if not signals_list:
-        print("警告：未能從字典中提取任何有效的信號數組。")
-        return None, None, None, 0
-
-    # 過濾並堆疊信號
-    valid_signals = [s for s in signals_list if isinstance(s, np.ndarray) and s.shape == (target_length,)]
-    if not valid_signals:
-         print(f"警告：未能找到任何有效（NumPy 數組且長度為 {target_length}）的信號。")
-         return None, None, None, 0
-
-    try:
-        signals_array = np.stack(valid_signals, axis=1)
-        num_signals = signals_array.shape[1]
-    except Exception as e:
-        print(f"錯誤：數據準備過程中無法堆疊數組 (檢查長度是否均為 {target_length})：{e}")
-        return None, None, None, 0
-
-    # 計算統計數據 (忽略 NaN)
-    avg_signal = np.nanmean(signals_array, axis=1)
-    std_signal = np.nanstd(signals_array, axis=1)
-
-    # 檢查計算結果是否有效 (例如，如果所有輸入都是 NaN)
-    if np.all(np.isnan(avg_signal)) or np.all(np.isnan(std_signal)):
-        print(f"警告：計算得到的平均值或標準差全部為 NaN (可能所有輸入信號都無效或全為 NaN)。")
-        return None, None, None, num_signals # 即使計算失敗也返回信號數量
-
-    lower_bound = avg_signal - std_signal
-    upper_bound = avg_signal + std_signal
-
-    return avg_signal, lower_bound, upper_bound, num_signals
-
 def plot_standardized_signals_cloud_compare(
-        signals_dict1,             # 第一個數據集 (必需)
-        target_length,             # 信號的標準化長度 (必需)
-        signals_dict2=None,        # 第二個數據集 (可選)
-        title="Comparison of Mean ± Std Dev Clouds",
-        xlabel="Normalized Time (%)",
-        ylabel="Signal Value (°/s or other units)",
-        label1='Dataset 1',      # 第一個數據集的標籤
-        label2='Dataset 2',      # 第二個數據集的標籤
-        color_index1=0,            # 第一個數據集的顏色索引
-        color_index2=1             # 第二個數據集的顏色索引
+        signals_dict1,              # First dataset (required)
+        target_length,              # Standardized length of signals (required)
+        signals_dict2=None,         # Second dataset (optional)
+        title="Comparison of Mean ± Std Dev Clouds", # English
+        xlabel="Normalized Time (%)",               # English
+        ylabel="Signal Value (°/s or other units)", # English
+        label1='Dataset 1',         # Label for the first dataset (English)
+        label2='Dataset 2',         # Label for the second dataset (English)
+        color_index1=0,             # Color index for the first dataset
+        color_index2=1              # Color index for the second dataset
     ):
     """
-    在同一張圖上繪製一個或兩個標準化信號數據集的平均值和標準差範圍圖。
+    Plots the mean and standard deviation range for one or two datasets of
+    standardized signals on the same figure.
 
-    參數 (Parameters):
-        signals_dict1 (dict):      第一個包含標準化信號的字典 (鍵: ID, 值: 1D NumPy array)。
-        target_length (int):       標準化信號的長度。兩個數據集必須相同。
-        signals_dict2 (dict, optional): 第二個包含標準化信號的字典。預設為 None。
-        title (str):               圖表的標題。
-        xlabel (str):              x 軸的標籤。
-        ylabel (str):              y 軸的標籤。
-        label1 (str):              第一個數據集在圖例中的標籤。
-        label2 (str):              第二個數據集在圖例中的標籤 (如果提供 signals_dict2)。
-        color_index1 (int):        第一個數據集使用的 'Set1' 調色板顏色索引。
-        color_index2 (int):        第二個數據集使用的 'Set1' 調色板顏色索引。
+    Parameters:
+        signals_dict1 (dict):   Dictionary containing the first set of standardized signals
+                                (Keys: ID, Values: 1D NumPy array).
+        target_length (int):    The standardized length of the signals. Must be the same
+                                for both datasets.
+        signals_dict2 (dict, optional): Dictionary containing the second set of standardized signals.
+                                Defaults to None.
+        title (str):            Title for the plot.
+        xlabel (str):           Label for the x-axis.
+        ylabel (str):           Label for the y-axis.
+        label1 (str):           Legend label for the first dataset.
+        label2 (str):           Legend label for the second dataset (if signals_dict2 is provided).
+        color_index1 (int):     Index for the color from 'Set1' palette for dataset 1.
+        color_index2 (int):     Index for the color from 'Set1' palette for dataset 2.
     """
+    # --- Define Inner Helper Function ---
+    def _process_and_calculate_stats(signals_dict, target_length):
+        """(Internal helper function) Process signal dictionary and calculate statistics"""
+        if not signals_dict:
+            print("Warning: Provided signal dictionary is empty.") # English
+            return None, None, None, 0 # Return None to indicate failure
 
-    # --- 創建圖表和 x 軸 ---
+        signals_list = list(signals_dict.values())
+        if not signals_list:
+            print("Warning: Could not extract any valid signal arrays from the dictionary.") # English
+            return None, None, None, 0
+
+        # Filter and stack signals
+        valid_signals = [s for s in signals_list if isinstance(s, np.ndarray) and s.shape == (target_length,)]
+        if not valid_signals:
+            print(f"Warning: Could not find any valid signals (NumPy array with length {target_length}).") # English
+            return None, None, None, 0
+
+        try:
+            signals_array = np.stack(valid_signals, axis=1)
+            num_signals = signals_array.shape[1]
+        except Exception as e:
+            print(f"Error: Could not stack arrays during data preparation (check if all lengths are {target_length}): {e}") # English
+            return None, None, None, 0
+
+        # Calculate statistics (ignore NaN)
+        # Use np.nanmean and np.nanstd for robustness against NaNs within signals
+        with np.errstate(all='ignore'): # Suppress warnings from mean/std of empty/all-NaN slices
+            avg_signal = np.nanmean(signals_array, axis=1)
+            std_signal = np.nanstd(signals_array, axis=1)
+
+        # Check if calculations were valid (e.g., if all inputs were NaN)
+        if np.all(np.isnan(avg_signal)) or np.all(np.isnan(std_signal)):
+            print("Warning: Calculated mean or standard deviation are all NaN (perhaps all input signals were invalid or all NaN).") # English
+            return None, None, None, num_signals # Return signal count even if stats failed
+
+        lower_bound = avg_signal - std_signal
+        upper_bound = avg_signal + std_signal
+
+        return avg_signal, lower_bound, upper_bound, num_signals
+    # --- End of Inner Helper Function Definition ---
+
+
+    # --- Main Function Logic Starts Here ---
+    # --- Create figure and x-axis ---
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-    iters = np.linspace(0, 100, target_length) # x 軸：0% 到 100%
-    palette = plt.get_cmap('Set1')
+    iters = np.linspace(0, 100, target_length) # x-axis: 0% to 100%
+    try:
+        palette = plt.get_cmap('Set1')
+    except ValueError:
+        print("Warning: Colormap 'Set1' not found. Using default 'viridis'.")
+        palette = plt.get_cmap('viridis')
+
 
     plot_success_count = 0
 
-    # --- 處理和繪製第一個數據集 ---
-    print(f"處理數據集 1 ({label1})...")
+    # --- Process and plot Dataset 1 ---
+    print(f"Processing Dataset 1 ({label1})...") # English
     avg1, lower1, upper1, count1 = _process_and_calculate_stats(signals_dict1, target_length)
 
-    if avg1 is not None: # 確保數據處理和計算成功
-        color1 = palette(color_index1 % palette.N)
+    if avg1 is not None: # Ensure data processing and calculation succeeded
+        color1 = palette(color_index1 % palette.N) # Use modulo for safety
         ax.plot(iters, avg1, color=color1, label=f'{label1} (n={count1})', linewidth=2)
         ax.fill_between(iters, lower1, upper1, color=color1, alpha=0.2)
         plot_success_count += 1
     else:
-        print(f"未能成功處理或計算數據集 1 ({label1}) 的統計數據。")
+        print(f"Could not successfully process or calculate statistics for Dataset 1 ({label1}).") # English
 
 
-    # --- 處理和繪製第二個數據集 (如果存在) ---
+    # --- Process and plot Dataset 2 (if provided) ---
     if signals_dict2 is not None:
-        print(f"\n處理數據集 2 ({label2})...")
+        print(f"\nProcessing Dataset 2 ({label2})...") # English
         avg2, lower2, upper2, count2 = _process_and_calculate_stats(signals_dict2, target_length)
 
-        if avg2 is not None: # 確保數據處理和計算成功
+        if avg2 is not None: # Ensure data processing and calculation succeeded
             color2 = palette(color_index2 % palette.N)
-            # 確保顏色不同
+            # Ensure colors are different if indices are the same
             if color_index1 == color_index2:
-                print(f"警告：數據集 1 和 2 的顏色索引相同 ({color_index1})。將嘗試使用下一個顏色。")
+                print(f"Warning: Color index for Dataset 1 and 2 is the same ({color_index1}). Attempting to use next color for Dataset 2.") # English
                 color2 = palette((color_index2 + 1) % palette.N)
 
             ax.plot(iters, avg2, color=color2, label=f'{label2} (n={count2})', linewidth=2)
             ax.fill_between(iters, lower2, upper2, color=color2, alpha=0.2)
             plot_success_count += 1
         else:
-           print(f"未能成功處理或計算數據集 2 ({label2}) 的統計數據。")
+            print(f"Could not successfully process or calculate statistics for Dataset 2 ({label2}).") # English
 
-    # --- 圖表格式設定 ---
-    if plot_success_count > 0: # 只有成功繪製了至少一個數據集才進行格式化
+    # --- Plot Formatting ---
+    if plot_success_count > 0: # Only format if at least one dataset was plotted
         ax.set_title(title, fontsize=14)
         ax.legend(loc="best")
         ax.grid(True, linestyle='-.')
         ax.set_xlabel(xlabel, fontsize=12)
         ax.set_ylabel(ylabel, fontsize=12)
+        ax.set_xlim(left=0, right=100)
         plt.tight_layout()
         plt.show()
     else:
-        print("\n沒有成功繪製任何數據集，圖表未顯示。")
-        plt.close(fig) # 關閉空的圖表窗口
+        print("\nNo datasets were plotted successfully, figure not shown.") # English
+        plt.close(fig) # Close the empty figure window
+
+# %%
+      
 
 
-# --- 如何使用 ---
-# 假設 standardized_speeds1 和 standardized_speeds2 是兩個包含標準化速度信號的字典
-# 假設 target_length = 101
-standardized_speeds1 = standardized_speeds
-# 示例 1: 只繪製一個數據集
-if standardized_speeds1:
-      plot_standardized_signals_cloud_compare(
-          signals_dict1=standardized_speeds1,
-          target_length=101,
-          title="數據集 1 的平均速度 ± 標準差",
-          label1='實驗組 A',
-          ylabel="速度 (°/s)"
-      )
 
-# 示例 2: 繪製兩個數據集進行比較
-# if standardized_speeds1 and standardized_speeds2:
-#      plot_standardized_signals_cloud_compare(
-#          signals_dict1=standardized_speeds1,
-#          target_length=101,
-#          signals_dict2=standardized_speeds2, # 提供第二個字典
-#          title="比較兩個數據集的平均速度 ± 標準差",
-#          label1='實驗組 A',
-#          label2='實驗組 B',        # 為第二個數據集提供標籤
-#          ylabel="速度 (°/s)",
-#          color_index1=0,         # 第一個用顏色 0
-#          color_index2=1          # 第二個用顏色 1
-#      )
-# else:
-#      print("至少需要一個有效的標準化信號字典才能繪圖。")
+
+
+
+
+
+
+
+
 
 
 
