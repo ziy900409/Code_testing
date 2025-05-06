@@ -9,8 +9,8 @@ import numpy as np
 
 # %%
 
-def calculate_trajectory_efficiency(df: pd.DataFrame,
-                                    grouped_df: pd.DataFrame) -> pd.DataFrame:
+def cal_tra_efficiency(df: pd.DataFrame,
+                       grouped_df: pd.DataFrame) -> pd.DataFrame:
     """
     計算每個群組的實際視角軌跡長度與理想直線距離的比值。
 
@@ -37,7 +37,9 @@ def calculate_trajectory_efficiency(df: pd.DataFrame,
     actual_lengths = []
     ideal_lengths = []
     ratios = []
-
+    mean_vel_1shot = []
+    max_vel_1shot = []
+    
     print("開始計算每個群組的軌跡效率...")
     # 迭代每個群組
     for index, row in grouped_df.iterrows():
@@ -51,9 +53,12 @@ def calculate_trajectory_efficiency(df: pd.DataFrame,
                 # 並確保它們存在於 df 的索引中
                 # valid_frame_indices = df.index.intersection([int(f) for f in frames_list if pd.notna(f)])
                 start_point = int(frames_list[0])
+                first_end = int(frames_list[1])
                 end_point = int(frames_list[-1])
 
                 if (end_point - start_point) >= 2:
+                    # 計算低一次開槍的移動速度
+                    trial_speed = df.loc[start_point:first_end, "speed"]
                     # 提取這個群組所有有效幀的軌跡數據
                     trajectory = df.loc[start_point:end_point, ['cum_pitch_deg', 'cum_yaw_deg']]
 
@@ -93,12 +98,24 @@ def calculate_trajectory_efficiency(df: pd.DataFrame,
         actual_lengths.append(act_len)
         ideal_lengths.append(ideal_len)
         ratios.append(ratio)
+        mean_vel_1shot.append(trial_speed.mean())
+        max_vel_1shot.append(trial_speed.max())
 
     # 將計算結果添加為新的欄位
     grouped_df_out = grouped_df.copy() # 避免修改原始傳入的 DataFrame
     grouped_df_out['Actual Path Length'] = actual_lengths
     grouped_df_out['Ideal Path Length'] = ideal_lengths
-    grouped_df_out['Efficiency Ratio'] = ratios # 比值 > 1 表示實際路徑比直線長
+    grouped_df_out['Efficiency Ratio'] = ratios # 比值 < 1 表示實際路徑比直線長
+    grouped_df_out['mean_vel_1shot'] = mean_vel_1shot
+    grouped_df_out['max_vel_1shot'] = max_vel_1shot
 
     print("軌跡效率計算完成。")
     return grouped_df_out
+
+
+
+
+
+
+
+

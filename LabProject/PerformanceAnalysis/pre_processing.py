@@ -2012,71 +2012,71 @@ def excludeCenter(df: pd.DataFrame, grouped_df: pd.DataFrame,
     return filtered_grouped_df
 # %%
 def plot_standardized_signals_cloud_compare(
-        signals_dict1,              # First dataset (required)
+        datasets,                   # List of signal dictionaries (required)
         target_length,              # Standardized length of signals (required)
-        signals_dict2=None,         # Second dataset (optional)
-        title="Comparison of Mean ± Std Dev Clouds", # English
-        xlabel="Normalized Time (%)",               # English
-        ylabel="Signal Value (°/s or other units)", # English
-        label1='Dataset 1',         # Label for the first dataset (English)
-        label2='Dataset 2',         # Label for the second dataset (English)
-        color_index1=0,             # Color index for the first dataset
-        color_index2=1              # Color index for the second dataset
+        title="Comparison of Mean ± Std Dev Clouds",
+        xlabel="Normalized Time (%)",
+        ylabel="Signal Value (°/s or other units)",
+        # Optional: Provide lists for labels and colors, otherwise defaults are used
+        labels=None,                # List of labels corresponding to datasets
+        color_indices=None          # List of color indices corresponding to datasets
     ):
     """
-    Plots the mean and standard deviation range for one or two datasets of
+    Plots the mean and standard deviation range for one or more (up to N) datasets of
     standardized signals on the same figure.
 
     Parameters:
-        signals_dict1 (dict):   Dictionary containing the first set of standardized signals
+        datasets (list[dict]):  List where each element is a dictionary containing standardized signals
                                 (Keys: ID, Values: 1D NumPy array).
         target_length (int):    The standardized length of the signals. Must be the same
-                                for both datasets.
-        signals_dict2 (dict, optional): Dictionary containing the second set of standardized signals.
-                                Defaults to None.
+                                for all datasets.
         title (str):            Title for the plot.
         xlabel (str):           Label for the x-axis.
         ylabel (str):           Label for the y-axis.
-        label1 (str):           Legend label for the first dataset.
-        label2 (str):           Legend label for the second dataset (if signals_dict2 is provided).
-        color_index1 (int):     Index for the color from 'Set1' palette for dataset 1.
-        color_index2 (int):     Index for the color from 'Set1' palette for dataset 2.
+        labels (list[str], optional): List of legend labels for each dataset. If None, defaults
+                                      like "Dataset 1", "Dataset 2", etc., will be used.
+        color_indices (list[int], optional): List of indices for the color from 'Set1' palette
+                                             for each dataset. If None, indices 0, 1, 2,... will be used.
     """
     # --- Define Inner Helper Function ---
     def _process_and_calculate_stats(signals_dict, target_length):
         """(Internal helper function) Process signal dictionary and calculate statistics"""
         if not signals_dict:
-            print("Warning: Provided signal dictionary is empty.") # English
-            return None, None, None, 0 # Return None to indicate failure
+            print("Warning: Provided signal dictionary is empty.")
+            return None, None, None, 0
 
-        signals_list = list(signals_dict.values())
+        # Handle cases where values might not be lists/arrays directly
+        try:
+            signals_list = list(signals_dict.values())
+        except AttributeError: # Handle if signals_dict is not dict-like
+             print("Warning: Input signals_dict is not a dictionary or dictionary-like object.")
+             return None, None, None, 0
+
         if not signals_list:
-            print("Warning: Could not extract any valid signal arrays from the dictionary.") # English
+            print("Warning: Could not extract any valid signal arrays from the dictionary.")
             return None, None, None, 0
 
         # Filter and stack signals
-        valid_signals = [s for s in signals_list if isinstance(s, np.ndarray) and s.shape == (target_length,)]
+        valid_signals = [s for s in signals_list if isinstance(s, np.ndarray) and s.ndim == 1 and s.shape[0] == target_length]
         if not valid_signals:
-            print(f"Warning: Could not find any valid signals (NumPy array with length {target_length}).") # English
+            print(f"Warning: Could not find any valid signals (1D NumPy array with length {target_length}).")
             return None, None, None, 0
 
         try:
             signals_array = np.stack(valid_signals, axis=1)
             num_signals = signals_array.shape[1]
         except Exception as e:
-            print(f"Error: Could not stack arrays during data preparation (check if all lengths are {target_length}): {e}") # English
+            print(f"Error: Could not stack arrays during data preparation (check if all lengths are {target_length}): {e}")
             return None, None, None, 0
 
         # Calculate statistics (ignore NaN)
-        # Use np.nanmean and np.nanstd for robustness against NaNs within signals
-        with np.errstate(all='ignore'): # Suppress warnings from mean/std of empty/all-NaN slices
+        with np.errstate(all='ignore'):
             avg_signal = np.nanmean(signals_array, axis=1)
             std_signal = np.nanstd(signals_array, axis=1)
 
-        # Check if calculations were valid (e.g., if all inputs were NaN)
         if np.all(np.isnan(avg_signal)) or np.all(np.isnan(std_signal)):
-            print("Warning: Calculated mean or standard deviation are all NaN (perhaps all input signals were invalid or all NaN).") # English
-            return None, None, None, num_signals # Return signal count even if stats failed
+            print("Warning: Calculated mean or standard deviation are all NaN (perhaps all input signals were invalid or all NaN).")
+            return None, None, None, num_signals
 
         lower_bound = avg_signal - std_signal
         upper_bound = avg_signal + std_signal
@@ -2086,51 +2086,68 @@ def plot_standardized_signals_cloud_compare(
 
 
     # --- Main Function Logic Starts Here ---
+    if not isinstance(datasets, list) or not datasets:
+        print("Error: 'datasets' must be a non-empty list of dictionaries.")
+        return
+
+    num_datasets = len(datasets)
+
+    # --- Setup Labels and Colors ---
+    if labels is None:
+        labels = [f'Dataset {i+1}' for i in range(num_datasets)]
+    elif len(labels) != num_datasets:
+        print(f"Warning: Number of labels ({len(labels)}) does not match number of datasets ({num_datasets}). Using default labels.")
+        labels = [f'Dataset {i+1}' for i in range(num_datasets)]
+
+    if color_indices is None:
+        color_indices = list(range(num_datasets))
+    elif len(color_indices) != num_datasets:
+        print(f"Warning: Number of color_indices ({len(color_indices)}) does not match number of datasets ({num_datasets}). Using default indices.")
+        color_indices = list(range(num_datasets))
+
     # --- Create figure and x-axis ---
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     iters = np.linspace(0, 100, target_length) # x-axis: 0% to 100%
     try:
-        palette = plt.get_cmap('Set1')
+        # Use a colormap with more distinct colors if plotting many lines
+        if num_datasets > plt.get_cmap('Set1').N:
+             palette = plt.get_cmap('tab10') # Or 'tab20', 'viridis', etc.
+             print(f"Warning: More datasets ({num_datasets}) than distinct colors in 'Set1'. Switched to '{palette.name}' colormap.")
+        else:
+             palette = plt.get_cmap('Set1')
     except ValueError:
         print("Warning: Colormap 'Set1' not found. Using default 'viridis'.")
         palette = plt.get_cmap('viridis')
 
-
     plot_success_count = 0
 
-    # --- Process and plot Dataset 1 ---
-    print(f"Processing Dataset 1 ({label1})...") # English
-    avg1, lower1, upper1, count1 = _process_and_calculate_stats(signals_dict1, target_length)
+    # --- Loop through datasets, process and plot ---
+    plotted_colors = set() # Keep track of used colors to avoid reuse if indices clash
+    for i in range(num_datasets):
+        signals_dict = datasets[i]
+        label = labels[i]
+        color_idx = color_indices[i]
 
-    if avg1 is not None: # Ensure data processing and calculation succeeded
-        color1 = palette(color_index1 % palette.N) # Use modulo for safety
-        ax.plot(iters, avg1, color=color1, label=f'{label1} (n={count1})', linewidth=2)
-        ax.fill_between(iters, lower1, upper1, color=color1, alpha=0.2)
-        plot_success_count += 1
-    else:
-        print(f"Could not successfully process or calculate statistics for Dataset 1 ({label1}).") # English
+        print(f"\nProcessing {label}...")
+        avg, lower, upper, count = _process_and_calculate_stats(signals_dict, target_length)
 
+        if avg is not None:
+            # Assign color, ensuring uniqueness if indices clash
+            current_color_idx = color_idx
+            while current_color_idx in plotted_colors:
+                 print(f"Warning: Color index {current_color_idx} for '{label}' already used. Trying next index.")
+                 current_color_idx += 1
+            color = palette(current_color_idx % palette.N) # Use modulo for safety
+            plotted_colors.add(current_color_idx)
 
-    # --- Process and plot Dataset 2 (if provided) ---
-    if signals_dict2 is not None:
-        print(f"\nProcessing Dataset 2 ({label2})...") # English
-        avg2, lower2, upper2, count2 = _process_and_calculate_stats(signals_dict2, target_length)
-
-        if avg2 is not None: # Ensure data processing and calculation succeeded
-            color2 = palette(color_index2 % palette.N)
-            # Ensure colors are different if indices are the same
-            if color_index1 == color_index2:
-                print(f"Warning: Color index for Dataset 1 and 2 is the same ({color_index1}). Attempting to use next color for Dataset 2.") # English
-                color2 = palette((color_index2 + 1) % palette.N)
-
-            ax.plot(iters, avg2, color=color2, label=f'{label2} (n={count2})', linewidth=2)
-            ax.fill_between(iters, lower2, upper2, color=color2, alpha=0.2)
+            ax.plot(iters, avg, color=color, label=f'{label} (n={count})', linewidth=2)
+            ax.fill_between(iters, lower, upper, color=color, alpha=0.2)
             plot_success_count += 1
         else:
-            print(f"Could not successfully process or calculate statistics for Dataset 2 ({label2}).") # English
+            print(f"Could not successfully process or calculate statistics for {label}.")
 
     # --- Plot Formatting ---
-    if plot_success_count > 0: # Only format if at least one dataset was plotted
+    if plot_success_count > 0:
         ax.set_title(title, fontsize=14)
         ax.legend(loc="best")
         ax.grid(True, linestyle='-.')
@@ -2140,8 +2157,8 @@ def plot_standardized_signals_cloud_compare(
         plt.tight_layout()
         plt.show()
     else:
-        print("\nNo datasets were plotted successfully, figure not shown.") # English
-        plt.close(fig) # Close the empty figure window
+        print("\nNo datasets were plotted successfully, figure not shown.")
+        plt.close(fig)
 
 # %%
       
