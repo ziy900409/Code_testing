@@ -144,13 +144,16 @@ def pro_main(data_path):
             print("錯誤：需要安裝 scipy 庫才能執行插值。請運行 pip install scipy")
     else:
           print("沒有可供標準化的群組 (filtered_grouped_df is empty)。")
-    return df, excldueCen_grouped_df, standardized_speeds
+    return df, metadata, excldueCen_grouped_df, standardized_speeds
 
 # %%
 
 data_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
-data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S05\250318\S05_LargeFlick_I_3.c3d"
-df, excldueCen_grouped_df, standardized_speeds = pro_main(data_path)
+data_path_1 = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S05\250318\S05_LargeFlick_I_3.c3d"
+
+# data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S06\250318\S06_GridShot_I_1.c3d"
+df, metadata, excldueCen_grouped_df, standardized_speeds = pro_main(data_path)
+df_1, metadata_1, excldueCen_grouped_df_1, standardized_speeds_1 = pro_main(data_path_1)
 
 # %%
 
@@ -178,7 +181,7 @@ df, excldueCen_grouped_df, standardized_speeds = pro_main(data_path)
 # 假設 standardized_speeds1 和 standardized_speeds2 是兩個包含標準化速度信號的字典
 # 假設 target_length = 101
 standardized_speeds1 = standardized_speeds
-standardized_speeds2 = standardized_speeds
+standardized_speeds2 = standardized_speeds_1
 
 # 示例 2: 繪製兩個數據集進行比較
 if standardized_speeds1 and standardized_speeds2:
@@ -188,9 +191,9 @@ if standardized_speeds1 and standardized_speeds2:
           title="Comparison of Mean ± Std Dev Clouds",
           xlabel="Normalized Time (%)",
           ylabel="Signal Value (°/s or other units)",
-          title="Sine Group Mean ± Std Dev",
+          # title="Sine Group Mean ± Std Dev",
           labels=['Data A', 'group2'],
-          labels=None,                
+          # labels=None,                
           # color_indices=[0, 2, 4]          
       )    
 
@@ -238,7 +241,6 @@ path_time = np.mean(excldueCen_grouped_df["Frame Span"])\
 
 # === e. Reaction Time ===
 # 只計算從中心出發，並且 initial move angle 小於 45 度
-
 
 # 呼叫函數計算效率
 grouped_df = cal.cal_tra_efficiency(df, # 原始資料

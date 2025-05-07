@@ -1,699 +1,798 @@
-
-z_file = r"C:\Users\Hsin.YH.Yang\Downloads\Z.txt"
-manual_min_file = r"C:\Users\Hsin.YH.Yang\Downloads\localmin.txt"
- 
- # %%
+import pandas as pd
 import numpy as np
-from scipy.signal import savgol_filter, find_peaks, argrelextrema
-from sklearn.metrics import precision_score, recall_score, f1_score
-import matplotlib.pyplot as plt
+from scipy import signal
+import math
+import ezc3d
+import logging # For warnings
+# %%
+down_freq = 1000
+c = 0.802
+# 帶通濾波頻率
+bandpass_cutoff = [20/0.802, 450/0.802]
+# 低通濾波頻率
+lowpass_freq = 10/c
+# 設定移動平均數與移動均方根之參數
+# 更改window length, 更改overlap length
+time_of_window = 0.1 # 窗格長度 (單位 second)
+overlap_len = 0.5 # 百分比 (%)
+# 設定 notch filter cutoff frequency
 
-# --- 參數設定 ---
-z_file = r"C:\Users\Hsin.YH.Yang\Downloads\Z.txt"
-manual_min_file = r"C:\Users\Hsin.YH.Yang\Downloads\localmin.txt"
+notch_cutoff = [[59, 61],
+                [295.5, 296.5],
+                [369.5, 370.5],
+                [179, 181],
+                [299, 301],
+                [419, 421],
+                ]
 
-# Savitzky-Golay 濾波器參數 (試著調整看看)
-baseline_window_length = 51 # 試試 101 或 31?
-baseline_polyorder = 3     # 試試 2?
+c3d_notch_cutoff = [[49, 51],
+                    [99.5, 100.5],
+                    [149.5, 150.5],
+                    [199.5, 200.5],
+                    [249.5, 250.5],
+                    [299.5, 300.5],
+                    [349.5, 350.5],
+                    [295, 297],
+                    [369, 371],
+                    [73, 75],
+                    [399, 401]
+                    ]
 
-# find_peaks 參數 (啟用 prominence 並調整)
-prominence_threshold = 0.1 # <--- *** 試著調整這個值 (例如 0.05, 0.2, 0.5 ...) ***
+csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
+                     'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
+                     'Mini sensor 3: EMG 3': 'Triceps Brachii',
+                     'Quattro sensor 4: EMG.A 4': 'Extensor Carpi Ulnaris', 
+                     'Quattro sensor 4: EMG.B 4': '1st Dorsal Interosseous', 
+                     'Quattro sensor 4: EMG.C 4': 'Abductor Digiti Quinti', 
+                     'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
+                     'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
 
-# argrelextrema 參數 (試著調整看看)
-order_param = 5 # 試試 3 或 10?
+c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
+                     'FleRad': 'Flexor Carpi Radialis',
+                     'Triceps': 'Triceps Brachii',
+                     'Triceps': 'Triceps Brachii',
+                     'ExtUlnar': 'Extensor Carpi Ulnaris',
+                     'ExtUlnar': 'Extensor Carpi Ulnaris',
+                     'DorInter': '1st Dorsal Interosseous', 
+                     'AbdDigMin': 'Abductor Digiti Quinti',
+                     #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
+                     'ExtInd': 'Extensor Indicis',
+                     'Biceps': 'Biceps Brachii',
+                     }
 
-# --- 1. 載入資料 ---
-# (同前)
-try:
-    z_data = np.loadtxt(z_file, skiprows=1)
-    print(f"成功從 '{z_file}' 載入 {len(z_data)} 個數據點。")
-except FileNotFoundError:
-    print(f"錯誤：找不到檔案 '{z_file}'。")
-    exit()
-except Exception as e:
-    print(f"讀取 '{z_file}' 時發生錯誤：{e}")
-    exit()
+c3d_analog_cha = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
+                  "Biceps", "Triceps"]
 
-try:
-    manual_indices = np.loadtxt(manual_min_file, dtype=int) - 1
-    print(f"成功從 '{manual_min_file}' 載入 {len(manual_indices)} 個手動標記的最小值索引。")
-except FileNotFoundError:
-    print(f"錯誤：找不到檔案 '{manual_min_file}'。")
-    exit()
-except Exception as e:
-    print(f"讀取 '{manual_min_file}' 時發生錯誤：{e}")
-    exit()
-
-if baseline_window_length >= len(z_data):
-    print(f"錯誤：baseline_window_length ({baseline_window_length}) 必須小於數據點總數 ({len(z_data)})。")
-    baseline_window_length = len(z_data) // 2 * 2 + 1
-    if baseline_window_length < baseline_polyorder + 1:
-         baseline_window_length = baseline_polyorder + 2 if (baseline_polyorder + 1) % 2 == 0 else baseline_polyorder + 1
-    print(f"已自動調整 baseline_window_length 為 {baseline_window_length}")
-
-# --- 2. 資料預處理 (去除基線) ---
-# (同前)
-try:
-    z_baseline = savgol_filter(z_data, baseline_window_length, baseline_polyorder)
-    z_detrended = z_data - z_baseline
-    print("成功計算基線並進行去除。")
-except Exception as e:
-    print(f"計算 Savitzky-Golay 濾波時發生錯誤：{e}")
-    exit()
-
-# --- 3. 尋找局部最小值 ---
-# 方法一：使用 find_peaks 並過濾
-try:
-    # 使用 prominence 參數，並獲取 properties
-    peaks_indices_raw, properties = find_peaks(
-        -z_detrended,
-        prominence=prominence_threshold
-        # 可以加入其他參數, e.g., width=width_threshold, distance=distance_threshold
-    )
-    print(f"使用 find_peaks (prominence={prominence_threshold}) 找到 {len(peaks_indices_raw)} 個原始峰。")
-
-    # *** 新增：過濾 Z_detrended < 0 的點 ***
-    if len(peaks_indices_raw) > 0: # 確保索引不為空
-        negative_detrended_mask = z_detrended[peaks_indices_raw] < 0
-        peaks_indices_filtered = peaks_indices_raw[negative_detrended_mask]
-        # 如果需要，也可以過濾 properties
-        # properties_filtered = {k: v[negative_detrended_mask] for k, v in properties.items()}
-    else:
-        peaks_indices_filtered = np.array([], dtype=int)
-
-    print(f"--> 過濾後 (Z_detrended < 0)，剩下 {len(peaks_indices_filtered)} 個局部最小值。")
-
-except Exception as e:
-    print(f"執行 find_peaks 或過濾時發生錯誤：{e}")
-    peaks_indices_raw = np.array([], dtype=int)
-    peaks_indices_filtered = np.array([], dtype=int)
-
-# 方法二：使用 argrelextrema
-# (同前)
-try:
-    extrema_indices = argrelextrema(z_detrended, np.less, order=order_param)[0]
-    print(f"使用 argrelextrema (order={order_param}) 找到 {len(extrema_indices)} 個局部最小值。")
-except Exception as e:
-    print(f"執行 argrelextrema 時發生錯誤：{e}")
-    extrema_indices = np.array([], dtype=int)
-
-
-# --- 4 & 5. 比較與評估 ---
-# (同前 - 但注意 find_peaks 的評估要用 filtered indices)
-def evaluate_algorithm(predicted_indices, true_indices, data_length):
-    """計算 Precision, Recall, F1-score"""
-    pred_set = set(predicted_indices)
-    true_set = set(true_indices)
-    tp = len(pred_set.intersection(true_set))
-    fp = len(pred_set - true_set)
-    fn = len(true_set - pred_set)
-    y_true = np.zeros(data_length)
-    y_pred = np.zeros(data_length)
-    if len(true_set) > 0:
-      y_true[list(true_set)] = 1
-    if len(pred_set) > 0:
-      y_pred[list(pred_set)] = 1
-    precision = precision_score(y_true, y_pred, zero_division=0)
-    recall = recall_score(y_true, y_pred, zero_division=0)
-    f1 = f1_score(y_true, y_pred, zero_division=0)
-    return tp, fp, fn, precision, recall, f1
-
-print("\n--- 演算法評估 (與 manual_min.txt 比較) ---")
-
-# *** 評估 find_peaks (使用過濾後的索引) ***
-tp_fp, fp_fp, fn_fp, precision_fp, recall_fp, f1_fp = evaluate_algorithm(peaks_indices_filtered, manual_indices, len(z_data))
-print(f"Find_Peaks (prominence={prominence_threshold}, Z_detrended<0):") # 更新標題
-print(f"  找到的索引: {peaks_indices_filtered[:20]} ... (前 20 個)")
-print(f"  TP: {tp_fp}, FP: {fp_fp}, FN: {fn_fp}")
-print(f"  Precision: {precision_fp:.4f}")
-print(f"  Recall:    {recall_fp:.4f}")
-print(f"  F1-score:  {f1_fp:.4f}")
-
-# 評估 argrelextrema (同前)
-tp_ar, fp_ar, fn_ar, precision_ar, recall_ar, f1_ar = evaluate_algorithm(extrema_indices, manual_indices, len(z_data))
-print(f"\nArgrelextrema (order={order_param}):")
-print(f"  找到的索引: {extrema_indices[:20]} ... (前 20 個)")
-print(f"  TP: {tp_ar}, FP: {fp_ar}, FN: {fn_ar}")
-print(f"  Precision: {precision_ar:.4f}")
-print(f"  Recall:    {recall_ar:.4f}")
-print(f"  F1-score:  {f1_ar:.4f}")
-
-
-# --- 6. 判斷最佳演算法 ---
-# (同前)
-print("\n--- 結論 ---")
-if f1_fp > f1_ar:
-    print(f"基於 F1-score，find_peaks (prominence={prominence_threshold}, Z_detrended<0) 在此參數設定下表現較好。")
-elif f1_ar > f1_fp:
-    print(f"基於 F1-score，argrelextrema (order={order_param}) 在此參數設定下表現較好。")
-else:
-    # 考慮到 find_peaks 多了一步過濾，如果 F1 相同，argrelextrema 可能更直接
-    if f1_fp == 0 and f1_ar == 0:
-         print("兩種演算法的 F1-score 均為 0。")
-    else:
-         print("兩種演算法的 F1-score 相同。")
-
-
-print("\n建議：")
-print("1. **調整 `prominence_threshold`**：這是最可能改善 find_peaks 結果的參數。")
-print("2. 調整 `baseline_window_length` 和 `order_param`。")
-print("3. 觀察圖表：查看過濾後的 find_peaks 點和 argrelextrema 點是否更符合您的預期。")
-
-# --- 可選：繪圖比較 ---
-# (繪圖部分程式碼不變，但會顯示過濾後的 find_peaks 結果)
-plt.figure(figsize=(15, 10))
-plt.subplot(2, 1, 1)
-plt.plot(z_data, label='原始數據 (Z.txt)', alpha=0.7)
-plt.plot(z_baseline, label=f'基線 (savgol win={baseline_window_length}, poly={baseline_polyorder})', linestyle='--')
-# Handle potential empty manual_indices for plotting
-if len(manual_indices) > 0:
-    plt.scatter(manual_indices, z_data[manual_indices], color='red', marker='x', s=100, label='手動標記最小值', zorder=5)
-else:
-    plt.scatter([], [], color='red', marker='x', s=100, label='手動標記最小值', zorder=5) # Add label even if empty
-plt.title('原始數據、基線和手動標記')
-plt.legend()
-plt.grid(True)
-
-plt.subplot(2, 1, 2)
-plt.plot(z_detrended, label='去基線數據 (Z_detrended)')
-plt.axhline(0, color='gray', linestyle=':', linewidth=0.8) # 添加 y=0 的參考線
-# Handle potential empty indices for plotting
-if len(manual_indices) > 0:
-    plt.scatter(manual_indices, z_detrended[manual_indices], color='red', marker='x', s=100, label='手動標記 (對應去基線)', zorder=5)
-else:
-     plt.scatter([], [], color='red', marker='x', s=100, label='手動標記 (對應去基線)', zorder=5)
-if len(peaks_indices_filtered) > 0:
-    plt.scatter(peaks_indices_filtered, z_detrended[peaks_indices_filtered], color='purple', marker='v', s=60, label=f'find_peaks 過濾後 ({len(peaks_indices_filtered)})', alpha=0.7)
-else:
-    plt.scatter([], [], color='purple', marker='v', s=60, label=f'find_peaks 過濾後 (0)', alpha=0.7)
-if len(extrema_indices) > 0:
-    plt.scatter(extrema_indices, z_detrended[extrema_indices], color='green', marker='o', s=40, label=f'argrelextrema ({len(extrema_indices)})', alpha=0.7)
-else:
-    plt.scatter([], [], color='green', marker='o', s=40, label=f'argrelextrema (0)', alpha=0.7)
-
-plt.title('去基線數據與演算法找到的最小值 (find_peaks 已過濾 Z_detrended < 0)')
-plt.legend()
-plt.grid(True)
-plt.xlabel('索引')
-plt.tight_layout()
-plt.show()
+muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
+               'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
+               'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
 
 # %%
+try:
+    import ezc3d
+except ImportError:
+    ezc3d = None
 
-import numpy as np
-import pandas as pd
-from scipy.signal import savgol_filter, find_peaks, argrelextrema
-from sklearn.metrics import precision_score, recall_score, f1_score
-import matplotlib.pyplot as plt
-import warnings # To suppress potential warnings if needed
-plt.rcParams['font.sans-serif'] = ['Noto Sans TC']  # 改為你實際有的
-plt.rcParams['axes.unicode_minus'] = False    # 避免座標軸負號亂碼
-
-# Helper function for evaluation (必須在主函數外部或內部定義)
-def evaluate_algorithm(predicted_indices, true_indices, data_length):
-    """計算 Precision, Recall, F1-score"""
-    # Handle potential empty inputs
-    if not isinstance(predicted_indices, (list, np.ndarray)) or len(predicted_indices) == 0:
-        pred_set = set()
-    else:
-        pred_set = set(predicted_indices)
-
-    if not isinstance(true_indices, (list, np.ndarray)) or len(true_indices) == 0:
-        true_set = set()
-    else:
-        true_set = set(true_indices)
-
-    if not true_set and not pred_set:
-        # Handle case where both true and predicted are empty
-        tp, fp, fn = 0, 0, 0
-        precision, recall, f1 = 1.0, 1.0, 1.0 # Or 0.0 depending on convention
-    elif not true_set:
-        # Handle case where true is empty but predicted is not
-        tp, fp, fn = 0, len(pred_set), 0
-        precision, recall, f1 = 0.0, 0.0, 0.0
-    elif not pred_set:
-         # Handle case where predicted is empty but true is not
-        tp, fp, fn = 0, 0, len(true_set)
-        precision, recall, f1 = 0.0, 0.0, 0.0
-    else:
-        tp = len(pred_set.intersection(true_set))
-        fp = len(pred_set - true_set)
-        fn = len(true_set - pred_set)
-
-        # Use sklearn calculation, requires binary arrays
-        y_true = np.zeros(data_length, dtype=int)
-        y_pred = np.zeros(data_length, dtype=int)
-        y_true[list(true_set)] = 1
-        y_pred[list(pred_set)] = 1
-
-        # Use zero_division=0 to avoid warnings and return 0 in case of undefined metric
-        precision = precision_score(y_true, y_pred, zero_division=0)
-        recall = recall_score(y_true, y_pred, zero_division=0)
-        f1 = f1_score(y_true, y_pred, zero_division=0)
-
-    metrics = {
-        "TP": tp, "FP": fp, "FN": fn,
-        "Precision": precision, "Recall": recall, "F1-score": f1
-    }
-    return metrics
-
-def find_Zaxis_min_combined( # Renamed function
-        df,                      # Input DataFrame
-        manual_min_file,         # Path to manual labels file ('localmin.txt')
-        method='argrelextrema',  # Algorithm: 'argrelextrema' or 'find_peaks'
-        # --- Baseline Removal Params ---
-        use_baseline_removal=True,
-        baseline_window_length=51,
-        baseline_polyorder=3,
-        # --- Minima Finding Params ---
-        # argrelextrema specific
-        order=5,
-        # find_peaks specific
-        prominence_threshold=0.1,
-        filter_find_peaks_below_zero=True,
-        # --- Filtering Params ---
-        # Original threshold logic replaced by z_value_threshold applied to detrended/raw Z
-        z_value_threshold=None, # e.g., 0 or -0.1. If None, this filter is skipped.
-        # Original custom filter logic
-        use_custom_filter=True,
-        min_frame_gap=8,
-        min_z_diff=0.2,
-        # --- Output Params ---
-        show=True,
-        showVel=True):
+def load_emg_data(file_path, time_column_csv=None, known_fs_csv=None, c3d_channel_keywords=None):
     """
-    結合了基線移除、不同最小值搜尋演算法 (argrelextrema, find_peaks)、
-    多重過濾條件以及與手動標籤比較評估的功能。
+    加載 CSV 或 C3D 檔案中的 EMG 數據。
 
-    Parameters:
-        df: DataFrame, 包含 'Z' 欄位以及繪圖所需的 'cum_yaw_deg', 'cum_pitch_deg', 'speed'。
-        manual_min_file: str, 手動標記最小值索引檔案路徑 (每行一個索引，基於 1)。
-        method: str, 使用的演算法 ('argrelextrema' 或 'find_peaks')。
-        use_baseline_removal: bool, 是否進行基線移除。
-        baseline_window_length: int, Savitzky-Golay 濾波窗口。
-        baseline_polyorder: int, Savitzky-Golay 濾波多項式階數。
-        order: int, `argrelextrema` 的 order 參數。
-        prominence_threshold: float, `find_peaks` 的 prominence 參數。
-        filter_find_peaks_below_zero: bool, 是否只保留 `find_peaks` 找到的 Z < 0 的點。
-        z_value_threshold: float or None, 最小值 Z 值的門檻 (作用於去基線後或原始 Z)。
-        use_custom_filter: bool, 是否啟用自訂的間隔/差異過濾。
-        min_frame_gap: int, 自訂過濾：最小 frame 間隔。
-        min_z_diff: float, 自訂過濾：最小 Z 值差異。
-        show: bool, 是否顯示 Z 值和視角軌跡圖。
-        showVel: bool, 是否顯示速度著色的視角軌跡圖。
+    參數:
+    file_path (str): 數據檔案的路徑 (支援 .csv 或 .c3d)。
+    time_column_csv (str, optional): 對於 CSV 檔案，指定包含時間戳記的欄位名稱。
+                                     若為 None，則嘗試自動檢測 'Time', 'time', 'Frame', 'frame'。
+    known_fs_csv (float, optional): 對於 CSV 檔案，如果已知原始採樣頻率 (Hz)，可在此指定。
+                                   若為 None，則會從時間欄位估算。
+    c3d_channel_keywords (list of str, optional): 對於 C3D 檔案，提供一個字串列表。
+                                                 程式將選取那些標籤名稱包含列表中任一字串的類比通道。
+                                                 如果為 None 或空列表，則會先嘗試查找含 "EMG" 的通道。
 
-    Returns:
-        final_minima_idx: list, 最終篩選出的最小值索引 (基於 0)。
-        filtered_minima_data: DataFrame, 包含最終最小值點對應的視角等資訊。
-        evaluation_metrics: dict, 與手動標籤比較的評估結果。
+    回傳:
+    processed_df (pd.DataFrame): 包含 EMG 數據的 DataFrame。第一欄為 'time'，後續欄位為各 EMG 通道。
+                                 若加載失敗或格式不支援，則返回 None。
+    original_fs (float): 偵測到或提供的原始採樣頻率 (Hz)。若無法確定，則返回 None。
+    emg_channel_names (list): EMG 數據欄位的名稱列表。
+    data_type (str): "csv" 或 "c3d"，表示數據類型。
+
+    拋出:
+    ValueError: 如果檔案格式不支援，或 C3D 檔案加載需要 ezc3d 但未安裝，或找不到任何可處理的通道。
+    FileNotFoundError: 如果檔案路徑不存在。
     """
-    print(f"\n--- 開始分析：使用方法 '{method}' ---")
-    if not all(col in df.columns for col in ['Z', 'cum_yaw_deg', 'cum_pitch_deg', 'speed']):
-         warnings.warn("DataFrame 缺少必要的欄位 ('Z', 'cum_yaw_deg', 'cum_pitch_deg', 'speed')，部分功能可能無法運作或出錯。")
+    emg_channel_names = []
+    original_fs = None
 
-    z_values_raw = df["Z"].values.copy() # 使用 .copy() 避免修改原始 df
-    data_length = len(z_values_raw)
-    evaluation_metrics = {} # Initialize evaluation metrics
+    if not isinstance(file_path, str):
+        raise ValueError("檔案路徑必須是字串。")
 
-    # --- 1. Baseline Removal (Optional) ---
-    z_baseline = np.zeros_like(z_values_raw) # Default baseline if not calculated
-    if use_baseline_removal:
-        print(f"步驟 1: 應用 Savitzky-Golay 基線移除 (窗口={baseline_window_length}, 階數={baseline_polyorder})")
-        # Check window length validity
-        if baseline_window_length >= data_length:
-            original_wl = baseline_window_length
-            baseline_window_length = data_length // 2 * 2 + 1 # Adjust to largest odd number <= length/2
-            if baseline_window_length < 3: baseline_window_length = 3 # Minimum practical window
-            # Ensure window > polyorder
-            if baseline_window_length <= baseline_polyorder:
-                 baseline_window_length = baseline_polyorder + 1 if baseline_polyorder % 2 == 0 else baseline_polyorder + 2
-            print(f"  警告: baseline_window_length ({original_wl}) >= data length ({data_length})。已自動調整為 {baseline_window_length}")
-
-        try:
-            z_baseline = savgol_filter(z_values_raw, baseline_window_length, baseline_polyorder)
-            z_values_processed = z_values_raw - z_baseline # Processed Z = Detrended Z
-            print("  基線移除完成。")
-        except Exception as e:
-            print(f"  錯誤: 基線移除失敗: {e}。將使用原始 Z 值進行後續處理。")
-            z_values_processed = z_values_raw # Fallback to raw Z
-            use_baseline_removal = False # Disable flag to reflect reality
-    else:
-        print("步驟 1: 跳過基線移除。")
-        z_values_processed = z_values_raw # Processed Z = Raw Z
-
-    # --- 2. Find Initial Local Minima ---
-    print(f"步驟 2: 使用 '{method}' 尋找初始局部最小值")
-    initial_minima_idx = np.array([], dtype=int) # Ensure it's always an array
-
-    if method == 'argrelextrema':
-        try:
-            initial_minima_idx = argrelextrema(z_values_processed, np.less, order=order)[0]
-            print(f"  argrelextrema (order={order}) 找到 {len(initial_minima_idx)} 個初始點。")
-        except Exception as e:
-            print(f"  錯誤: argrelextrema 執行失敗: {e}")
-    elif method == 'find_peaks':
-        try:
-            # find_peaks finds peaks, so use negative data for minima
-            peaks_indices_raw, _ = find_peaks(-z_values_processed, prominence=prominence_threshold)
-            print(f"  find_peaks (prominence={prominence_threshold}) 找到 {len(peaks_indices_raw)} 個原始點。")
-            if filter_find_peaks_below_zero:
-                if len(peaks_indices_raw) > 0:
-                    # Filter based on the processed Z value (detrended or raw)
-                    below_zero_mask = z_values_processed[peaks_indices_raw] < 0
-                    initial_minima_idx = peaks_indices_raw[below_zero_mask]
-                    print(f"  --> 已過濾 Z < 0 的點，剩下: {len(initial_minima_idx)}")
-                # else: initial_minima_idx remains empty array
+    try:
+        if file_path.lower().endswith('.csv'):
+            data_type = "csv"
+            raw_data = pd.read_csv(file_path)
+            
+            # 尋找時間欄位
+            if time_column_csv and time_column_csv in raw_data.columns:
+                time_col_name = time_column_csv
             else:
-                initial_minima_idx = peaks_indices_raw
-        except Exception as e:
-            print(f"  錯誤: find_peaks 執行失敗: {e}")
-    else:
-        print(f"  錯誤: 未知的 method '{method}'。請選擇 'argrelextrema' 或 'find_peaks'.")
-        # Return empty results if method is invalid
-        return [], pd.DataFrame(), evaluation_metrics
-
-    # Ensure initial_minima_idx is always a numpy array for consistency
-    if not isinstance(initial_minima_idx, np.ndarray):
-         initial_minima_idx = np.array(initial_minima_idx, dtype=int)
-
-    # --- 3. Filter by Z Value Threshold (Optional) ---
-    filtered_minima_idx_step3 = initial_minima_idx # Start with results from step 2
-    if z_value_threshold is not None:
-        print(f"步驟 3: 過濾 Z 值低於 {z_value_threshold:.4f} 的點")
-        if len(initial_minima_idx) > 0:
-            threshold_mask = z_values_processed[initial_minima_idx] < z_value_threshold
-            filtered_minima_idx_step3 = initial_minima_idx[threshold_mask]
-            print(f"  --> 過濾後剩下: {len(filtered_minima_idx_step3)}")
-        else:
-             print("  --> 無初始點可供過濾。")
-        # else: filtered_minima_idx_step3 remains empty if initial_minima_idx was empty
-    else:
-        print("步驟 3: 跳過 Z 值門檻過濾。")
-
-
-    # --- 4. Apply Custom Gap/Difference Filtering (Optional) ---
-    final_minima_idx_step4 = filtered_minima_idx_step3 # Start with results from step 3
-    if use_custom_filter:
-        print(f"步驟 4: 應用自訂過濾 (最小間隔={min_frame_gap}, 最小 Z 差={min_z_diff})")
-        if len(filtered_minima_idx_step3) > 0:
-            # Sort indices first
-            sorted_indices = np.sort(filtered_minima_idx_step3)
-            temp_final_indices = [sorted_indices[0]] # Add the first one
-
-            for i in range(1, len(sorted_indices)):
-                current_idx = sorted_indices[i]
-                last_added_idx = temp_final_indices[-1]
-                frame_diff = current_idx - last_added_idx
-
-                if frame_diff >= min_frame_gap:
-                    temp_final_indices.append(current_idx)
-                else:
-                    # Compare based on processed Z value (detrended or raw)
-                    z_diff = abs(z_values_processed[current_idx] - z_values_processed[last_added_idx])
-                    if z_diff < min_z_diff:
-                        # If difference is small, only keep the lower one
-                        if z_values_processed[current_idx] < z_values_processed[last_added_idx]:
-                            temp_final_indices[-1] = current_idx # Replace the last added index
-                        # else: keep the last_added_idx (do nothing)
+                possible_time_cols = ['Time', 'time', 'Frame', 'frame']
+                time_col_name = next((col for col in possible_time_cols if col in raw_data.columns), None)
+                if not time_col_name and raw_data.shape[1] > 0 :
+                    if pd.api.types.is_numeric_dtype(raw_data.iloc[:, 0]):
+                         print(f"警告: CSV檔案中未找到明確的時間欄位名稱 ('Time', 'time', 'Frame', 'frame')，且未指定 time_column_csv。將假設第一欄 '{raw_data.columns[0]}' 為時間欄位。")
+                         time_col_name = raw_data.columns[0]
                     else:
-                        # If difference is large enough, keep both
-                        temp_final_indices.append(current_idx)
-            final_minima_idx_step4 = temp_final_indices
-            print(f"  --> 自訂過濾後剩下: {len(final_minima_idx_step4)}")
-        else:
-            print("  --> 無點可供自訂過濾。")
-            final_minima_idx_step4 = [] # Ensure it's a list if empty
-    else:
-        print("步驟 4: 跳過自訂過濾。")
-        # Ensure output is a list if custom filter skipped
-        final_minima_idx_step4 = list(filtered_minima_idx_step3)
+                        raise ValueError("CSV檔案中找不到可用的時間欄位，請透過 'time_column_csv' 參數指定。")
+                elif not time_col_name and raw_data.shape[1] == 0:
+                     raise ValueError("CSV檔案為空或無法識別時間欄位。")
 
+            time_series = raw_data[time_col_name].copy()
 
-    # Final indices are the result of step 4
-    final_minima_idx = final_minima_idx_step4
-
-    # --- 5. Prepare Output DataFrame ---
-    print("步驟 5: 準備輸出 DataFrame")
-    if final_minima_idx and len(final_minima_idx) > 0:
-        # Check if required columns exist before accessing iloc
-        required_cols = ['cum_yaw_deg', 'cum_pitch_deg']
-        if all(col in df.columns for col in required_cols):
-             filtered_minima_data = pd.DataFrame({
-                 "Frame": final_minima_idx,
-                 "Z Value Raw": z_values_raw[final_minima_idx], # Always report raw Z
-                 "Z Processed": z_values_processed[final_minima_idx], # Report processed Z (detrended or raw)
-                 "Yaw Angle (°)": df["cum_yaw_deg"].iloc[final_minima_idx].values,
-                 "Pitch Angle (°)": df["cum_pitch_deg"].iloc[final_minima_idx].values
-             })
-             print("  最終篩選出的最小值點 (部分):")
-             print(filtered_minima_data.head())
-        else:
-             print("  警告: DataFrame 缺少 'cum_yaw_deg' 或 'cum_pitch_deg' 欄位，無法包含角度資訊。")
-             filtered_minima_data = pd.DataFrame({
-                 "Frame": final_minima_idx,
-                 "Z Value Raw": z_values_raw[final_minima_idx],
-                 "Z Processed": z_values_processed[final_minima_idx]
-             })
-             print(filtered_minima_data.head())
-    else:
-        print("  未找到符合所有條件的最終最小值點。")
-        filtered_minima_data = pd.DataFrame(columns=["Frame", "Z Value Raw", "Z Processed", "Yaw Angle (°)", "Pitch Angle (°)"])
-
-
-    # --- 6. Evaluation Against Manual Labels ---
-    print(f"步驟 6: 與手動標籤檔案 '{manual_min_file}' 比較")
-    try:
-        # Load manual indices (assuming 1-based)
-        manual_indices = np.loadtxt(manual_min_file, dtype=int) - 1
-        print(f"  載入 {len(manual_indices)} 個手動標籤。")
-
-        # Ensure indices are within bounds
-        manual_indices = manual_indices[(manual_indices >= 0) & (manual_indices < data_length)]
-        if len(manual_indices) == 0:
-             print("  警告: 手動標籤檔案中無有效索引。")
-
-        evaluation_metrics = evaluate_algorithm(final_minima_idx, manual_indices, data_length)
-        print("  評估指標:")
-        for key, value in evaluation_metrics.items():
-            if isinstance(value, float):
-                print(f"    {key}: {value:.4f}")
+            if known_fs_csv:
+                original_fs = float(known_fs_csv)
+            elif pd.api.types.is_numeric_dtype(time_series) and len(time_series) > 1:
+                valid_time_series = time_series.dropna()
+                if len(valid_time_series) > 1:
+                    mean_diff = np.mean(np.diff(valid_time_series))
+                    if mean_diff > 0:
+                        original_fs = 1.0 / mean_diff
+                    else:
+                        print(f"警告: 從CSV時間欄位 '{time_col_name}' 計算得到的平均時間差非正值，無法估算採樣頻率。")
+                else:
+                    print(f"警告: CSV時間欄位 '{time_col_name}' 的有效數據點不足以估算採樣頻率。")
             else:
-                print(f"    {key}: {value}")
+                print(f"警告: CSV時間欄位 '{time_col_name}' 非數值或數據點不足，無法估算採樣頻率。")
+
+            emg_columns_data = []
+            for col in raw_data.columns:
+                if "EMG" in col.upper() and col != time_col_name:
+                    emg_channel_names.append(col)
+                    emg_columns_data.append(raw_data[col])
+            
+            if not emg_channel_names:
+                print("警告: CSV檔案中未找到欄位名稱包含 'EMG' 的欄位。將嘗試把所有非時間的數值欄位視為 EMG 數據。")
+                for col in raw_data.columns:
+                    if col != time_col_name and pd.api.types.is_numeric_dtype(raw_data[col]):
+                        emg_channel_names.append(col)
+                        emg_columns_data.append(raw_data[col])
+                if not emg_channel_names:
+                    raise ValueError("CSV檔案中未能識別出任何 EMG 數據欄位。")
+
+            processed_df = pd.concat([time_series] + emg_columns_data, axis=1)
+            processed_df.columns = ['time'] + emg_channel_names
+            processed_df['time'] = pd.to_numeric(processed_df['time'], errors='coerce')
+
+        elif file_path.lower().endswith('.c3d'):
+            data_type = "c3d"
+            if ezc3d is None:
+                raise ImportError("處理 C3D 檔案需要 'ezc3d' 函式庫，但該函式庫未安裝。請執行 'pip install ezc3d' 安裝。")
+            
+            c3d_data = ezc3d.c3d(file_path)
+            
+            analog_labels = c3d_data['parameters']['ANALOG']['LABELS']['value']
+            selected_channels_tuples = [] # 儲存 (索引, 標籤名稱)
+
+            # 階段 1: 嘗試使用 c3d_channel_keywords
+            if c3d_channel_keywords and isinstance(c3d_channel_keywords, list) and len(c3d_channel_keywords) > 0:
+                print(f"訊息: 使用提供的 'c3d_channel_keywords' ({c3d_channel_keywords}) 來篩選C3D通道。")
+                temp_selected_by_keywords = []
+                processed_indices_keywords = set() # 確保每個通道只被添加一次
+                for i, label_name in enumerate(analog_labels):
+                    if i in processed_indices_keywords:
+                        continue
+                    for pattern in c3d_channel_keywords:
+                        if pattern in label_name: # 檢查模式是否存在於標籤名稱中
+                            temp_selected_by_keywords.append((i, label_name))
+                            processed_indices_keywords.add(i)
+                            break # 此標籤已匹配，移至下一個標籤
+                if temp_selected_by_keywords:
+                    selected_channels_tuples = temp_selected_by_keywords
+            
+            # 階段 2: 如果關鍵字未產生結果 (或未提供)，嘗試 "EMG"
+            if not selected_channels_tuples:
+                print("訊息: 未通過 'c3d_channel_keywords' 找到通道，或該參數未提供/為空。嘗試查找標籤中包含 'EMG' 的類比通道。")
+                temp_selected_by_emg = []
+                # 此處假設如果 selected_channels_tuples 為空，則之前沒有通道被選中
+                for i, label_name in enumerate(analog_labels):
+                    if "EMG" in label_name.upper():
+                        temp_selected_by_emg.append((i, label_name))
+                if temp_selected_by_emg:
+                    selected_channels_tuples = temp_selected_by_emg
+            
+            # 階段 3: 如果仍然沒有通道，嘗試所有類比通道
+            if not selected_channels_tuples:
+                print("警告: C3D檔案中未找到符合指定關鍵字或 'EMG' 的類比通道。將嘗試加載所有類比通道。")
+                if len(analog_labels) > 0:
+                    selected_channels_tuples = list(enumerate(analog_labels))
+                # 如果 analog_labels 為空, selected_channels_tuples 仍為空
+            
+            # 階段 4: 最終檢查
+            if not selected_channels_tuples:
+                raise ValueError("C3D檔案中未找到任何可處理的類比通道數據 (analog_labels 可能為空或無匹配項)。")
+
+            raw_header_index = [item[0] for item in selected_channels_tuples]
+            emg_channel_names = [item[1] for item in selected_channels_tuples]
+            
+            emg_data_array = c3d_data['data']['analogs'][0, raw_header_index, :]
+            emg_df_c3d = pd.DataFrame(emg_data_array.T, columns=emg_channel_names)
+            
+            original_fs = float(c3d_data['parameters']['ANALOG']['RATE']['value'][0])
+            num_frames = emg_df_c3d.shape[0]
+            time_series = pd.Series(np.linspace(0, (num_frames - 1) / original_fs, num=num_frames), name='time')
+            
+            processed_df = pd.concat([time_series, emg_df_c3d], axis=1)
+
+        else:
+            raise ValueError(f"不支援的檔案格式: {file_path}。請提供 CSV 或 C3D 檔案。")
+
+        if original_fs is None or original_fs <=0:
+            print(f"警告: 未能成功確定 '{file_path}' 的有效原始採樣頻率。後續處理可能出錯。")
+
+        return processed_df, original_fs, emg_channel_names, data_type
+
     except FileNotFoundError:
-        print(f"  錯誤: 找不到手動標籤檔案 '{manual_min_file}'。跳過評估。")
-        evaluation_metrics = {} # Ensure it's empty dict on error
+        raise FileNotFoundError(f"錯誤: 找不到檔案 {file_path}")
     except Exception as e:
-        print(f"  錯誤: 評估過程中發生錯誤: {e}")
-        evaluation_metrics = {} # Ensure it's empty dict on error
+        print(f"加載數據時發生錯誤 ({file_path}): {e}")
+        raise
+
+# %%
+data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S06\250318\S06_GridShot_I_1.c3d"
+
+csv_data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\3.EMG\S10\S02_LargeFlick_Rep_8.24.csv"
+# %%
+
+# %%
+# 嘗試導入 ezc3d，如果失敗則在需要時拋出錯誤
 
 
-    # --- 7. Plotting ---
-    if show:
-        print("步驟 7: 產生圖表")
-        plt.style.use('seaborn-v0_8-darkgrid') # Use a nice style
-        fig, axes = plt.subplots(3, 1, figsize=(15, 12), sharex=True) # Share x-axis
-
-        # Plot 1: Raw Data, Baseline, Thresholds, Final Minima
-        axes[0].plot(z_values_raw, label='原始 Z 值', color='gray', alpha=0.7, linewidth=1)
-        if use_baseline_removal:
-            axes[0].plot(z_baseline, label=f'基線 (win={baseline_window_length}, poly={baseline_polyorder})', color='orange', linestyle='--', linewidth=1.5)
-        # Plot Z threshold only if applied to raw Z
-        if z_value_threshold is not None and not use_baseline_removal:
-             axes[0].axhline(z_value_threshold, color='cyan', linestyle=':', label=f'Z 值門檻 ({z_value_threshold:.2f})', linewidth=1.5)
-        # Plot final minima on raw data
-        if final_minima_idx and len(final_minima_idx) > 0:
-             axes[0].scatter(final_minima_idx, z_values_raw[final_minima_idx], color='red', label=f'最終最小值 ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
-        axes[0].set_title(f"原始 Z 值、基線與最終最小值點 (方法: {method})")
-        axes[0].set_ylabel("原始 Z 值")
-        axes[0].legend()
-        axes[0].grid(True, which='both', linestyle='--', linewidth=0.5)
 
 
-        # Plot 2: Processed Data, Thresholds, Final Minima
-        axes[1].plot(z_values_processed, label='處理後 Z 值' + (' (去基線)' if use_baseline_removal else ' (原始)'), color='blue', alpha=0.8, linewidth=1)
-        # Plot Z=0 line if filtered below zero for find_peaks
-        if method == 'find_peaks' and filter_find_peaks_below_zero:
-             axes[1].axhline(0, color='magenta', linestyle=':', label='Z=0 過濾線 (find_peaks)', linewidth=1.5)
-        # Plot Z threshold if applied to processed Z
-        if z_value_threshold is not None: # Check if threshold exists, applies to processed Z here
-            axes[1].axhline(z_value_threshold, color='cyan', linestyle=':', label=f'Z 值門檻 ({z_value_threshold:.2f})', linewidth=1.5)
-        # Plot final minima on processed data
-        if final_minima_idx and len(final_minima_idx) > 0:
-             axes[1].scatter(final_minima_idx, z_values_processed[final_minima_idx], color='red', label=f'最終最小值 ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
-        axes[1].set_title(f"處理後 Z 值與最終最小值點")
-        axes[1].set_ylabel("處理後 Z 值")
-        axes[1].legend()
-        axes[1].grid(True, which='both', linestyle='--', linewidth=0.5)
+# 嘗試導入 ezc3d，如果失敗則在需要時拋出錯誤
+try:
+    import ezc3d
+except ImportError:
+    ezc3d = None
 
+# 設定日誌記錄器
+logging.basicConfig(level=logging.INFO) # 可以調整為 logging.WARNING 等
+logger = logging.getLogger(__name__)
 
-        # Plot 3: Add manual labels for reference
+def EMG_Process_Combined(
+    raw_data_path,
+    target_down_freq=1000,
+    bandpass_cutoff=[20, 450],
+    envelope_lowpass_freq=6,
+    notch_cutoff_list=[[59, 61]],
+    time_column_csv=None,
+    # known_fs_csv=None,
+    c3d_select_keywords=None, # 用於C3D通道選擇的關鍵字列表
+    channel_rename_map=None # 用於重命名通道的字典 {'old_name': 'new_name'}
+):
+    """
+    整合的 EMG 信號處理函數。
+    執行數據加載、預處理、濾波、包絡提取和降採樣。
+
+    程式邏輯：
+    1. 數據加載 (CSV/C3D):
+        - 自動檢測或使用指定的時間欄位 (CSV)。
+        - 使用關鍵字 (C3D) 或 "EMG" 標識 (CSV/C3D) 選擇 EMG 通道。
+        - 估算或使用已知的原始採樣頻率。
+        - 可選：重命名通道。
+    2. 預處理：
+        - CSV: 計算各通道的實際採樣頻率、有效數據長度、截止時間。
+               根據最短的有效截止時間 (`min_stop_time`) 調整數據。
+        - C3D: 使用頭部訊息獲取採樣頻率和數據長度。
+        - 計算降採樣後的目標數據長度 (`downsample_len`)。
+    3. 逐通道濾波與處理 (在原始採樣率下進行，然後降採樣)：
+        - 處理 NaN 值 (填充為0並警告)。
+        - CSV: 根據 `min_stop_time` 截斷各通道數據。
+        - 應用帶通濾波。
+        - (儲存一份僅帶通濾波的結果，用於後續降採樣)
+        - 應用陷波濾波。
+        - 取絕對值。
+        - 應用低通濾波創建包絡。
+    4. 降採樣：
+        - 將處理後的包絡信號和僅帶通濾波的信號降採樣到 `target_down_freq`。
+    5. 插入時間軸並返回結果。
+
+    參數:
+    raw_data_path (str): 原始數據檔案路徑 (.csv 或 .c3d)。
+    target_down_freq (float): 目標降採樣頻率 (Hz)。預設 1000 Hz。
+    bandpass_cutoff (list): 帶通濾波截止頻率 [low, high] (Hz)。預設 [20, 450]。
+    envelope_lowpass_freq (float): 包絡提取用的低通濾波截止頻率 (Hz)。預設 6 Hz。
+    notch_cutoff_list (list of lists): 陷波濾波頻率列表 [[low1, high1], ...]。預設 [[59, 61]]。
+    time_column_csv (str, optional): CSV 檔案的時間欄位名稱。
+    known_fs_csv (float, optional): CSV 檔案的已知原始採樣頻率 (Hz)。
+    c3d_select_keywords (list of str, optional): C3D 檔案中用於選擇通道的關鍵字列表。
+                                                若為 None，則嘗試 "EMG"，再嘗試所有通道。
+    channel_rename_map (dict, optional): 用於重命名通道的字典，格式為 {'原始名稱': '新名稱'}。
+                                         適用於 CSV 加載後的欄位名或 C3D 的原始標籤名。
+
+    回傳:
+    final_envelope_df (pd.DataFrame): 包含時間軸和降採樣後 EMG 包絡的 DataFrame。
+    bandpass_only_df (pd.DataFrame): 包含時間軸和降採樣後僅帶通濾波的 EMG 信號的 DataFrame。
+                                     如果處理失敗或無有效數據，可能返回 None 或部分空的 DataFrame。
+    """
+    logger.info(f"開始處理 EMG 數據: {raw_data_path}")
+    # --- 1. 數據加載 ---
+    # raw_data_path = csv_data_path
+    raw_df = None
+    original_fs_dict = {} # 對於CSV，可能每個通道Fs不同
+    emg_channel_names_loaded = []
+    data_type = ""
+    time_col_actual_name = 'time' # 預期處理後的內部時間欄位名
+
+    if raw_data_path.lower().endswith('.csv'):
+        data_type = "csv"
         try:
-             manual_indices_plot = np.loadtxt(manual_min_file, dtype=int) - 1
-             manual_indices_plot = manual_indices_plot[(manual_indices_plot >= 0) & (manual_indices_plot < data_length)]
-             if len(manual_indices_plot) > 0:
-                  axes[1].scatter(manual_indices_plot, z_values_processed[manual_indices_plot],
-                                  facecolors='none', edgecolors='lime', s=100, linewidth=1.5,
-                                  label=f'手動標籤 ({len(manual_indices_plot)})', zorder=4, marker='o')
-                  # Also show on raw plot for context
-                  axes[0].scatter(manual_indices_plot, z_values_raw[manual_indices_plot],
-                                  facecolors='none', edgecolors='lime', s=100, linewidth=1.5,
-                                  label=f'手動標籤 ({len(manual_indices_plot)})', zorder=4, marker='o')
-                  # Update legends after adding manual points potentially
-                  axes[0].legend()
-                  axes[1].legend()
+            temp_raw_df = pd.read_csv(raw_data_path)
+            
+            # 確定時間欄位
+            # if time_column_csv and time_column_csv in temp_raw_df.columns:
+            #     time_col_actual_name = time_column_csv
+            # else:
+            #     possible_time_cols = ['Time', 'time', 'Frame', 'frame', 'X[s]']
+            #     time_col_actual_name = next((col for col in possible_time_cols if col in temp_raw_df.columns), None)
+            #     if not time_col_actual_name and temp_raw_df.shape[1] > 0:
+            #         if pd.api.types.is_numeric_dtype(temp_raw_df.iloc[:, 0]):
+            #             time_col_actual_name = temp_raw_df.columns[0]
+            #             logger.warning(f"CSV: 未找到明確時間欄位，假設第一欄 '{time_col_actual_name}' 為時間。")
+            #         else:
+            #             raise ValueError("CSV: 找不到時間欄位，請用 'time_column_csv' 指定。")
+            #     elif not time_col_actual_name:
+            #          raise ValueError("CSV: 檔案為空或無法識別時間欄位。")
+            
+            # 識別 EMG 欄位 (名稱包含 "EMG"，且非時間欄位)
+            for col in temp_raw_df.columns:
+                if col.upper().startswith("EMG") and col != time_col_actual_name: # 修改為 startswith("EMG") 更靈活
+                    emg_channel_names_loaded.append(col)
+            
+            if not emg_channel_names_loaded: # 如果沒有 "EMG" 開頭的，嘗試包含 "EMG"
+                 for col in temp_raw_df.columns:
+                    if "EMG" in col.upper() and col != time_col_actual_name:
+                        emg_channel_names_loaded.append(col)
+
+            if not emg_channel_names_loaded:
+                logger.warning("CSV: 未找到 'EMG' 相關欄位，將嘗試所有非時間的數值欄位。")
+                for col in temp_raw_df.columns:
+                    if col != time_col_actual_name and pd.api.types.is_numeric_dtype(temp_raw_df[col]):
+                        emg_channel_names_loaded.append(col)
+                if not emg_channel_names_loaded:
+                    raise ValueError("CSV: 未能識別任何 EMG 數據欄位。")
+            
+            emg_channel_names_loaded_withtime = []
+            cols = temp_raw_df.columns  # 原始欄位 Index
+
+            for col in emg_channel_names_loaded:
+                idx = cols.get_loc(col)         # 找到 col 在欄位裡的索引
+                if idx == 0:
+                    prev_name = None           # 第 0 個欄位本身就沒有前一個
+                else:
+                    prev_name = cols[idx - 1]  # 前一個欄位的字串名稱
+                    emg_channel_names_loaded_withtime.append(prev_name)
+                    emg_channel_names_loaded_withtime.append(col)
+
+            # 組合 DataFrame，時間欄位統一命名為 'time'
+            raw_df_cols = [temp_raw_df[col] for col in emg_channel_names_loaded_withtime]
+            raw_df = pd.concat(raw_df_cols, axis=1)
+
+            for col in raw_df.columns:
+                raw_df[col] = pd.to_numeric(raw_df[col], errors='coerce')
+            """
+            改到這裡
+            """
+
+            # 估算或使用已知的採樣頻率 (CSV 可能每個通道不同，但這裡先估算一個整體的，後續可細化)
+            # if known_fs_csv:
+            #     # 如果提供了 known_fs_csv，假設所有通道都是這個 Fs
+            #     for ch_name in emg_channel_names_loaded:
+            #         original_fs_dict[ch_name] = float(known_fs_csv)
+            # else: # 否則，將在預處理階段為每個通道估算 Fs
+            #     pass # Fs 將在下面計算
+
         except Exception as e:
-             print(f"  繪製手動標籤時出錯: {e}")
+            logger.error(f"加載 CSV 檔案 '{raw_data_path}' 失敗: {e}")
+            return None, None
 
-        axes[2].set_xlabel("Frame") # Only set x-label on the bottom plot
-        plt.tight_layout()
-        plt.show()
+    elif raw_data_path.lower().endswith('.c3d'):
+        data_type = "c3d"
+        if ezc3d is None:
+            raise ImportError("處理 C3D 檔案需要 'ezc3d' 函式庫。請執行 'pip install ezc3d'。")
+        try:
+            c3d = ezc3d.c3d(raw_data_path)
+            all_analog_labels = c3d['parameters']['ANALOG']['LABELS']
+            selected_tuples = [] # (index, original_label)
 
-        # --- View Angle Plots ---
-        required_angle_cols = ['cum_yaw_deg', 'cum_pitch_deg']
-        has_angle_data = all(col in df.columns for col in required_angle_cols)
+            if c3d_select_keywords and isinstance(c3d_select_keywords, list) and len(c3d_select_keywords) > 0:
+                processed_indices = set()
+                for keyword in c3d_select_keywords:
+                    for i, label in enumerate(all_analog_labels):
+                        if keyword in label and i not in processed_indices:
+                            selected_tuples.append((i, label))
+                            processed_indices.add(i)
+            
+            if not selected_tuples: # 未提供關鍵字或未匹配到，嘗試 "EMG"
+                logger.info("C3D: 未通過關鍵字選擇通道，嘗試查找含 'EMG' 的通道。")
+                for i, label in enumerate(all_analog_labels):
+                    if "EMG" in label.upper():
+                        selected_tuples.append((i, label))
+            
+            if not selected_tuples: # 仍未匹配到，嘗試所有通道
+                logger.warning("C3D: 未找到 'EMG' 通道，嘗試加載所有類比通道。")
+                if len(all_analog_labels) > 0:
+                    selected_tuples = list(enumerate(all_analog_labels))
+            
+            if not selected_tuples:
+                raise ValueError("C3D: 未找到任何可處理的類比通道。")
 
-        if has_angle_data:
-            if final_minima_idx and len(final_minima_idx) > 0:
-                filtered_yaw = df["cum_yaw_deg"].iloc[final_minima_idx].values
-                filtered_pitch = df["cum_pitch_deg"].iloc[final_minima_idx].values
-            else:
-                filtered_yaw, filtered_pitch = [], []
+            selected_indices = [item[0] for item in selected_tuples]
+            emg_channel_names_loaded = [item[1] for item in selected_tuples]
 
-            # Plot 8: Basic Trajectory
-            plt.figure(figsize=(8, 8))
-            plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.6, s=10, label="視角軌跡 (依 Frame)")
-            plt.scatter(filtered_pitch, filtered_yaw, color="red", s=50, label="最終最小值", zorder=3, marker='x')
-            plt.colorbar(label="Frame Index")
-            plt.xlabel("Pitch Angle (Vertical) °")
-            plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-            plt.title(f"視角軌跡與 Z 軸最終最小值 ({method})")
-            plt.legend()
-            plt.grid(True, linestyle='--', linewidth=0.5)
-            plt.show()
+            analog_data_array = c3d['data']['analogs'][0, selected_indices, :]
+            emg_df_c3d = pd.DataFrame(analog_data_array.T, columns=emg_channel_names_loaded)
+            
+            # C3D 的所有類比通道通常有相同的採樣率
+            fs_c3d = float(c3d['parameters']['ANALOG']['RATE']['value'][0])
+            for ch_name in emg_channel_names_loaded:
+                original_fs_dict[ch_name] = fs_c3d
+            
+            num_frames = emg_df_c3d.shape[0]
+            time_series_c3d = pd.Series(np.linspace(0, (num_frames - 1) / fs_c3d, num=num_frames), name='time')
+            raw_df = pd.concat([time_series_c3d, emg_df_c3d], axis=1)
 
-            # Plot 9: Velocity Colored Trajectory
-            if showVel and 'speed' in df.columns:
-                plt.figure(figsize=(8, 8))
-                sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
-                                 c=df["speed"], cmap="plasma", alpha=0.7, s=10,
-                                 label="視角軌跡 (依速度)")
-                plt.scatter(filtered_pitch, filtered_yaw, color="red", s=50,
-                            label="最終最小值", zorder=3, marker='x')
-                plt.colorbar(sc, label="滑鼠速度 (單位未知)") # Speed unit might vary
-                plt.xlabel("Pitch Angle (Vertical) °")
-                plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-                plt.title(f"視角軌跡 (依速度) 與 Z 軸最終最小值 ({method})")
-                plt.legend()
-                plt.grid(True, linestyle='--', linewidth=0.5)
-                plt.show()
-            elif showVel and 'speed' not in df.columns:
-                 print("  警告: DataFrame 中缺少 'speed' 欄位，無法繪製速度著色圖。")
-        else:
-            print("  跳過視角軌跡繪圖，因缺少 'cum_yaw_deg' 或 'cum_pitch_deg' 欄位。")
-
-    print(f"--- '{method}' 分析完成 ---")
-    return final_minima_idx, filtered_minima_data, evaluation_metrics
-
-
-# --- 範例使用 ---
-if __name__ == "__main__":
-    # 1. 載入您的 DataFrame (假設為 df)
-    #    確保它包含 'Z', 'cum_yaw_deg', 'cum_pitch_deg', 'speed' 欄位
-    #    這裡使用 dummy data 示範
-    try:
-        z_file = r"C:\Users\Hsin.YH.Yang\Downloads\Z.txt"
-        manual_min_file = r"C:\Users\Hsin.YH.Yang\Downloads\localmin.txt"
-        # 從 Z.txt 載入數據來創建基礎 DataFrame
-        z_data_for_df = np.loadtxt(z_file, skiprows=1)
-        n_points = len(z_data_for_df)
-        df_main = pd.DataFrame({
-            'Z': z_data_for_df,
-            # 創建更真實的角度和速度數據 (例如模擬一些運動)
-            'cum_yaw_deg': np.cumsum(np.random.randn(n_points) * 0.5) % 360,
-            'cum_pitch_deg': np.cumsum(np.random.randn(n_points) * 0.3),
-            'speed': np.abs(np.random.randn(n_points) * 10 + 5) # 模擬速度
-        })
-        # 限制 pitch 範圍
-        df_main['cum_pitch_deg'] = np.clip(df_main['cum_pitch_deg'], -90, 90)
-        print(f"已創建包含 {n_points} 點的範例 DataFrame。")
-    except FileNotFoundError:
-        print("錯誤: 找不到 'Z.txt' 檔案，無法創建範例 DataFrame。請將 Z.txt 放在腳本同目錄下。")
-        exit()
-    except Exception as e:
-        print(f"創建範例 DataFrame 時發生錯誤: {e}")
-        exit()
-
-    # 2. 設定手動標籤檔案路徑
-    manual_labels_file = manual_min_file
-
-    # --- 3. 分別執行和比較不同設定 ---
-
-    # 設定 1: 使用 argrelextrema，包含基線移除和自訂過濾
-    print("\n" + "="*20 + " 設定 1: Argrelextrema (基線+自訂過濾) " + "="*20)
-    indices_ar1, data_ar1, metrics_ar1 = find_Zaxis_min_combined(
-        df=df_main.copy(), # 使用 .copy() 避免意外修改
-        manual_min_file=manual_labels_file,
-        method='argrelextrema',
-        use_baseline_removal=True, baseline_window_length=51, baseline_polyorder=3,
-        order=5,
-        use_custom_filter=True, min_frame_gap=8, min_z_diff=0.2,
-        z_value_threshold=None, # 不使用 Z 值門檻
-        show=True, showVel=True
-    )
-
-    # 設定 2: 使用 find_peaks，包含基線移除和 Z<0 過濾，不使用自訂過濾
-    print("\n" + "="*20 + " 設定 2: Find_Peaks (基線+Z<0過濾) " + "="*20)
-    indices_fp1, data_fp1, metrics_fp1 = find_Zaxis_min_combined(
-        df=df_main.copy(),
-        manual_min_file=manual_labels_file,
-        method='find_peaks',
-        use_baseline_removal=True, baseline_window_length=51, baseline_polyorder=3,
-        prominence_threshold=0.05, # 嘗試較小的 prominence
-        filter_find_peaks_below_zero=True,
-        use_custom_filter=False, # 關閉自訂過濾
-        z_value_threshold=None,
-        show=True, showVel=True
-    )
-
-    # 設定 3: 使用 find_peaks，包含基線移除、Z<0 過濾 和 自訂過濾
-    print("\n" + "="*20 + " 設定 3: Find_Peaks (基線+Z<0+自訂過濾) " + "="*20)
-    indices_fp2, data_fp2, metrics_fp2 = find_Zaxis_min_combined(
-        df=df_main.copy(),
-        manual_min_file=manual_labels_file,
-        method='find_peaks',
-        use_baseline_removal=True, baseline_window_length=101, # 嘗試不同基線窗口
-        baseline_polyorder=3,
-        prominence_threshold=0.1, # 調整 prominence
-        filter_find_peaks_below_zero=True,
-        use_custom_filter=True, min_frame_gap=10, min_z_diff=0.15, # 調整自訂過濾參數
-        z_value_threshold=-0.05, # 加上 Z 值門檻試試
-        show=True, showVel=True
-    )
-
-
-    # --- 4. 最終比較 ---
-    print("\n" + "="*40 + " 最終指標比較 " + "="*40)
-    print(f"設定 1 (Argrelextrema, Baseline, CustomFilter): F1 = {metrics_ar1.get('F1-score', 'N/A'):.4f}")
-    print(f"設定 2 (Find_Peaks, Baseline, Z<0 Filter):      F1 = {metrics_fp1.get('F1-score', 'N/A'):.4f}")
-    print(f"設定 3 (Find_Peaks, Baseline, Z<0, Custom, Z_thresh): F1 = {metrics_fp2.get('F1-score', 'N/A'):.4f}")
-
-    # 可以在這裡加入邏輯來找出 F1 最高的設定
-    best_f1 = -1
-    best_setting = "N/A"
-    results = {
-        "Setting 1": metrics_ar1.get('F1-score'),
-        "Setting 2": metrics_fp1.get('F1-score'),
-        "Setting 3": metrics_fp2.get('F1-score'),
-    }
-    for setting, f1 in results.items():
-        if f1 is not None and f1 > best_f1:
-            best_f1 = f1
-            best_setting = setting
-
-    if best_f1 > -1:
-         print(f"\n表現最佳的設定 (基於 F1-score): {best_setting} (F1 = {best_f1:.4f})")
+        except Exception as e:
+            logger.error(f"加載 C3D 檔案 '{raw_data_path}' 失敗: {e}")
+            return None, None
     else:
-         print("\n無法確定最佳設定 (可能評估失敗或 F1 為 0)。")
+        raise ValueError(f"不支援的檔案格式: {raw_data_path}。請提供 CSV 或 C3D。")
+
+    if raw_df is None or raw_df.empty:
+        logger.error("數據加載後 DataFrame 為空。")
+        return None, None
+    # channel_rename_map = csv_recolumns_name
+    # 可選：重命名通道
+    if channel_rename_map and isinstance(channel_rename_map, dict):
+        # 更新 emg_channel_names_loaded 列表以反映重命名
+        current_columns = list(raw_df.columns)
+        new_emg_channel_names = []
+        for old_name in emg_channel_names_loaded:
+            new_emg_channel_names.append(channel_rename_map.get(old_name, old_name))
+        
+        raw_df.rename(columns=channel_rename_map, inplace=True)
+        emg_channel_names_loaded = new_emg_channel_names # 更新列表
+        logger.info(f"通道已重命名。新 EMG 通道名稱: {emg_channel_names_loaded}")
+
+
+    logger.info(f"數據加載完成。偵測到 EMG 通道: {emg_channel_names_loaded}")
+
+    # --- 2. 預處理 ---
+    
+    
+    # 確定一個用於計算總體 downsample_len 的 Fs (對於C3D是固定的，對於CSV取最小值或平均值)
+    overall_fs_for_downsample_len_calc = None
+
+    if data_type == "csv":
+        min_stop_time_csv = float('inf')
+        csv_channel_data_lengths = {} # 儲存CSV各通道的原始有效長度
+        csv_channel_stop_times = {}   # 儲存CSV各通道的截止時間
+        
+        temp_fs_values = []
+        for ch_idx, emg_col_name in enumerate(emg_channel_names_loaded):
+            # CSV: 計算每個通道的 Fs (如果 known_fs_csv 未提供)
+            # if not known_fs_csv:
+                # 假設時間欄位是 'time'，EMG數據欄位是 emg_col_name
+                # 原始代碼中，時間欄位是 EMG 欄位索引 - 1。這裡我們有統一的 'time' 欄。
+            idx = raw_df.columns.get_loc(emg_col_name) - 1
+            time_data_for_fs = raw_df.iloc[:, idx].dropna()
+            if len(time_data_for_fs) > 10 : # 需要足夠點來估算
+                # 使用前10個差異的平均值
+                fs_est = 1.0 / np.mean(np.diff(time_data_for_fs.iloc[1:11])) # 從1開始避免0索引
+                if fs_est > 0:
+                    original_fs_dict[emg_col_name] = fs_est
+                    temp_fs_values.append(fs_est)
+                else:
+                    logger.warning(f"CSV: 通道 {emg_col_name} Fs 估算失敗 (時間差非正)，將嘗試使用其他通道的Fs。")
+            else: # 數據點不足
+                logger.warning(f"CSV: 通道 {emg_col_name} 時間數據不足以估算 Fs。")
+
+
+            # 計算有效數據長度和截止時間 (僅針對CSV的尾部0值處理)
+            channel_data_series = raw_df[emg_col_name]
+            non_zero_indices = np.where(channel_data_series.fillna(0).values != 0)[0] # fillna(0) 以處理 NaN
+            if len(non_zero_indices) > 0:
+                valid_len = non_zero_indices[-1] + 1
+                csv_channel_data_lengths[emg_col_name] = valid_len
+                if valid_len > 0:
+                    stop_time_val = raw_df.iloc[:, idx].iloc[valid_len - 1]
+                    if pd.notna(stop_time_val):
+                        csv_channel_stop_times[emg_col_name] = stop_time_val
+                        min_stop_time_csv = min(min_stop_time_csv, stop_time_val)
+            else: # 通道全為0或NaN
+                csv_channel_data_lengths[emg_col_name] = 0
+                logger.warning(f"CSV: 通道 {emg_col_name} 無有效數據 (全為0或NaN)。")
+        
+        if not temp_fs_values: # 如果所有通道Fs估算失敗且無已知Fs
+            raise ValueError("CSV: 無法確定任何通道的採樣頻率。")
+        elif not temp_fs_values: # 使用估算Fs的最小值
+            overall_fs_for_downsample_len_calc = min(temp_fs_values)
+            # 將估算失敗的通道的Fs也設為這個最小值
+            for ch_name in emg_channel_names_loaded:
+                if ch_name not in original_fs_dict or original_fs_dict[ch_name] <=0:
+                    original_fs_dict[ch_name] = overall_fs_for_downsample_len_calc
+                    logger.info(f"CSV: 通道 {ch_name} Fs 設為估算的最小 Fs: {overall_fs_for_downsample_len_calc:.2f} Hz")
+        
+        
+        if min_stop_time_csv == float('inf'): # 如果沒有任何有效的 stop time
+            if raw_df.shape[0] > 0:
+                min_stop_time_csv = raw_df.iloc[-1:, 0] # 使用數據的最後時間點
+                logger.warning("CSV: 未能確定有效的 min_stop_time，將使用數據的總時長。")
+            else:
+                logger.error("CSV: 數據為空，無法確定 min_stop_time。")
+                return None, None
+        logger.info(f"CSV: 所有通道將對齊到最小截止時間: {min_stop_time_csv:.3f} s")
+
+    elif data_type == "c3d":
+        # 對於 C3D，所有通道 Fs 相同，且通常無尾部0問題
+        if emg_channel_names_loaded: # 確保列表非空
+            overall_fs_for_downsample_len_calc = original_fs_dict[emg_channel_names_loaded[0]]
+        else:
+            logger.error("C3D: 加載後 EMG 通道列表為空。")
+            return None, None
+
+    if overall_fs_for_downsample_len_calc is None or overall_fs_for_downsample_len_calc <= 0:
+        logger.error(f"無法確定有效的整體採樣頻率 ({overall_fs_for_downsample_len_calc})。")
+        return None, None
+
+    # 計算降採樣目標長度
+    # 使用 raw_df 的總長度（對於C3D）或與 min_stop_time_csv 對應的長度（對於CSV）
+    if data_type == "csv":
+        # 找到 min_stop_time_csv 在 'time' 列中的索引，或最接近的索引
+        if raw_df.empty or raw_df['time'].empty:
+             max_initial_len = 0
+        else:
+            time_diff = np.abs(raw_df['time'] - min_stop_time_csv)
+            if time_diff.empty: # 如果 raw_df['time'] 是空的
+                max_initial_len = 0
+            else:
+                max_initial_len = time_diff.idxmin() + 1 if not time_diff.empty else 0
+
+    else: # C3D
+        max_initial_len = raw_df.shape[0]
+    
+    if max_initial_len == 0:
+        logger.warning("用於計算降採樣長度的初始數據長度為0。")
+        downsample_len = 0
+    else:
+        downsample_len = math.floor(max_initial_len / overall_fs_for_downsample_len_calc * target_down_freq)
+
+    if downsample_len <= 0:
+        logger.warning(f"計算得到的降採樣目標長度為 {downsample_len}。可能無輸出數據。")
+        # 根據需求，這裡可以決定是否繼續或返回
+        # return None, None # 如果不希望處理長度為0的情況
+
+    logger.info(f"整體 Fs 用於降採樣長度計算: {overall_fs_for_downsample_len_calc:.2f} Hz. 降採樣目標長度: {downsample_len} 點.")
+
+    # 初始化結果 DataFrame
+    # 列名將是 emg_channel_names_loaded
+    final_envelope_list = []
+    bandpass_only_list = []
+
+    # --- 3. 逐通道濾波與處理 ---
+    for emg_col in emg_channel_names_loaded:
+        channel_fs = original_fs_dict.get(emg_col)
+        if channel_fs is None or channel_fs <= 0:
+            logger.warning(f"通道 {emg_col} 的採樣頻率無效 ({channel_fs})，跳過此通道。")
+            if downsample_len > 0: # 保持 DataFrame 結構一致性
+                 final_envelope_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
+                 bandpass_only_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
+            else: # 如果 downsample_len 也是0
+                 final_envelope_list.append(pd.Series(dtype=float, name=emg_col))
+                 bandpass_only_list.append(pd.Series(dtype=float, name=emg_col))
+            continue
+
+        # 獲取原始數據
+        data_series = raw_df[emg_col].copy()
+
+        # 處理 NaN
+        nan_indices = np.where(np.isnan(data_series))[0]
+        if len(nan_indices) > 0:
+            logger.warning(f"通道 {emg_col}: 發現 {len(nan_indices)} 個 NaN 值，位置: {nan_indices[:5]}... 已用 0 填充。")
+            if len(nan_indices) > 0.1 * channel_fs: # 斷訊超過0.1秒
+                logger.warning(f"通道 {emg_col}: NaN 值數量超過0.1秒的數據量。")
+            data_series.fillna(0, inplace=True)
+        
+        data_values = data_series.values
+
+        # CSV: 根據 min_stop_time 截斷數據
+        if data_type == "csv":
+            # 找到 min_stop_time_csv 在該通道時間軸上的索引
+            # (假設 raw_df['time'] 是所有通道共用的時間軸)
+            if not raw_df['time'].empty:
+                end_index_for_channel = (np.abs(raw_df['time'] - min_stop_time_csv)).idxmin()
+                # 確保 end_index_for_channel 不超過 data_values 的長度
+                end_index_for_channel = min(end_index_for_channel, len(data_values) - 1)
+                if end_index_for_channel >= 0 :
+                    data_values = data_values[:end_index_for_channel + 1]
+                else: # 如果 end_index < 0 (例如時間序列為空或min_stop_time_csv無效)
+                    data_values = np.array([]) # 空數據
+            else: # 時間序列為空
+                data_values = np.array([])
+
+
+        if len(data_values) == 0:
+            logger.warning(f"通道 {emg_col} 在預處理後數據長度為0，跳過濾波。")
+            if downsample_len > 0:
+                 final_envelope_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
+                 bandpass_only_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
+            else:
+                 final_envelope_list.append(pd.Series(dtype=float, name=emg_col))
+                 bandpass_only_list.append(pd.Series(dtype=float, name=emg_col))
+            continue
+            
+        # 3.1 帶通濾波
+        bp_sos = signal.butter(2, bandpass_cutoff, btype='bandpass', fs=channel_fs, output='sos')
+        signal_after_bandpass = signal.sosfiltfilt(bp_sos, data_values)
+        
+        # 儲存僅帶通濾波的結果 (用於後續降採樣)
+        resampled_bandpass_only_signal = np.array([])
+        if downsample_len > 0 and len(signal_after_bandpass) > 0:
+            resampled_bandpass_only_signal = signal.resample(signal_after_bandpass, downsample_len)
+        elif downsample_len > 0 and len(signal_after_bandpass) == 0: # 輸入為空，輸出補零
+            resampled_bandpass_only_signal = np.zeros(downsample_len)
+        bandpass_only_list.append(pd.Series(resampled_bandpass_only_signal, name=emg_col))
+
+        # 3.2 陷波濾波 (在帶通濾波後的信號上進行)
+        signal_after_notch = signal_after_bandpass
+        if notch_cutoff_list:
+            for notch_range in notch_cutoff_list:
+                if not (isinstance(notch_range, list) and len(notch_range) == 2):
+                    logger.warning(f"陷波濾波範圍 {notch_range} 格式不正確，已跳過。")
+                    continue
+                try:
+                    notch_sos = signal.butter(2, notch_range, btype='bandstop', fs=channel_fs, output='sos')
+                    signal_after_notch = signal.sosfiltfilt(notch_sos, signal_after_notch)
+                except ValueError as ve: # 例如截止頻率超出奈奎斯特頻率
+                    logger.warning(f"通道 {emg_col}: 應用陷波濾波 {notch_range} 失敗: {ve} (Fs={channel_fs}). 跳過此陷波。")
+
+
+        # 3.3 取絕對值
+        signal_abs = np.abs(signal_after_notch)
+
+        # 3.4 低通濾波創建包絡
+        env_lp_sos = signal.butter(2, envelope_lowpass_freq, btype='low', fs=channel_fs, output='sos')
+        envelope_signal = signal.sosfiltfilt(env_lp_sos, signal_abs)
+
+        # --- 4. 降採樣包絡 ---
+        resampled_envelope = np.array([])
+        if downsample_len > 0 and len(envelope_signal) > 0:
+            resampled_envelope = signal.resample(envelope_signal, downsample_len)
+        elif downsample_len > 0 and len(envelope_signal) == 0:
+            resampled_envelope = np.zeros(downsample_len)
+        final_envelope_list.append(pd.Series(resampled_envelope, name=emg_col))
+
+    # --- 5. 組合結果並插入時間軸 ---
+    final_envelope_df = pd.DataFrame()
+    bandpass_only_df = pd.DataFrame()
+
+    if final_envelope_list:
+        # 檢查是否所有 Series 都為空或長度不一致 (理論上應與 downsample_len 一致)
+        # 這裡假設如果 downsample_len > 0，則列表中的 Series 長度都應為 downsample_len
+        # 如果 downsample_len = 0，則列表中的 Series 都應為空
+        final_envelope_df = pd.concat(final_envelope_list, axis=1)
+    else: # 如果 emg_channel_names_loaded 為空或所有通道處理失敗
+        logger.warning("沒有 EMG 通道數據被處理成包絡。")
+        # 創建一個空的 DataFrame 但保留欄位名，如果 downsample_len > 0
+        if downsample_len > 0 and emg_channel_names_loaded:
+            final_envelope_df = pd.DataFrame(np.zeros((downsample_len, len(emg_channel_names_loaded))), columns=emg_channel_names_loaded)
+        else: # 否則完全空
+            final_envelope_df = pd.DataFrame(columns=emg_channel_names_loaded)
+
+
+    if bandpass_only_list:
+        bandpass_only_df = pd.concat(bandpass_only_list, axis=1)
+    else:
+        logger.warning("沒有 EMG 通道數據被處理成僅帶通濾波。")
+        if downsample_len > 0 and emg_channel_names_loaded:
+             bandpass_only_df = pd.DataFrame(np.zeros((downsample_len, len(emg_channel_names_loaded))), columns=emg_channel_names_loaded)
+        else:
+             bandpass_only_df = pd.DataFrame(columns=emg_channel_names_loaded)
+
+
+    # 創建新的時間軸
+    new_time_axis_values = np.array([])
+    if downsample_len > 0 and target_down_freq > 0:
+        new_time_axis_values = np.linspace(0, (downsample_len - 1) / target_down_freq, num=downsample_len)
+    
+    time_series_for_output = pd.Series(new_time_axis_values, name='time')
+
+    # 將時間軸插入到結果 DataFrame 的第一列
+    # 確保即使 EMG 數據為空，時間軸也能正確插入
+    if not final_envelope_df.empty:
+        final_envelope_df.insert(0, 'time', time_series_for_output)
+    elif len(time_series_for_output) > 0 : # 如果 EMG 數據為空但有時間軸
+        final_envelope_df = pd.DataFrame({'time': time_series_for_output})
+        for col_name in emg_channel_names_loaded: # 添加空的 EMG 列
+            final_envelope_df[col_name] = pd.Series(dtype=float)
+
+
+    if not bandpass_only_df.empty:
+        bandpass_only_df.insert(0, 'time', time_series_for_output)
+    elif len(time_series_for_output) > 0:
+        bandpass_only_df = pd.DataFrame({'time': time_series_for_output})
+        for col_name in emg_channel_names_loaded:
+            bandpass_only_df[col_name] = pd.Series(dtype=float)
+
+
+    logger.info("EMG 核心處理完成。")
+    return final_envelope_df, bandpass_only_df
+
+# %%
+final_envelope_df, bandpass_only_df = EMG_Process_Combined(csv_data_path,
+                                                           target_down_freq=1000)
+# %%
+# --- 使用範例 ---
+if __name__ == '__main__':
+    # 建立一個假的 CSV 檔案來測試
+    dummy_csv_data = {
+        'Timestamp': np.linspace(0, 5, 10000), # 2kHz 採樣率，5秒數據
+        'EMG_Signal_A': np.random.rand(10000) - 0.5 + np.sin(np.linspace(0, 10, 10000) * 2 * np.pi * 1) * 0.2,
+        'EMG_B': np.random.rand(10000) - 0.5 + np.cos(np.linspace(0, 10, 10000) * 2 * np.pi * 2) * 0.3,
+        'AuxInput': np.random.rand(10000) 
+    }
+    # 在 EMG_B 的末尾加入一些0，模擬無效數據
+    dummy_csv_data['EMG_B'][-500:] = 0 
+    dummy_df = pd.DataFrame(dummy_csv_data)
+    dummy_csv_path = 'dummy_emg_combined_sample.csv'
+    dummy_df.to_csv(dummy_csv_path, index=False)
+    
+    logger.info("\n--- 測試 CSV 檔案處理 (EMG_Process_Combined) ---")
+    
+    # 測試1: 基本CSV處理
+    envelope_data_csv, bp_data_csv = EMG_Process_Combined(
+        raw_data_path=dummy_csv_path,
+        target_down_freq=500,
+        bandpass_cutoff=[30, 400],
+        envelope_lowpass_freq=8,
+        notch_cutoff_list=[[58, 62], [118, 122]],
+        time_column_csv='Timestamp',
+        # known_fs_csv=2000 # 可以選擇提供或讓程式估算
+        channel_rename_map={'EMG_Signal_A': 'Vastus_R', 'EMG_B': 'Tibialis_L'}
+    )
+    if envelope_data_csv is not None:
+        logger.info("CSV 處理 - 包絡數據 (前5行):")
+        print(envelope_data_csv.head())
+    if bp_data_csv is not None:
+        logger.info("CSV 處理 - 僅帶通數據 (前5行):")
+        print(bp_data_csv.head())
+
+    # 清理假檔案
+    import os
+    if os.path.exists(dummy_csv_path):
+        os.remove(dummy_csv_path)
+
+    # C3D 檔案測試需要一個實際的 .c3d 檔案
+    # 假設您有一個名為 'sample.c3d' 的檔案，其中包含名為 'EMG_Channel1' 和 'OtherAnalog_Sensor2' 的通道
+    # logger.info("\n--- 測試 C3D 檔案處理 (EMG_Process_Combined) ---")
+    # c3d_file_path_example = 'your_actual_sample.c3d' # 替換為您的 C3D 檔案路徑
+    # if os.path.exists(c3d_file_path_example) and ezc3d is not None:
+    #     envelope_data_c3d, bp_data_c3d = EMG_Process_Combined(
+    #         raw_data_path=c3d_file_path_example,
+    #         target_down_freq=1000,
+    #         bandpass_cutoff=[20, 450],
+    #         envelope_lowpass_freq=6,
+    #         notch_cutoff_list=[[49, 51]], # 假設 50Hz 市電
+    #         c3d_select_keywords=["EMG", "Sensor2"], # 選擇包含 "EMG" 或 "Sensor2" 的通道
+    #         channel_rename_map={'EMG_Channel1': 'Muscle_X', 'OtherAnalog_Sensor2': 'Aux_Y'}
+    #     )
+    #     if envelope_data_c3d is not None:
+    #         logger.info("C3D 處理 - 包絡數據 (前5行):")
+    #         print(envelope_data_c3d.head())
+    #     if bp_data_c3d is not None:
+    #         logger.info("C3D 處理 - 僅帶通數據 (前5行):")
+    #         print(bp_data_c3d.head())
+    # elif ezc3d is None:
+    #    logger.warning("未安裝 ezc3d，跳過 C3D 檔案測試。")
+    # else:
+    #    logger.warning(f"C3D 測試檔案 '{c3d_file_path_example}' 未找到，跳過 C3D 測試。")
 
 
 
