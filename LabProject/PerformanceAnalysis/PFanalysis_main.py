@@ -149,11 +149,13 @@ def pro_main(data_path):
 # %%
 
 data_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
-data_path_1 = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S05\250318\S05_LargeFlick_I_3.c3d"
+data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
+data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
 
 # data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S06\250318\S06_GridShot_I_1.c3d"
 df, metadata, excldueCen_grouped_df, standardized_speeds = pro_main(data_path)
 df_1, metadata_1, excldueCen_grouped_df_1, standardized_speeds_1 = pro_main(data_path_1)
+df_2, metadata_2, excldueCen_grouped_df_2, standardized_speeds_2 = pro_main(data_path_2)
 
 # %%
 
@@ -182,23 +184,26 @@ df_1, metadata_1, excldueCen_grouped_df_1, standardized_speeds_1 = pro_main(data
 # 假設 target_length = 101
 standardized_speeds1 = standardized_speeds
 standardized_speeds2 = standardized_speeds_1
+standardized_speeds3 = standardized_speeds_2
 
 # 示例 2: 繪製兩個數據集進行比較
 if standardized_speeds1 and standardized_speeds2:
       pre.plot_standardized_signals_cloud_compare(
-          datasets=[standardized_speeds1, standardized_speeds2],
+          datasets=[standardized_speeds1, standardized_speeds2, standardized_speeds3],
           target_length=101,
           title="Comparison of Mean ± Std Dev Clouds",
           xlabel="Normalized Time (%)",
           ylabel="Signal Value (°/s or other units)",
           # title="Sine Group Mean ± Std Dev",
-          labels=['Data A', 'group2'],
+          labels=['55g', '65g', "60g"],
           # labels=None,                
           # color_indices=[0, 2, 4]          
       )    
 
 else:
       print("至少需要一個有效的標準化信號字典才能繪圖。")
+      
+      # 長條圖 花費時間
       
 # %%
 """
