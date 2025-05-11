@@ -1,10 +1,4 @@
-import pandas as pd
-import numpy as np
-from scipy import signal
-import math
-import ezc3d
-import logging # For warnings
-# %%
+
 down_freq = 1000
 c = 0.802
 # 帶通濾波頻率
@@ -66,734 +60,849 @@ c3d_analog_cha = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtI
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
                'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
+ #%%
+import pandas as pd
+import numpy as np
+from scipy import signal
+from scipy.fft import fft, fftfreq # 使用 scipy.fft
+import ezc3d
+import math
+import logging
+import io
+
+# (如果後端環境不確定是否有顯示，可以加上下面這行，但如果完全不繪圖則非必須)
+# import matplotlib
+# matplotlib.use('Agg')
+
+# --- 日誌設定 ---
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# 假設日誌已在 Flask app 層級設定
+
+
+APP_CONFIG = {
+    "DEFAULT_DOWNSAMPLE_FREQ": 1000,
+    "DEFAULT_BANDPASS_CUTOFF": [20, 450],
+    "DEFAULT_LOWPASS_FREQ": 6,
+    "DEFAULT_CSV_NOTCH_CUTOFF_LIST": notch_cutoff, # 假設 50Hz 工頻
+    "DEFAULT_C3D_NOTCH_CUTOFF_LIST": c3d_notch_cutoff, # 假設 60Hz 工頻
+    "DEFAULT_CSV_RECOLUMNS_NAME": csv_recolumns_name, # 範例
+    "DEFAULT_C3D_RECOLUMNS_NAME": c3d_recolumns_name, # 範例
+    "EMG_CHANNEL_IDENTIFIER": muscle_name # 用於辨識 EMG 頻道的關鍵字
+}
 
 # %%
-try:
-    import ezc3d
-except ImportError:
-    ezc3d = None
-
-def load_emg_data(file_path, time_column_csv=None, known_fs_csv=None, c3d_channel_keywords=None):
-    """
-    加載 CSV 或 C3D 檔案中的 EMG 數據。
-
-    參數:
-    file_path (str): 數據檔案的路徑 (支援 .csv 或 .c3d)。
-    time_column_csv (str, optional): 對於 CSV 檔案，指定包含時間戳記的欄位名稱。
-                                     若為 None，則嘗試自動檢測 'Time', 'time', 'Frame', 'frame'。
-    known_fs_csv (float, optional): 對於 CSV 檔案，如果已知原始採樣頻率 (Hz)，可在此指定。
-                                   若為 None，則會從時間欄位估算。
-    c3d_channel_keywords (list of str, optional): 對於 C3D 檔案，提供一個字串列表。
-                                                 程式將選取那些標籤名稱包含列表中任一字串的類比通道。
-                                                 如果為 None 或空列表，則會先嘗試查找含 "EMG" 的通道。
-
-    回傳:
-    processed_df (pd.DataFrame): 包含 EMG 數據的 DataFrame。第一欄為 'time'，後續欄位為各 EMG 通道。
-                                 若加載失敗或格式不支援，則返回 None。
-    original_fs (float): 偵測到或提供的原始採樣頻率 (Hz)。若無法確定，則返回 None。
-    emg_channel_names (list): EMG 數據欄位的名稱列表。
-    data_type (str): "csv" 或 "c3d"，表示數據類型。
-
-    拋出:
-    ValueError: 如果檔案格式不支援，或 C3D 檔案加載需要 ezc3d 但未安裝，或找不到任何可處理的通道。
-    FileNotFoundError: 如果檔案路徑不存在。
-    """
-    emg_channel_names = []
-    original_fs = None
-
-    if not isinstance(file_path, str):
-        raise ValueError("檔案路徑必須是字串。")
-
-    try:
-        if file_path.lower().endswith('.csv'):
-            data_type = "csv"
-            raw_data = pd.read_csv(file_path)
-            
-            # 尋找時間欄位
-            if time_column_csv and time_column_csv in raw_data.columns:
-                time_col_name = time_column_csv
-            else:
-                possible_time_cols = ['Time', 'time', 'Frame', 'frame']
-                time_col_name = next((col for col in possible_time_cols if col in raw_data.columns), None)
-                if not time_col_name and raw_data.shape[1] > 0 :
-                    if pd.api.types.is_numeric_dtype(raw_data.iloc[:, 0]):
-                         print(f"警告: CSV檔案中未找到明確的時間欄位名稱 ('Time', 'time', 'Frame', 'frame')，且未指定 time_column_csv。將假設第一欄 '{raw_data.columns[0]}' 為時間欄位。")
-                         time_col_name = raw_data.columns[0]
-                    else:
-                        raise ValueError("CSV檔案中找不到可用的時間欄位，請透過 'time_column_csv' 參數指定。")
-                elif not time_col_name and raw_data.shape[1] == 0:
-                     raise ValueError("CSV檔案為空或無法識別時間欄位。")
-
-            time_series = raw_data[time_col_name].copy()
-
-            if known_fs_csv:
-                original_fs = float(known_fs_csv)
-            elif pd.api.types.is_numeric_dtype(time_series) and len(time_series) > 1:
-                valid_time_series = time_series.dropna()
-                if len(valid_time_series) > 1:
-                    mean_diff = np.mean(np.diff(valid_time_series))
-                    if mean_diff > 0:
-                        original_fs = 1.0 / mean_diff
-                    else:
-                        print(f"警告: 從CSV時間欄位 '{time_col_name}' 計算得到的平均時間差非正值，無法估算採樣頻率。")
-                else:
-                    print(f"警告: CSV時間欄位 '{time_col_name}' 的有效數據點不足以估算採樣頻率。")
-            else:
-                print(f"警告: CSV時間欄位 '{time_col_name}' 非數值或數據點不足，無法估算採樣頻率。")
-
-            emg_columns_data = []
-            for col in raw_data.columns:
-                if "EMG" in col.upper() and col != time_col_name:
-                    emg_channel_names.append(col)
-                    emg_columns_data.append(raw_data[col])
-            
-            if not emg_channel_names:
-                print("警告: CSV檔案中未找到欄位名稱包含 'EMG' 的欄位。將嘗試把所有非時間的數值欄位視為 EMG 數據。")
-                for col in raw_data.columns:
-                    if col != time_col_name and pd.api.types.is_numeric_dtype(raw_data[col]):
-                        emg_channel_names.append(col)
-                        emg_columns_data.append(raw_data[col])
-                if not emg_channel_names:
-                    raise ValueError("CSV檔案中未能識別出任何 EMG 數據欄位。")
-
-            processed_df = pd.concat([time_series] + emg_columns_data, axis=1)
-            processed_df.columns = ['time'] + emg_channel_names
-            processed_df['time'] = pd.to_numeric(processed_df['time'], errors='coerce')
-
-        elif file_path.lower().endswith('.c3d'):
-            data_type = "c3d"
-            if ezc3d is None:
-                raise ImportError("處理 C3D 檔案需要 'ezc3d' 函式庫，但該函式庫未安裝。請執行 'pip install ezc3d' 安裝。")
-            
-            c3d_data = ezc3d.c3d(file_path)
-            
-            analog_labels = c3d_data['parameters']['ANALOG']['LABELS']['value']
-            selected_channels_tuples = [] # 儲存 (索引, 標籤名稱)
-
-            # 階段 1: 嘗試使用 c3d_channel_keywords
-            if c3d_channel_keywords and isinstance(c3d_channel_keywords, list) and len(c3d_channel_keywords) > 0:
-                print(f"訊息: 使用提供的 'c3d_channel_keywords' ({c3d_channel_keywords}) 來篩選C3D通道。")
-                temp_selected_by_keywords = []
-                processed_indices_keywords = set() # 確保每個通道只被添加一次
-                for i, label_name in enumerate(analog_labels):
-                    if i in processed_indices_keywords:
-                        continue
-                    for pattern in c3d_channel_keywords:
-                        if pattern in label_name: # 檢查模式是否存在於標籤名稱中
-                            temp_selected_by_keywords.append((i, label_name))
-                            processed_indices_keywords.add(i)
-                            break # 此標籤已匹配，移至下一個標籤
-                if temp_selected_by_keywords:
-                    selected_channels_tuples = temp_selected_by_keywords
-            
-            # 階段 2: 如果關鍵字未產生結果 (或未提供)，嘗試 "EMG"
-            if not selected_channels_tuples:
-                print("訊息: 未通過 'c3d_channel_keywords' 找到通道，或該參數未提供/為空。嘗試查找標籤中包含 'EMG' 的類比通道。")
-                temp_selected_by_emg = []
-                # 此處假設如果 selected_channels_tuples 為空，則之前沒有通道被選中
-                for i, label_name in enumerate(analog_labels):
-                    if "EMG" in label_name.upper():
-                        temp_selected_by_emg.append((i, label_name))
-                if temp_selected_by_emg:
-                    selected_channels_tuples = temp_selected_by_emg
-            
-            # 階段 3: 如果仍然沒有通道，嘗試所有類比通道
-            if not selected_channels_tuples:
-                print("警告: C3D檔案中未找到符合指定關鍵字或 'EMG' 的類比通道。將嘗試加載所有類比通道。")
-                if len(analog_labels) > 0:
-                    selected_channels_tuples = list(enumerate(analog_labels))
-                # 如果 analog_labels 為空, selected_channels_tuples 仍為空
-            
-            # 階段 4: 最終檢查
-            if not selected_channels_tuples:
-                raise ValueError("C3D檔案中未找到任何可處理的類比通道數據 (analog_labels 可能為空或無匹配項)。")
-
-            raw_header_index = [item[0] for item in selected_channels_tuples]
-            emg_channel_names = [item[1] for item in selected_channels_tuples]
-            
-            emg_data_array = c3d_data['data']['analogs'][0, raw_header_index, :]
-            emg_df_c3d = pd.DataFrame(emg_data_array.T, columns=emg_channel_names)
-            
-            original_fs = float(c3d_data['parameters']['ANALOG']['RATE']['value'][0])
-            num_frames = emg_df_c3d.shape[0]
-            time_series = pd.Series(np.linspace(0, (num_frames - 1) / original_fs, num=num_frames), name='time')
-            
-            processed_df = pd.concat([time_series, emg_df_c3d], axis=1)
-
-        else:
-            raise ValueError(f"不支援的檔案格式: {file_path}。請提供 CSV 或 C3D 檔案。")
-
-        if original_fs is None or original_fs <=0:
-            print(f"警告: 未能成功確定 '{file_path}' 的有效原始採樣頻率。後續處理可能出錯。")
-
-        return processed_df, original_fs, emg_channel_names, data_type
-
-    except FileNotFoundError:
-        raise FileNotFoundError(f"錯誤: 找不到檔案 {file_path}")
-    except Exception as e:
-        print(f"加載數據時發生錯誤 ({file_path}): {e}")
-        raise
-
-# %%
-data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S06\250318\S06_GridShot_I_1.c3d"
-
-csv_data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\3.EMG\S10\S02_LargeFlick_Rep_8.24.csv"
-# %%
-
-# %%
-# 嘗試導入 ezc3d，如果失敗則在需要時拋出錯誤
-
-
-
-
-# 嘗試導入 ezc3d，如果失敗則在需要時拋出錯誤
-try:
-    import ezc3d
-except ImportError:
-    ezc3d = None
-
-# 設定日誌記錄器
-logging.basicConfig(level=logging.INFO) # 可以調整為 logging.WARNING 等
-logger = logging.getLogger(__name__)
-
-def EMG_Process_Combined(
-    raw_data_path,
-    target_down_freq=1000,
-    bandpass_cutoff=[20, 450],
-    envelope_lowpass_freq=6,
-    notch_cutoff_list=[[59, 61]],
-    time_column_csv=None,
-    # known_fs_csv=None,
-    c3d_select_keywords=None, # 用於C3D通道選擇的關鍵字列表
-    channel_rename_map=None # 用於重命名通道的字典 {'old_name': 'new_name'}
+config = APP_CONFIG
+def calculate_fft_for_emg_data(
+    raw_data_object,
+    input_file_extension,
+    config,
+    original_filename=None
 ):
     """
-    整合的 EMG 信號處理函數。
-    執行數據加載、預處理、濾波、包絡提取和降採樣。
-
-    程式邏輯：
-    1. 數據加載 (CSV/C3D):
-        - 自動檢測或使用指定的時間欄位 (CSV)。
-        - 使用關鍵字 (C3D) 或 "EMG" 標識 (CSV/C3D) 選擇 EMG 通道。
-        - 估算或使用已知的原始採樣頻率。
-        - 可選：重命名通道。
-    2. 預處理：
-        - CSV: 計算各通道的實際採樣頻率、有效數據長度、截止時間。
-               根據最短的有效截止時間 (`min_stop_time`) 調整數據。
-        - C3D: 使用頭部訊息獲取採樣頻率和數據長度。
-        - 計算降採樣後的目標數據長度 (`downsample_len`)。
-    3. 逐通道濾波與處理 (在原始採樣率下進行，然後降採樣)：
-        - 處理 NaN 值 (填充為0並警告)。
-        - CSV: 根據 `min_stop_time` 截斷各通道數據。
-        - 應用帶通濾波。
-        - (儲存一份僅帶通濾波的結果，用於後續降採樣)
-        - 應用陷波濾波。
-        - 取絕對值。
-        - 應用低通濾波創建包絡。
-    4. 降採樣：
-        - 將處理後的包絡信號和僅帶通濾波的信號降採樣到 `target_down_freq`。
-    5. 插入時間軸並返回結果。
+    計算 EMG 數據的 FFT 並回傳頻譜數據。
 
     參數:
-    raw_data_path (str): 原始數據檔案路徑 (.csv 或 .c3d)。
-    target_down_freq (float): 目標降採樣頻率 (Hz)。預設 1000 Hz。
-    bandpass_cutoff (list): 帶通濾波截止頻率 [low, high] (Hz)。預設 [20, 450]。
-    envelope_lowpass_freq (float): 包絡提取用的低通濾波截止頻率 (Hz)。預設 6 Hz。
-    notch_cutoff_list (list of lists): 陷波濾波頻率列表 [[low1, high1], ...]。預設 [[59, 61]]。
-    time_column_csv (str, optional): CSV 檔案的時間欄位名稱。
-    known_fs_csv (float, optional): CSV 檔案的已知原始採樣頻率 (Hz)。
-    c3d_select_keywords (list of str, optional): C3D 檔案中用於選擇通道的關鍵字列表。
-                                                若為 None，則嘗試 "EMG"，再嘗試所有通道。
-    channel_rename_map (dict, optional): 用於重命名通道的字典，格式為 {'原始名稱': '新名稱'}。
-                                         適用於 CSV 加載後的欄位名或 C3D 的原始標籤名。
+    - raw_data_object: 檔案物件 (如 io.BytesIO) 或 c3d 檔案路徑 (ezc3d 可能需要路徑)。
+    - input_file_extension: '.csv' 或 '.c3d'。
+    - config: 包含所有處理參數的字典。
+    - original_filename: 原始檔案名稱，用於記錄。
 
     回傳:
-    final_envelope_df (pd.DataFrame): 包含時間軸和降採樣後 EMG 包絡的 DataFrame。
-    bandpass_only_df (pd.DataFrame): 包含時間軸和降採樣後僅帶通濾波的 EMG 信號的 DataFrame。
-                                     如果處理失敗或無有效數據，可能返回 None 或部分空的 DataFrame。
+    - dict: 包含 FFT 結果的字典。
     """
-    logger.info(f"開始處理 EMG 數據: {raw_data_path}")
-    # --- 1. 數據加載 ---
-    # raw_data_path = csv_data_path
-    raw_df = None
-    original_fs_dict = {} # 對於CSV，可能每個通道Fs不同
-    emg_channel_names_loaded = []
-    data_type = ""
-    time_col_actual_name = 'time' # 預期處理後的內部時間欄位名
+    raw_data = None
+    c3d_instance = None # 用於儲存 c3d 物件以便後續提取 header info
 
-    if raw_data_path.lower().endswith('.csv'):
-        data_type = "csv"
+    # ----- 檔案讀取與初步轉換 -----
+    if '.csv' in raw_data_object:
         try:
-            temp_raw_df = pd.read_csv(raw_data_path)
+            # 假設 raw_data_object 是一個 file-like object
+            raw_data = pd.read_csv(raw_data_object)
+            # 使用 config 中的 csv_recolumns_name 來篩選和準備重命名
+            # 原碼中的 csv_recolumns_name 是直接使用的，這裡從 config 傳入
+            # 注意：原碼中 csv_recolumns_name 的使用方式 (迴圈其鍵) 與其後面的 rename 邏輯可能需要仔細對應
+            target_csv_labels_map = config.get("DEFAULT_CSV_RECOLUMNS_NAME", {})
+            num_columns_indices = []
+            emg_signal_columns = []
+            # 方法1: 如果 c3d_recolumns_name 的鍵是 c3d 檔案中「期望找到的部分字串」
+            for desired_key_part in target_csv_labels_map.keys():
+                for i, actual_label in enumerate(raw_data.columns):
+                    if desired_key_part in actual_label:
+                        if i not in num_columns_indices: # 避免重複添加
+                            num_columns_indices.append(i)
+                            emg_signal_columns.append(actual_label) # 原始 c3d 標籤
+                        break # 找到一個就跳出內層迴圈 (假設一個 desired_key_part 對應一個頻道)
+            if not num_columns_indices:
+                raise ValueError("在 C3D 檔案中找不到符合條件的 EMG 頻道。")
+            # ----- 1. 前處理 (續) -----
+            # # 識別 EMG 頻道 (現在使用 config 中的 IDENTIFIER)
+            # emg_cols_bool = raw_data.columns.str.contains(config.get("EMG_CHANNEL_IDENTIFIER", "EMG"))
+            # emg_signal_columns = raw_data.columns[emg_cols_bool]
+            # num_columns_indices = [raw_data.columns.get_loc(col) for col in emg_signal_columns] # 獲取索引
+        except Exception as e:
+            logging.error(f"讀取 CSV 檔案時發生錯誤: {e}")
+            raise ValueError(f"無法解析 CSV 檔案: {e}")
+    elif '.c3d' in raw_data_object:
+        try:
+            # ezc3d 通常需要檔案路徑，但可以嘗試傳遞 file-like object
+            # 如果不行，則需先將上傳的檔案暫存到臨時位置再傳遞路徑
+            # 這裡假設 ezc3d 可以處理類似檔案的物件，或已在 API 層處理成路徑
+            c = ezc3d.c3d(raw_data_object) # 這行可能需要調整
             
-            # 確定時間欄位
-            # if time_column_csv and time_column_csv in temp_raw_df.columns:
-            #     time_col_actual_name = time_column_csv
-            # else:
-            #     possible_time_cols = ['Time', 'time', 'Frame', 'frame', 'X[s]']
-            #     time_col_actual_name = next((col for col in possible_time_cols if col in temp_raw_df.columns), None)
-            #     if not time_col_actual_name and temp_raw_df.shape[1] > 0:
-            #         if pd.api.types.is_numeric_dtype(temp_raw_df.iloc[:, 0]):
-            #             time_col_actual_name = temp_raw_df.columns[0]
-            #             logger.warning(f"CSV: 未找到明確時間欄位，假設第一欄 '{time_col_actual_name}' 為時間。")
-            #         else:
-            #             raise ValueError("CSV: 找不到時間欄位，請用 'time_column_csv' 指定。")
-            #     elif not time_col_actual_name:
-            #          raise ValueError("CSV: 檔案為空或無法識別時間欄位。")
+            # --- c3d 轉 DataFrame (與原碼類似，但使用 config 中的參數) ---
+            raw_data_header_labels = c['parameters']['ANALOG']['LABELS']['value']
+            num_columns_indices = []
+            emg_signal_columns = []
             
-            # 識別 EMG 欄位 (名稱包含 "EMG"，且非時間欄位)
-            for col in temp_raw_df.columns:
-                if col.upper().startswith("EMG") and col != time_col_actual_name: # 修改為 startswith("EMG") 更靈活
-                    emg_channel_names_loaded.append(col)
+            # 使用 config 中的 c3d_recolumns_name 來篩選和準備重命名
+            # 原碼中的 c3d_recolumns_name 是直接使用的，這裡從 config 傳入
+            # 注意：原碼中 c3d_recolumns_name 的使用方式 (迴圈其鍵) 與其後面的 rename 邏輯可能需要仔細對應
+            target_c3d_labels_map = config.get("DEFAULT_C3D_RECOLUMNS_NAME", {})
             
-            if not emg_channel_names_loaded: # 如果沒有 "EMG" 開頭的，嘗試包含 "EMG"
-                 for col in temp_raw_df.columns:
-                    if "EMG" in col.upper() and col != time_col_actual_name:
-                        emg_channel_names_loaded.append(col)
+            # 方法1: 如果 c3d_recolumns_name 的鍵是 c3d 檔案中「期望找到的部分字串」
+            for desired_key_part in target_c3d_labels_map.keys():
+                for i, actual_label in enumerate(raw_data_header_labels):
+                    if desired_key_part in actual_label:
+                        if i not in num_columns_indices: # 避免重複添加
+                            num_columns_indices.append(i)
+                            emg_signal_columns.append(actual_label) # 原始 c3d 標籤
+                        break # 找到一個就跳出內層迴圈 (假設一個 desired_key_part 對應一個頻道)
+            if not num_columns_indices:
+                raise ValueError("在 C3D 檔案中找不到符合條件的 EMG 頻道。")
 
-            if not emg_channel_names_loaded:
-                logger.warning("CSV: 未找到 'EMG' 相關欄位，將嘗試所有非時間的數值欄位。")
-                for col in temp_raw_df.columns:
-                    if col != time_col_actual_name and pd.api.types.is_numeric_dtype(temp_raw_df[col]):
-                        emg_channel_names_loaded.append(col)
-                if not emg_channel_names_loaded:
-                    raise ValueError("CSV: 未能識別任何 EMG 數據欄位。")
+            analog_data = c['data']['analogs'][0, num_columns_indices, :]
+            raw_data = pd.DataFrame(np.transpose(analog_data), columns=emg_signal_columns)
             
-            emg_channel_names_loaded_withtime = []
-            cols = temp_raw_df.columns  # 原始欄位 Index
-
-            for col in emg_channel_names_loaded:
-                idx = cols.get_loc(col)         # 找到 col 在欄位裡的索引
-                if idx == 0:
-                    prev_name = None           # 第 0 個欄位本身就沒有前一個
-                else:
-                    prev_name = cols[idx - 1]  # 前一個欄位的字串名稱
-                    emg_channel_names_loaded_withtime.append(prev_name)
-                    emg_channel_names_loaded_withtime.append(col)
-
-            # 組合 DataFrame，時間欄位統一命名為 'time'
-            raw_df_cols = [temp_raw_df[col] for col in emg_channel_names_loaded_withtime]
-            raw_df = pd.concat(raw_df_cols, axis=1)
-
-            for col in raw_df.columns:
-                raw_df[col] = pd.to_numeric(raw_df[col], errors='coerce')
-            """
-            改到這裡
-            """
-
-            # 估算或使用已知的採樣頻率 (CSV 可能每個通道不同，但這裡先估算一個整體的，後續可細化)
-            # if known_fs_csv:
-            #     # 如果提供了 known_fs_csv，假設所有通道都是這個 Fs
-            #     for ch_name in emg_channel_names_loaded:
-            #         original_fs_dict[ch_name] = float(known_fs_csv)
-            # else: # 否則，將在預處理階段為每個通道估算 Fs
-            #     pass # Fs 將在下面計算
+            # 插入時間軸
+            analog_time = np.linspace(
+                0,
+                (c['header']['analogs']['last_frame']) / c['header']['analogs']['frame_rate'],
+                num=(np.shape(c['data']['analogs'])[-1])
+            )
+            raw_data.insert(0, 'Frame', analog_time) # 初始時間欄位
 
         except Exception as e:
-            logger.error(f"加載 CSV 檔案 '{raw_data_path}' 失敗: {e}")
-            return None, None
-
-    elif raw_data_path.lower().endswith('.c3d'):
-        data_type = "c3d"
-        if ezc3d is None:
-            raise ImportError("處理 C3D 檔案需要 'ezc3d' 函式庫。請執行 'pip install ezc3d'。")
-        try:
-            c3d = ezc3d.c3d(raw_data_path)
-            all_analog_labels = c3d['parameters']['ANALOG']['LABELS']
-            selected_tuples = [] # (index, original_label)
-
-            if c3d_select_keywords and isinstance(c3d_select_keywords, list) and len(c3d_select_keywords) > 0:
-                processed_indices = set()
-                for keyword in c3d_select_keywords:
-                    for i, label in enumerate(all_analog_labels):
-                        if keyword in label and i not in processed_indices:
-                            selected_tuples.append((i, label))
-                            processed_indices.add(i)
-            
-            if not selected_tuples: # 未提供關鍵字或未匹配到，嘗試 "EMG"
-                logger.info("C3D: 未通過關鍵字選擇通道，嘗試查找含 'EMG' 的通道。")
-                for i, label in enumerate(all_analog_labels):
-                    if "EMG" in label.upper():
-                        selected_tuples.append((i, label))
-            
-            if not selected_tuples: # 仍未匹配到，嘗試所有通道
-                logger.warning("C3D: 未找到 'EMG' 通道，嘗試加載所有類比通道。")
-                if len(all_analog_labels) > 0:
-                    selected_tuples = list(enumerate(all_analog_labels))
-            
-            if not selected_tuples:
-                raise ValueError("C3D: 未找到任何可處理的類比通道。")
-
-            selected_indices = [item[0] for item in selected_tuples]
-            emg_channel_names_loaded = [item[1] for item in selected_tuples]
-
-            analog_data_array = c3d['data']['analogs'][0, selected_indices, :]
-            emg_df_c3d = pd.DataFrame(analog_data_array.T, columns=emg_channel_names_loaded)
-            
-            # C3D 的所有類比通道通常有相同的採樣率
-            fs_c3d = float(c3d['parameters']['ANALOG']['RATE']['value'][0])
-            for ch_name in emg_channel_names_loaded:
-                original_fs_dict[ch_name] = fs_c3d
-            
-            num_frames = emg_df_c3d.shape[0]
-            time_series_c3d = pd.Series(np.linspace(0, (num_frames - 1) / fs_c3d, num=num_frames), name='time')
-            raw_df = pd.concat([time_series_c3d, emg_df_c3d], axis=1)
-
-        except Exception as e:
-            logger.error(f"加載 C3D 檔案 '{raw_data_path}' 失敗: {e}")
-            return None, None
+            logging.error(f"處理 C3D 檔案時發生錯誤: {e}")
+            raise ValueError(f"無法解析或處理 C3D 檔案: {e}")
     else:
-        raise ValueError(f"不支援的檔案格式: {raw_data_path}。請提供 CSV 或 C3D。")
+        raise ValueError("不支援的檔案類型。請上傳 .csv 或 .c3d 檔案。")
 
-    if raw_df is None or raw_df.empty:
-        logger.error("數據加載後 DataFrame 為空。")
-        return None, None
-    # channel_rename_map = csv_recolumns_name
-    # 可選：重命名通道
-    if channel_rename_map and isinstance(channel_rename_map, dict):
-        # 更新 emg_channel_names_loaded 列表以反映重命名
-        current_columns = list(raw_df.columns)
-        new_emg_channel_names = []
-        for old_name in emg_channel_names_loaded:
-            new_emg_channel_names.append(channel_rename_map.get(old_name, old_name))
-        
-        raw_df.rename(columns=channel_rename_map, inplace=True)
-        emg_channel_names_loaded = new_emg_channel_names # 更新列表
-        logger.info(f"通道已重命名。新 EMG 通道名稱: {emg_channel_names_loaded}")
+    if raw_data is None or raw_data.empty:
+        raise ValueError("資料讀取失敗或檔案為空。")
 
+   
 
-    logger.info(f"數據加載完成。偵測到 EMG 通道: {emg_channel_names_loaded}")
-
-    # --- 2. 預處理 ---
+    if not num_columns_indices:
+        logging.error("找不到任何 EMG 訊號欄位。")
+        raise ValueError("找不到任何 EMG 訊號欄位。請檢查欄位名稱是否包含指定的識別符。")
     
-    
-    # 確定一個用於計算總體 downsample_len 的 Fs (對於C3D是固定的，對於CSV取最小值或平均值)
-    overall_fs_for_downsample_len_calc = None
-
-    if data_type == "csv":
-        min_stop_time_csv = float('inf')
-        csv_channel_data_lengths = {} # 儲存CSV各通道的原始有效長度
-        csv_channel_stop_times = {}   # 儲存CSV各通道的截止時間
-        
-        temp_fs_values = []
-        for ch_idx, emg_col_name in enumerate(emg_channel_names_loaded):
-            # CSV: 計算每個通道的 Fs (如果 known_fs_csv 未提供)
-            # if not known_fs_csv:
-                # 假設時間欄位是 'time'，EMG數據欄位是 emg_col_name
-                # 原始代碼中，時間欄位是 EMG 欄位索引 - 1。這裡我們有統一的 'time' 欄。
-            idx = raw_df.columns.get_loc(emg_col_name) - 1
-            time_data_for_fs = raw_df.iloc[:, idx].dropna()
-            if len(time_data_for_fs) > 10 : # 需要足夠點來估算
-                # 使用前10個差異的平均值
-                fs_est = 1.0 / np.mean(np.diff(time_data_for_fs.iloc[1:11])) # 從1開始避免0索引
-                if fs_est > 0:
-                    original_fs_dict[emg_col_name] = fs_est
-                    temp_fs_values.append(fs_est)
-                else:
-                    logger.warning(f"CSV: 通道 {emg_col_name} Fs 估算失敗 (時間差非正)，將嘗試使用其他通道的Fs。")
-            else: # 數據點不足
-                logger.warning(f"CSV: 通道 {emg_col_name} 時間數據不足以估算 Fs。")
+    logging.info(f"處理 EMG 訊號，總共 {len(num_columns_indices)} 條肌肉，分別為以下欄位: {emg_signal_columns}")
+    if not emg_signal_columns:
+        logging.error(f"在檔案 '{original_filename}' 中找不到任何 EMG 訊號欄位。")
+        raise ValueError(f"在檔案 '{original_filename}' 中找不到任何 EMG 訊號欄位。請檢查欄位名稱或 EMG_CHANNEL_IDENTIFIER。")
+    # 欄位重命名 (CSV)
+    if '.csv' in raw_data_object:
+        raw_data.rename(columns=config.get("DEFAULT_CSV_RECOLUMNS_NAME", {}), inplace=True)
+    elif '.c3d' in raw_data_object:
+        raw_data.rename(columns=config.get("DEFAULT_C3D_RECOLUMNS_NAME", {}), inplace=True)
 
 
-            # 計算有效數據長度和截止時間 (僅針對CSV的尾部0值處理)
-            channel_data_series = raw_df[emg_col_name]
-            non_zero_indices = np.where(channel_data_series.fillna(0).values != 0)[0] # fillna(0) 以處理 NaN
-            if len(non_zero_indices) > 0:
-                valid_len = non_zero_indices[-1] + 1
-                csv_channel_data_lengths[emg_col_name] = valid_len
-                if valid_len > 0:
-                    stop_time_val = raw_df.iloc[:, idx].iloc[valid_len - 1]
-                    if pd.notna(stop_time_val):
-                        csv_channel_stop_times[emg_col_name] = stop_time_val
-                        min_stop_time_csv = min(min_stop_time_csv, stop_time_val)
-            else: # 通道全為0或NaN
-                csv_channel_data_lengths[emg_col_name] = 0
-                logger.warning(f"CSV: 通道 {emg_col_name} 無有效數據 (全為0或NaN)。")
-        
-        if not temp_fs_values: # 如果所有通道Fs估算失敗且無已知Fs
-            raise ValueError("CSV: 無法確定任何通道的採樣頻率。")
-        elif not temp_fs_values: # 使用估算Fs的最小值
-            overall_fs_for_downsample_len_calc = min(temp_fs_values)
-            # 將估算失敗的通道的Fs也設為這個最小值
-            for ch_name in emg_channel_names_loaded:
-                if ch_name not in original_fs_dict or original_fs_dict[ch_name] <=0:
-                    original_fs_dict[ch_name] = overall_fs_for_downsample_len_calc
-                    logger.info(f"CSV: 通道 {ch_name} Fs 設為估算的最小 Fs: {overall_fs_for_downsample_len_calc:.2f} Hz")
-        
-        
-        if min_stop_time_csv == float('inf'): # 如果沒有任何有效的 stop time
-            if raw_df.shape[0] > 0:
-                min_stop_time_csv = raw_df.iloc[-1:, 0] # 使用數據的最後時間點
-                logger.warning("CSV: 未能確定有效的 min_stop_time，將使用數據的總時長。")
-            else:
-                logger.error("CSV: 數據為空，無法確定 min_stop_time。")
-                return None, None
-        logger.info(f"CSV: 所有通道將對齊到最小截止時間: {min_stop_time_csv:.3f} s")
-
-    elif data_type == "c3d":
-        # 對於 C3D，所有通道 Fs 相同，且通常無尾部0問題
-        if emg_channel_names_loaded: # 確保列表非空
-            overall_fs_for_downsample_len_calc = original_fs_dict[emg_channel_names_loaded[0]]
-        else:
-            logger.error("C3D: 加載後 EMG 通道列表為空。")
-            return None, None
-
-    if overall_fs_for_downsample_len_calc is None or overall_fs_for_downsample_len_calc <= 0:
-        logger.error(f"無法確定有效的整體採樣頻率 ({overall_fs_for_downsample_len_calc})。")
-        return None, None
-
-    # 計算降採樣目標長度
-    # 使用 raw_df 的總長度（對於C3D）或與 min_stop_time_csv 對應的長度（對於CSV）
-    if data_type == "csv":
-        # 找到 min_stop_time_csv 在 'time' 列中的索引，或最接近的索引
-        if raw_df.empty or raw_df['time'].empty:
-             max_initial_len = 0
-        else:
-            time_diff = np.abs(raw_df['time'] - min_stop_time_csv)
-            if time_diff.empty: # 如果 raw_df['time'] 是空的
-                max_initial_len = 0
-            else:
-                max_initial_len = time_diff.idxmin() + 1 if not time_diff.empty else 0
-
-    else: # C3D
-        max_initial_len = raw_df.shape[0]
-    
-    if max_initial_len == 0:
-        logger.warning("用於計算降採樣長度的初始數據長度為0。")
-        downsample_len = 0
-    else:
-        downsample_len = math.floor(max_initial_len / overall_fs_for_downsample_len_calc * target_down_freq)
-
-    if downsample_len <= 0:
-        logger.warning(f"計算得到的降採樣目標長度為 {downsample_len}。可能無輸出數據。")
-        # 根據需求，這裡可以決定是否繼續或返回
-        # return None, None # 如果不希望處理長度為0的情況
-
-    logger.info(f"整體 Fs 用於降採樣長度計算: {overall_fs_for_downsample_len_calc:.2f} Hz. 降採樣目標長度: {downsample_len} 點.")
-
-    # 初始化結果 DataFrame
-    # 列名將是 emg_channel_names_loaded
-    final_envelope_list = []
-    bandpass_only_list = []
-
-    # --- 3. 逐通道濾波與處理 ---
-    for emg_col in emg_channel_names_loaded:
-        channel_fs = original_fs_dict.get(emg_col)
-        if channel_fs is None or channel_fs <= 0:
-            logger.warning(f"通道 {emg_col} 的採樣頻率無效 ({channel_fs})，跳過此通道。")
-            if downsample_len > 0: # 保持 DataFrame 結構一致性
-                 final_envelope_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
-                 bandpass_only_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
-            else: # 如果 downsample_len 也是0
-                 final_envelope_list.append(pd.Series(dtype=float, name=emg_col))
-                 bandpass_only_list.append(pd.Series(dtype=float, name=emg_col))
-            continue
-
-        # 獲取原始數據
-        data_series = raw_df[emg_col].copy()
-
-        # 處理 NaN
-        nan_indices = np.where(np.isnan(data_series))[0]
-        if len(nan_indices) > 0:
-            logger.warning(f"通道 {emg_col}: 發現 {len(nan_indices)} 個 NaN 值，位置: {nan_indices[:5]}... 已用 0 填充。")
-            if len(nan_indices) > 0.1 * channel_fs: # 斷訊超過0.1秒
-                logger.warning(f"通道 {emg_col}: NaN 值數量超過0.1秒的數據量。")
-            data_series.fillna(0, inplace=True)
-        
-        data_values = data_series.values
-
-        # CSV: 根據 min_stop_time 截斷數據
-        if data_type == "csv":
-            # 找到 min_stop_time_csv 在該通道時間軸上的索引
-            # (假設 raw_df['time'] 是所有通道共用的時間軸)
-            if not raw_df['time'].empty:
-                end_index_for_channel = (np.abs(raw_df['time'] - min_stop_time_csv)).idxmin()
-                # 確保 end_index_for_channel 不超過 data_values 的長度
-                end_index_for_channel = min(end_index_for_channel, len(data_values) - 1)
-                if end_index_for_channel >= 0 :
-                    data_values = data_values[:end_index_for_channel + 1]
-                else: # 如果 end_index < 0 (例如時間序列為空或min_stop_time_csv無效)
-                    data_values = np.array([]) # 空數據
-            else: # 時間序列為空
-                data_values = np.array([])
-
-
-        if len(data_values) == 0:
-            logger.warning(f"通道 {emg_col} 在預處理後數據長度為0，跳過濾波。")
-            if downsample_len > 0:
-                 final_envelope_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
-                 bandpass_only_list.append(pd.Series(np.zeros(downsample_len), name=emg_col))
-            else:
-                 final_envelope_list.append(pd.Series(dtype=float, name=emg_col))
-                 bandpass_only_list.append(pd.Series(dtype=float, name=emg_col))
-            continue
-            
-        # 3.1 帶通濾波
-        bp_sos = signal.butter(2, bandpass_cutoff, btype='bandpass', fs=channel_fs, output='sos')
-        signal_after_bandpass = signal.sosfiltfilt(bp_sos, data_values)
-        
-        # 儲存僅帶通濾波的結果 (用於後續降採樣)
-        resampled_bandpass_only_signal = np.array([])
-        if downsample_len > 0 and len(signal_after_bandpass) > 0:
-            resampled_bandpass_only_signal = signal.resample(signal_after_bandpass, downsample_len)
-        elif downsample_len > 0 and len(signal_after_bandpass) == 0: # 輸入為空，輸出補零
-            resampled_bandpass_only_signal = np.zeros(downsample_len)
-        bandpass_only_list.append(pd.Series(resampled_bandpass_only_signal, name=emg_col))
-
-        # 3.2 陷波濾波 (在帶通濾波後的信號上進行)
-        signal_after_notch = signal_after_bandpass
-        if notch_cutoff_list:
-            for notch_range in notch_cutoff_list:
-                if not (isinstance(notch_range, list) and len(notch_range) == 2):
-                    logger.warning(f"陷波濾波範圍 {notch_range} 格式不正確，已跳過。")
-                    continue
-                try:
-                    notch_sos = signal.butter(2, notch_range, btype='bandstop', fs=channel_fs, output='sos')
-                    signal_after_notch = signal.sosfiltfilt(notch_sos, signal_after_notch)
-                except ValueError as ve: # 例如截止頻率超出奈奎斯特頻率
-                    logger.warning(f"通道 {emg_col}: 應用陷波濾波 {notch_range} 失敗: {ve} (Fs={channel_fs}). 跳過此陷波。")
-
-
-        # 3.3 取絕對值
-        signal_abs = np.abs(signal_after_notch)
-
-        # 3.4 低通濾波創建包絡
-        env_lp_sos = signal.butter(2, envelope_lowpass_freq, btype='low', fs=channel_fs, output='sos')
-        envelope_signal = signal.sosfiltfilt(env_lp_sos, signal_abs)
-
-        # --- 4. 降採樣包絡 ---
-        resampled_envelope = np.array([])
-        if downsample_len > 0 and len(envelope_signal) > 0:
-            resampled_envelope = signal.resample(envelope_signal, downsample_len)
-        elif downsample_len > 0 and len(envelope_signal) == 0:
-            resampled_envelope = np.zeros(downsample_len)
-        final_envelope_list.append(pd.Series(resampled_envelope, name=emg_col))
-
-    # --- 5. 組合結果並插入時間軸 ---
-    final_envelope_df = pd.DataFrame()
-    bandpass_only_df = pd.DataFrame()
-
-    if final_envelope_list:
-        # 檢查是否所有 Series 都為空或長度不一致 (理論上應與 downsample_len 一致)
-        # 這裡假設如果 downsample_len > 0，則列表中的 Series 長度都應為 downsample_len
-        # 如果 downsample_len = 0，則列表中的 Series 都應為空
-        final_envelope_df = pd.concat(final_envelope_list, axis=1)
-    else: # 如果 emg_channel_names_loaded 為空或所有通道處理失敗
-        logger.warning("沒有 EMG 通道數據被處理成包絡。")
-        # 創建一個空的 DataFrame 但保留欄位名，如果 downsample_len > 0
-        if downsample_len > 0 and emg_channel_names_loaded:
-            final_envelope_df = pd.DataFrame(np.zeros((downsample_len, len(emg_channel_names_loaded))), columns=emg_channel_names_loaded)
-        else: # 否則完全空
-            final_envelope_df = pd.DataFrame(columns=emg_channel_names_loaded)
-
-
-    if bandpass_only_list:
-        bandpass_only_df = pd.concat(bandpass_only_list, axis=1)
-    else:
-        logger.warning("沒有 EMG 通道數據被處理成僅帶通濾波。")
-        if downsample_len > 0 and emg_channel_names_loaded:
-             bandpass_only_df = pd.DataFrame(np.zeros((downsample_len, len(emg_channel_names_loaded))), columns=emg_channel_names_loaded)
-        else:
-             bandpass_only_df = pd.DataFrame(columns=emg_channel_names_loaded)
-
-
-    # 創建新的時間軸
-    new_time_axis_values = np.array([])
-    if downsample_len > 0 and target_down_freq > 0:
-        new_time_axis_values = np.linspace(0, (downsample_len - 1) / target_down_freq, num=downsample_len)
-    
-    time_series_for_output = pd.Series(new_time_axis_values, name='time')
-
-    # 將時間軸插入到結果 DataFrame 的第一列
-    # 確保即使 EMG 數據為空，時間軸也能正確插入
-    if not final_envelope_df.empty:
-        final_envelope_df.insert(0, 'time', time_series_for_output)
-    elif len(time_series_for_output) > 0 : # 如果 EMG 數據為空但有時間軸
-        final_envelope_df = pd.DataFrame({'time': time_series_for_output})
-        for col_name in emg_channel_names_loaded: # 添加空的 EMG 列
-            final_envelope_df[col_name] = pd.Series(dtype=float)
-
-
-    if not bandpass_only_df.empty:
-        bandpass_only_df.insert(0, 'time', time_series_for_output)
-    elif len(time_series_for_output) > 0:
-        bandpass_only_df = pd.DataFrame({'time': time_series_for_output})
-        for col_name in emg_channel_names_loaded:
-            bandpass_only_df[col_name] = pd.Series(dtype=float)
-
-
-    logger.info("EMG 核心處理完成。")
-    return final_envelope_df, bandpass_only_df
-
-# %%
-final_envelope_df, bandpass_only_df = EMG_Process_Combined(csv_data_path,
-                                                           target_down_freq=1000)
-# %%
-# --- 使用範例 ---
-if __name__ == '__main__':
-    # 建立一個假的 CSV 檔案來測試
-    dummy_csv_data = {
-        'Timestamp': np.linspace(0, 5, 10000), # 2kHz 採樣率，5秒數據
-        'EMG_Signal_A': np.random.rand(10000) - 0.5 + np.sin(np.linspace(0, 10, 10000) * 2 * np.pi * 1) * 0.2,
-        'EMG_B': np.random.rand(10000) - 0.5 + np.cos(np.linspace(0, 10, 10000) * 2 * np.pi * 2) * 0.3,
-        'AuxInput': np.random.rand(10000) 
+    # ----- 準備回傳結果結構 -----
+    fft_results = {
+        "filename": original_filename,
+        "c3d_sampling_rate_from_header": c3d_instance['header']['analogs']['frame_rate'] if c3d_instance else None,
+        "channels_fft_data": []
     }
-    # 在 EMG_B 的末尾加入一些0，模擬無效數據
-    dummy_csv_data['EMG_B'][-500:] = 0 
-    dummy_df = pd.DataFrame(dummy_csv_data)
-    dummy_csv_path = 'dummy_emg_combined_sample.csv'
-    dummy_df.to_csv(dummy_csv_path, index=False)
-    
-    logger.info("\n--- 測試 CSV 檔案處理 (EMG_Process_Combined) ---")
-    
-    # 測試1: 基本CSV處理
-    envelope_data_csv, bp_data_csv = EMG_Process_Combined(
-        raw_data_path=dummy_csv_path,
-        target_down_freq=500,
-        bandpass_cutoff=[30, 400],
-        envelope_lowpass_freq=8,
-        notch_cutoff_list=[[58, 62], [118, 122]],
-        time_column_csv='Timestamp',
-        # known_fs_csv=2000 # 可以選擇提供或讓程式估算
-        channel_rename_map={'EMG_Signal_A': 'Vastus_R', 'EMG_B': 'Tibialis_L'}
-    )
-    if envelope_data_csv is not None:
-        logger.info("CSV 處理 - 包絡數據 (前5行):")
-        print(envelope_data_csv.head())
-    if bp_data_csv is not None:
-        logger.info("CSV 處理 - 僅帶通數據 (前5行):")
-        print(bp_data_csv.head())
 
-    # 清理假檔案
-    import os
-    if os.path.exists(dummy_csv_path):
-        os.remove(dummy_csv_path)
+    # ----- 逐頻道處理 -----
+    bandpass_cutoff_freqs = config.get("BANDPASS_CUTOFF") # 提供預設值
+    perform_notch = config.get("PERFORM_NOTCH_FILTER")
+    truncate_fft = config.get("FFT_TRUNCATE_TO_POWER_OF_2") # 默認截斷行為
 
-    # C3D 檔案測試需要一個實際的 .c3d 檔案
-    # 假設您有一個名為 'sample.c3d' 的檔案，其中包含名為 'EMG_Channel1' 和 'OtherAnalog_Sensor2' 的通道
-    # logger.info("\n--- 測試 C3D 檔案處理 (EMG_Process_Combined) ---")
-    # c3d_file_path_example = 'your_actual_sample.c3d' # 替換為您的 C3D 檔案路徑
-    # if os.path.exists(c3d_file_path_example) and ezc3d is not None:
-    #     envelope_data_c3d, bp_data_c3d = EMG_Process_Combined(
-    #         raw_data_path=c3d_file_path_example,
-    #         target_down_freq=1000,
-    #         bandpass_cutoff=[20, 450],
-    #         envelope_lowpass_freq=6,
-    #         notch_cutoff_list=[[49, 51]], # 假設 50Hz 市電
-    #         c3d_select_keywords=["EMG", "Sensor2"], # 選擇包含 "EMG" 或 "Sensor2" 的通道
-    #         channel_rename_map={'EMG_Channel1': 'Muscle_X', 'OtherAnalog_Sensor2': 'Aux_Y'}
-    #     )
-    #     if envelope_data_c3d is not None:
-    #         logger.info("C3D 處理 - 包絡數據 (前5行):")
-    #         print(envelope_data_c3d.head())
-    #     if bp_data_c3d is not None:
-    #         logger.info("C3D 處理 - 僅帶通數據 (前5行):")
-    #         print(bp_data_c3d.head())
-    # elif ezc3d is None:
-    #    logger.warning("未安裝 ezc3d，跳過 C3D 檔案測試。")
+    for emg_col_name in config["EMG_CHANNEL_IDENTIFIER"]:
+        channel_data_results = {
+            "channel_name": emg_col_name,
+            "sampling_frequency_used": None,
+            "frequencies": [],
+            "amplitudes": [],
+            "top_peaks": []
+        }
+        
+        # --- 計算取樣頻率 (freq) ---
+        freq = 0
+        if '.csv' in raw_data_object:
+            
+            data_time_series = raw_data.iloc[:, num_columns_indices-1]
+            # 原碼的 num_columns[col]-1 邏輯比較脆弱
+            # 如果每個EMG頻道有獨立的時間欄，那結構會更複雜
+            data_time_series = raw_data.iloc[:, num_columns_indices-1]
+            # data_time_series = raw_data.iloc[:, emg_col_idx].dropna()
+            if len(data_time_series) < 11:
+                raise ValueError(f"時間欄 '{raw_data.columns[num_columns_indices-1]}' 的數據不足以計算取樣頻率。")
+   
+            if len(data_time_series) >= 11:
+                try:
+                    freq = int(1 / np.mean(np.array(data_time_series[2:11]) - np.array(data_time_series[1:10])))
+                except ZeroDivisionError:
+                    logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) 計算 Fs 時發生除零錯誤 (時間差為0)。")
+                    freq = 0 # 或其他處理
+            else:
+                logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) 時間序列數據不足11點，無法精確計算 Fs。")
+                # 可以嘗試使用 c3d_sampling_rate_from_header (如果它是csv但有這個資訊) 或一個預設 Fs
+                freq = config.get("DEFAULT_FS_FALLBACK", 2000) # 需要一個預設值
+        elif input_file_extension == '.c3d' and c3d_instance:
+            freq = c3d_instance['header']['analogs']['frame_rate']
+        
+        if freq <= 0:
+            logging.error(f"頻道 '{emg_col_name}' ({original_filename}) 計算得到的取樣頻率無效 ({freq} Hz)。")
+            channel_data_results["error"] = f"Invalid sampling frequency: {freq} Hz."
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+        channel_data_results["sampling_frequency_used"] = freq
+
+        # --- 獲取並處理該頻道數據 ---
+        # 計算有效數據長度 (排除末尾的0) - 原碼中的 data_len
+        current_emg_series = raw_data[emg_col_name]
+        non_zero_indices = (current_emg_series.iloc[::-1] != 0)
+        if not non_zero_indices.any():
+            effective_data_len = 0
+        else:
+            effective_data_len = len(current_emg_series) - non_zero_indices.argmax()
+
+        if effective_data_len == 0:
+            logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) 沒有有效數據。")
+            channel_data_results["error"] = "No effective data in channel."
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+
+        channel_raw_values = current_emg_series.iloc[:effective_data_len].copy()
+
+        nan_indices = np.where(np.isnan(channel_raw_values))[0]
+        if nan_indices.size > 0:
+            if nan_indices.size > 0.1 * freq:
+                logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) NaN 數據超過0.1秒，已補0。")
+            else:
+                logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) 發現 {nan_indices.size} 個NaN，已補0。位置: {nan_indices.tolist()}")
+            channel_raw_values.fillna(0, inplace=True)
+        
+        data_for_filter = channel_raw_values.values
+
+        # --- 訊號濾波 ---
+        try:
+            # Bandpass filter
+            bandpass_sos = signal.butter(4, bandpass_cutoff_freqs, btype='bandpass', fs=freq, output='sos')
+            filtered_signal = signal.sosfiltfilt(bandpass_sos, data_for_filter)
+
+            # Notch filter (optional)
+            if perform_notch:
+                notch_freq_list = config.get("CSV_NOTCH_CUTOFF_LIST" if input_file_extension == '.csv' else "C3D_NOTCH_CUTOFF_LIST", [])
+                for notch_cutoff in notch_freq_list:
+                    if any(f >= freq / 2 for f in notch_cutoff) or any(f <= 0 for f in notch_cutoff) or notch_cutoff[0] >= notch_cutoff[1]:
+                        logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) Notch 頻率 {notch_cutoff} 無效 (Fs={freq})，跳過。")
+                        continue
+                    notch_sos = signal.butter(2, notch_cutoff, btype='bandstop', fs=freq, output='sos')
+                    filtered_signal = signal.sosfiltfilt(notch_sos, filtered_signal)
+            
+            fft_input_data = filtered_signal
+        except Exception as filter_err:
+            logging.error(f"頻道 '{emg_col_name}' ({original_filename}) 濾波失敗: {filter_err}")
+            channel_data_results["error"] = f"Filtering error: {filter_err}"
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+
+        # --- FFT 計算 ---
+        N = len(fft_input_data)
+        if N == 0:
+            channel_data_results["error"] = "Data length for FFT is zero after filtering."
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+
+        if truncate_fft:
+            N_truncated = 2**(N.bit_length() - 1) if N > 0 else 0
+            if N_truncated > 0:
+                # 截斷數據 (這會丟失尾部數據)
+                fft_input_data = fft_input_data[:N_truncated]
+                N = N_truncated
+            else: # 如果 N 太小 (e.g. N=1), N_truncated 可能為0
+                logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) 數據長度 {len(fft_input_data)} 過短，無法截斷到2的冪次方，將使用原始長度。")
+                # 不截斷
+
+        T = 1.0 / freq
+        
+        # 計算 FFT
+        yf = fft(fft_input_data, n=N) # 使用 scipy.fft.fft
+        xf = fftfreq(N, T)[:N // 2]   # 使用 scipy.fft.fftfreq，並取正頻率部分
+        
+        # 計算振幅 (歸一化)
+        amplitudes = (2.0 / N) * np.abs(yf[0:N // 2])
+        
+        channel_data_results["frequencies"] = xf.tolist()
+        channel_data_results["amplitudes"] = amplitudes.tolist()
+
+        # --- 找出前三大峰值 ---
+        if len(amplitudes) > 0:
+            # 複製一份振幅數據用於尋找峰值，避免修改原始數據
+            amp_for_peaks = np.copy(amplitudes)
+            peaks_found = []
+            for _ in range(3): # 尋找三個峰值
+                if not np.any(np.isfinite(amp_for_peaks)) or np.max(amp_for_peaks) == float('-inf'):
+                    break # 如果沒有有效值或都已標記為-inf
+                
+                max_idx = np.argmax(amp_for_peaks)
+                if max_idx < len(xf): # 確保索引有效
+                    peak_freq = xf[max_idx]
+                    peak_amp = amplitudes[max_idx] # 從原始amplitudes取值，因為amp_for_peaks會被修改
+                    peaks_found.append({"frequency": peak_freq, "amplitude": peak_amp})
+                    amp_for_peaks[max_idx] = float('-inf') # 標記已找到的峰值
+                else: # 索引超出xf範圍，不太可能發生，但作為保護
+                    break
+            channel_data_results["top_peaks"] = peaks_found
+        
+        fft_results["channels_fft_data"].append(channel_data_results)
+
+    return fft_results
+
+# ----- Flask API 路由範例 (與前一個 EMG_processing 類似) -----
+# from flask import Flask, request, jsonify
+# import os # 如果需要處理暫存檔案
+#
+# app = Flask(__name__)
+#
+# # 假設 APP_CONFIG 類似於 EMG_processing 中的定義
+# APP_CONFIG_FFT = {
+#     "EMG_CHANNEL_IDENTIFIER": "EMG",
+#     "CSV_RECOLUMNS_NAME": {"EMG_RAW1": "EMG_Sensor1"},
+#     "C3D_RECOLUMNS_NAME": {"AnaEMG1": "EMG_Sensor1", "Right VL": "EMG_RVL"},
+#     "BANDPASS_CUTOFF": [20, 450],
+#     "PERFORM_NOTCH_FILTER": True,
+#     "CSV_NOTCH_CUTOFF_LIST": [[48, 52], [98, 102]], # 50Hz
+#     "C3D_NOTCH_CUTOFF_LIST": [[58, 62], [118, 122]], # 60Hz
+#     "FFT_TRUNCATE_TO_POWER_OF_2": False, # 示例：不截斷
+#     "CSV_TIME_COLUMN_NAME": "Time", # CSV 中時間欄位的名稱
+#     "DEFAULT_FS_FALLBACK": 1000 # 當無法計算Fs時的備用值
+# }
+#
+# @app.route('/analyze_emg_fft', methods=['POST'])
+# def handle_emg_fft_analysis():
+#     if 'file' not in request.files:
+#         return jsonify({"error": "缺少檔案部分"}), 400
+#     
+#     file = request.files['file']
+#     if file.filename == '':
+#         return jsonify({"error": "未選擇檔案"}), 400
+#
+#     original_filename = file.filename
+#     file_extension = ""
+#     if '.' in original_filename and original_filename.rsplit('.', 1)[1].lower() == 'csv':
+#         file_extension = '.csv'
+#     elif '.' in original_filename and original_filename.rsplit('.', 1)[1].lower() == 'c3d':
+#         file_extension = '.c3d'
+#     else:
+#         return jsonify({"error": "不支援的檔案類型。請上傳 .csv 或 .c3d 檔案。"}), 400
+#
+#     try:
+#         # 獲取請求中的參數或使用預設值 (這裡簡化，實際中可能需要更複雜的參數解析)
+#         processing_config = APP_CONFIG_FFT.copy() # 從預設開始
+#         # 可以遍歷 request.form 來更新 processing_config 中的值
+#         # 例如: processing_config["PERFORM_NOTCH_FILTER"] = request.form.get("perform_notch", "true").lower() == "true"
+#
+#         file_object_or_path = None
+#         temp_file_to_delete = None
+#
+#         if file_extension == '.csv':
+#             file_object_or_path = io.BytesIO(file.read())
+#         elif file_extension == '.c3d':
+#             # ezc3d 可能需要檔案路徑
+#             import tempfile
+#             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.c3d')
+#             file.save(temp_file.name)
+#             file_object_or_path = temp_file.name
+#             temp_file_to_delete = temp_file.name
+#
+#         fft_data_results = calculate_fft_for_emg_data(
+#             file_object_or_path,
+#             file_extension,
+#             processing_config,
+#             original_filename
+#         )
+#
+#         if temp_file_to_delete:
+#             try:
+#                 os.remove(temp_file_to_delete)
+#             except Exception as e_remove:
+#                 logging.error(f"刪除暫存檔 {temp_file_to_delete} 失敗: {e_remove}")
+#
+#         return jsonify({
+#             "message": "EMG FFT 分析成功",
+#             "data": fft_data_results
+#         }), 200
+#
+#     except ValueError as ve:
+#         logging.error(f"FFT 分析請求時發生 Value Error ({original_filename}): {ve}")
+#         if temp_file_to_delete and os.path.exists(temp_file_to_delete): # 清理
+#             try: os.remove(temp_file_to_delete)
+#             except: pass
+#         return jsonify({"error": str(ve)}), 400
+#     except Exception as e:
+#         logging.exception(f"FFT 分析請求時發生未預期錯誤 ({original_filename}): {e}")
+#         if temp_file_to_delete and os.path.exists(temp_file_to_delete): # 清理
+#             try: os.remove(temp_file_to_delete)
+#             except: pass
+#         return jsonify({"error": f"內部伺服器錯誤: {e}"}), 500
+#
+# if __name__ == '__main__':
+#     # 為了測試 calculate_fft_for_emg_data，可以模擬檔案和 config
+#     # 例如:
+#     # config_test = APP_CONFIG_FFT.copy()
+#     # # 準備一個模擬的 csv_file_object (io.BytesIO) 或 c3d_file_path
+#     # # dummy_csv_content = "Frame,EMG_Sensor1\n0.0,1\n0.001,2\n0.002,3" # ... 更多數據
+#     # # csv_file_object = io.BytesIO(dummy_csv_content.encode())
+#     # # results = calculate_fft_for_emg_data(csv_file_object, '.csv', config_test, "dummy.csv")
+#     # # print(results)
+#
+#     # 若要執行 Flask app:
+#     # logging.basicConfig(level=logging.INFO) # 設定日誌
+#     # app.run(debug=True, host='0.0.0.0', port=5001) # 使用不同端口以避免與前一個衝突
+
+
+# %%
+
+import pandas as pd
+import numpy as np
+from scipy import signal
+from scipy.fft import fft, fftfreq # 使用 scipy.fft
+import ezc3d
+import math
+import logging
+import io
+import os # 用於路徑操作
+raw_data_object = r"D:\Hsin\BenQ\testfile\S02_LargeFlick_Rep_9.25.csv"
+raw_data_object = r"D:\Hsin\BenQ\testfile\S06_SpiderShot_S1_3.c3d"
+data_file_path = r"D:\Hsin\BenQ\testfile\S06_SpiderShot_S1_3.c3d"
+# %%
+
+
+# 假設日誌已在應用程式層級設定
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def calculate_fft_for_emg_data_v2(
+    data_file_path, # 檔案的完整路徑
+    config,
+    original_filename=None # 原始檔案名稱，用於記錄
+):
+    """
+    計算 EMG 數據的 FFT 並回傳頻譜數據。ˇ
+
+    參數:
+    - data_file_path (str): 原始資料檔案的完整路徑。
+    - config (dict): 包含所有處理參數的字典。
+    - original_filename (str, optional): 原始檔案名稱，用於記錄。
+
+    回傳:
+    - dict: 包含 FFT 結果的字典。
+    """
+    if not os.path.exists(data_file_path):
+        logging.error(f"檔案路徑不存在: {data_file_path}")
+        raise FileNotFoundError(f"檔案路徑不存在: {data_file_path}")
+
+    file_extension = ""
+    if '.' in data_file_path:
+        file_extension = '.' + data_file_path.rsplit('.', 1)[1].lower()
+
+    if not original_filename:
+        original_filename = os.path.basename(data_file_path)
+
+    raw_data = None
+    c3d_instance = None
+    # 儲存根據 config key 匹配到的原始欄位索引和名稱
+    initial_selected_indices = [] # 原始 DataFrame 中的索引
+    initial_selected_column_names = [] # 原始 DataFrame 中的欄位名
+
+    # ----- 檔案讀取與初步頻道識別 -----
+    if file_extension == '.csv':
+        try:
+            raw_data_full_csv = pd.read_csv(data_file_path) # 先完整讀取
+            csv_channel_map = config.get("DEFAULT_CSV_RECOLUMNS_NAME", {})
+            
+            temp_indices = []
+            temp_names = []
+            for key_identifier in csv_channel_map.keys(): # key_identifier 是 config 中定義的搜索字串
+                for i, actual_col_name in enumerate(raw_data_full_csv.columns):
+                    if key_identifier in actual_col_name:
+                        if i not in temp_indices:
+                            temp_indices.append(i)
+                            temp_names.append(actual_col_name)
+                        # break # 假設一個 key_identifier 只對應一個最先匹配到的頻道
+                                # 如果一個 key 可能匹配多個，則不應 break
+
+            if not temp_names:
+                raise ValueError(f"在 CSV 檔案 '{original_filename}' 中，根據 DEFAULT_CSV_RECOLUMNS_NAME 的 keys 未找到任何 EMG 頻道。")
+            
+            initial_selected_indices = temp_indices
+            initial_selected_column_names = temp_names
+            
+            # 根據識別出的原始欄位來決定後續操作的 DataFrame
+            # 注意：這裡的重命名邏輯與 EMG_processing 不同，EMG_processing 是先選取再重命名選取後的子集
+            # 而使用者提供的 process_emg_core 是先識別，然後對整個 raw_data 進行 rename
+            # 這裡我們遵循後者，先識別，然後對整個 raw_data_full_csv 進行 rename
+            raw_data = raw_data_full_csv.copy() # 操作副本
+            raw_data.rename(columns=csv_channel_map, inplace=True)
+            
+            # 更新 initial_selected_column_names 為重命名後的名稱 (如果它們被重命名了)
+            # 這裡需要一個映射關係，或者直接使用重命名後的 raw_data.columns 進行後續的 EMG 頻道篩選
+            # 為了簡化，後續的 EMG 頻道篩選將基於重命名後的 raw_data 和 config 中的 EMG_CHANNEL_IDENTIFIER
+
+        except Exception as e:
+            logging.error(f"讀取或初步處理 CSV 檔案 '{original_filename}' 時發生錯誤: {e}")
+            raise ValueError(f"無法解析或處理 CSV 檔案 '{original_filename}': {e}")
+
+    elif file_extension == '.c3d':
+        try:
+            c3d_instance = ezc3d.c3d(data_file_path)
+            c3d_analog_labels_original = c3d_instance['parameters']['ANALOG']['LABELS']['value']
+            c3d_channel_map = config.get("DEFAULT_C3D_RECOLUMNS_NAME", {})
+
+            temp_indices = []
+            temp_names_original = [] # 儲存原始 C3D 標籤名
+            
+            for key_identifier in c3d_channel_map.keys(): # key_identifier 是 config 中定義的搜索字串
+                for i, actual_c3d_label in enumerate(c3d_analog_labels_original):
+                    if key_identifier in actual_c3d_label:
+                        if i not in temp_indices:
+                            temp_indices.append(i)
+                            temp_names_original.append(actual_c3d_label)
+                        # break # 同上，取決於一個 key 是否只匹配一個
+
+            if not temp_indices:
+                raise ValueError(f"在 C3D 檔案 '{original_filename}' 中，根據 DEFAULT_C3D_RECOLUMNS_NAME 的 keys 未找到任何 EMG 頻道。")
+
+            initial_selected_indices = temp_indices
+            # initial_selected_column_names 儲存的是原始 C3D 標籤名
+            initial_selected_column_names = temp_names_original
+            
+            analog_data_subset = c3d_instance['data']['analogs'][0, initial_selected_indices, :]
+            # 使用原始 C3D 標籤名創建 DataFrame，然後再重命名
+            raw_data_from_c3d = pd.DataFrame(np.transpose(analog_data_subset), columns=initial_selected_column_names)
+            
+            # 進行重命名
+            raw_data = raw_data_from_c3d.copy()
+            raw_data.rename(columns=c3d_channel_map, inplace=True)
+            
+            # 插入時間軸
+            analog_time = np.linspace(
+                0,
+                (c3d_instance['header']['analogs']['last_frame']) / c3d_instance['header']['analogs']['frame_rate'],
+                num=(np.shape(c3d_instance['data']['analogs'])[-1])
+            )
+            raw_data.insert(0, 'Frame', analog_time)
+
+        except Exception as e:
+            logging.error(f"處理 C3D 檔案 '{original_filename}' 時發生錯誤: {e}")
+            raise ValueError(f"無法解析或處理 C3D 檔案 '{original_filename}': {e}")
+    else:
+        raise ValueError(f"不支援的檔案類型 '{file_extension}'。請上傳 .csv 或 .c3d 檔案。")
+
+    if raw_data is None or raw_data.empty:
+        raise ValueError(f"資料讀取失敗或檔案 '{original_filename}' 為空或未成功轉換。")
+
+    # ----- EMG 頻道最終確定 (基於重命名後的 raw_data) -----
+    # 現在 raw_data 的欄位名已經是 (可能) 重命名後的了
+    # 我們需要根據 config 中的 EMG_CHANNEL_IDENTIFIER 來最終確定哪些欄位是我們要處理的 EMG 頻道
+    emg_identifier_str = config.get("EMG_CHANNEL_IDENTIFIER", "EMG") # 通用識別符
+    
+    # 從重命名後的 raw_data.columns 中篩選
+    final_emg_column_names = [col for col in raw_data.columns if emg_identifier_str in col]
+
+    if not final_emg_column_names:
+        logging.error(f"在檔案 '{original_filename}' (重命名後) 中找不到任何包含 '{emg_identifier_str}' 的 EMG 訊號欄位。")
+        raise ValueError(f"在檔案 '{original_filename}' (重命名後) 中找不到任何包含 '{emg_identifier_str}' 的 EMG 訊號欄位。")
+    
+    logging.info(f"檔案 '{original_filename}': 最終處理 {len(final_emg_column_names)} 個 EMG 頻道: {final_emg_column_names}")
+
+    # ----- 準備回傳結果結構 -----
+    fft_results = {
+        "filename": original_filename,
+        "c3d_sampling_rate_from_header": c3d_instance['header']['analogs']['frame_rate'] if c3d_instance else None,
+        "channels_fft_data": []
+    }
+
+    # ----- 逐頻道處理 -----
+    bandpass_cutoff_freqs = config.get("BANDPASS_CUTOFF", [20, 450])
+    perform_notch = config.get("PERFORM_NOTCH_FILTER", False)
+    truncate_fft = config.get("FFT_TRUNCATE_TO_POWER_OF_2", True)
+    csv_time_column_explicit = config.get("CSV_TIME_COLUMN_NAME", None) # 明確的CSV時間欄位名
+
+    for emg_col_name_final in final_emg_column_names: # emg_col_name_final 是重命名後的 EMG 欄位名
+        channel_data_results = {
+            "channel_name": emg_col_name_final,
+            "sampling_frequency_used": None,
+            "frequencies": [],
+            "amplitudes": [],
+            "top_peaks": []
+        }
+        
+        freq = 0
+        if file_extension == '.csv':
+            time_series_for_fs = None
+            # 獲取重命名後 EMG 欄位在當前 raw_data 中的索引
+            try:
+                current_emg_col_idx_in_renamed_df = raw_data.columns.get_loc(emg_col_name_final)
+            except KeyError:
+                logging.error(f"CSV: 找不到重命名後的欄位 '{emg_col_name_final}'。跳過此頻道。")
+                channel_data_results["error"] = f"Renamed column '{emg_col_name_final}' not found."
+                fft_results["channels_fft_data"].append(channel_data_results)
+                continue
+
+            if csv_time_column_explicit and csv_time_column_explicit in raw_data.columns:
+                time_series_for_fs = raw_data[csv_time_column_explicit].dropna()
+            elif current_emg_col_idx_in_renamed_df > 0: # 嘗試使用前一欄
+                # 假設前一欄是時間欄，這是一個較弱的假設
+                assumed_time_col_idx = current_emg_col_idx_in_renamed_df - 1
+                assumed_time_col_name = raw_data.columns[assumed_time_col_idx]
+                logging.warning(f"CSV: 未指定時間欄位，嘗試使用 EMG 欄位 '{emg_col_name_final}' 的前一欄 '{assumed_time_col_name}' 作為時間序列。")
+                time_series_for_fs = raw_data.iloc[:, assumed_time_col_idx].dropna()
+            else:
+                logging.error(f"CSV: 無法確定頻道 '{emg_col_name_final}' 的時間序列以計算取樣頻率。")
+                channel_data_results["error"] = "Cannot determine time series for Fs calculation."
+                fft_results["channels_fft_data"].append(channel_data_results)
+                continue
+            
+            if time_series_for_fs is not None and len(time_series_for_fs) >= 11:
+                try:
+                    # 確保時間序列是數值類型
+                    time_series_numeric = pd.to_numeric(time_series_for_fs, errors='coerce').dropna()
+                    if len(time_series_numeric) >= 11:
+                         # 檢查時間差是否都為正
+                        time_diffs = np.diff(np.array(time_series_numeric[1:11]))
+                        if np.any(time_diffs <= 0):
+                            logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 時間序列包含非遞增值，Fs 計算可能不準確。Diffs: {time_diffs[:5]}")
+                            # 可以選擇使用預設 Fs 或拋出錯誤
+                            freq = config.get("DEFAULT_FS_FALLBACK", 0)
+                        else:
+                            freq = int(1 / np.mean(np.array(time_series_numeric[2:11]) - np.array(time_series_numeric[1:10])))
+
+                    else: # 轉換後數據不足
+                        logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 轉換為數值後的時間序列數據不足11點。")
+                        freq = config.get("DEFAULT_FS_FALLBACK", 0)
+
+                except ZeroDivisionError:
+                    logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 計算 Fs 時發生除零錯誤。")
+                    freq = config.get("DEFAULT_FS_FALLBACK", 0)
+                except Exception as e_fs:
+                    logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 計算 Fs 時發生錯誤: {e_fs}。")
+                    freq = config.get("DEFAULT_FS_FALLBACK", 0)
+            else:
+                logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 時間序列數據不足11點或無效。")
+                freq = config.get("DEFAULT_FS_FALLBACK", 0)
+
+        elif file_extension == '.c3d' and c3d_instance:
+            freq = c3d_instance['header']['analogs']['frame_rate']
+        
+        if freq <= 0:
+            logging.error(f"頻道 '{emg_col_name_final}' ({original_filename}) 計算得到的取樣頻率無效 ({freq} Hz)。")
+            channel_data_results["error"] = f"Invalid sampling frequency: {freq} Hz."
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+        channel_data_results["sampling_frequency_used"] = freq
+
+        # --- 獲取並處理該頻道數據 (從重命名後的 raw_data 中獲取) ---
+        current_emg_series = raw_data[emg_col_name_final]
+        non_zero_indices_from_end = (current_emg_series.iloc[::-1] != 0)
+        if not non_zero_indices_from_end.any():
+            effective_data_len = 0
+        else:
+            effective_data_len = len(current_emg_series) - non_zero_indices_from_end.argmax()
+
+        if effective_data_len == 0:
+            logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 沒有有效數據。")
+            channel_data_results["error"] = "No effective data in channel."
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+
+        channel_raw_values = current_emg_series.iloc[:effective_data_len].copy()
+        # 確保是數值型
+        channel_raw_values_numeric = pd.to_numeric(channel_raw_values, errors='coerce')
+
+
+        nan_indices = np.where(np.isnan(channel_raw_values_numeric))[0]
+        if nan_indices.size > 0:
+            if nan_indices.size > 0.1 * freq:
+                logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) NaN 數據超過0.1秒，已補0。")
+            else:
+                logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 發現 {nan_indices.size} 個NaN，已補0。位置: {nan_indices.tolist()}")
+            channel_raw_values_numeric.fillna(0, inplace=True)
+        
+        data_for_filter = channel_raw_values_numeric.values
+
+        # --- 訊號濾波 ---
+        try:
+            bandpass_sos = signal.butter(4, bandpass_cutoff_freqs, btype='bandpass', fs=freq, output='sos')
+            filtered_signal = signal.sosfiltfilt(bandpass_sos, data_for_filter)
+
+            if perform_notch:
+                notch_freq_list_key = "DEFAULT_CSV_NOTCH_CUTOFF_LIST" if file_extension == '.csv' else "DEFAULT_C3D_NOTCH_CUTOFF_LIST"
+                notch_freq_list = config.get(notch_freq_list_key, [])
+                for notch_cutoff in notch_freq_list:
+                    if any(f_val >= freq / 2 for f_val in notch_cutoff) or any(f_val <= 0 for f_val in notch_cutoff) or notch_cutoff[0] >= notch_cutoff[1]:
+                        logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) Notch 頻率 {notch_cutoff} 無效 (Fs={freq})，跳過。")
+                        continue
+                    notch_sos = signal.butter(2, notch_cutoff, btype='bandstop', fs=freq, output='sos')
+                    filtered_signal = signal.sosfiltfilt(notch_sos, filtered_signal)
+            
+            fft_input_data = filtered_signal
+        except Exception as filter_err:
+            logging.error(f"頻道 '{emg_col_name_final}' ({original_filename}) 濾波失敗: {filter_err}")
+            channel_data_results["error"] = f"Filtering error: {filter_err}"
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+
+        # --- FFT 計算 ---
+        N = len(fft_input_data)
+        if N == 0:
+            channel_data_results["error"] = "Data length for FFT is zero after filtering."
+            fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+
+        if truncate_fft:
+            N_truncated = 2**(N.bit_length() - 1) if N > 1 else N # 避免 N=1 時 N_truncated=0
+            if N_truncated > 0 and N_truncated < N : # 只在有意義截斷時才截斷
+                fft_input_data = fft_input_data[:N_truncated]
+                N = N_truncated
+            elif N_truncated == 0 and N > 0: # N=1 的情況
+                 logging.warning(f"頻道 '{emg_col_name_final}' ({original_filename}) 數據長度 {len(fft_input_data)} 過短，無法截斷到2的冪次方，將使用原始長度。")
+            # else N_truncated == N, 不用做任何事
+
+        T = 1.0 / freq
+        yf = fft(fft_input_data, n=N)
+        xf = fftfreq(N, T)[:N // 2]
+        amplitudes = (2.0 / N) * np.abs(yf[0:N // 2])
+        
+        channel_data_results["frequencies"] = xf.tolist()
+        channel_data_results["amplitudes"] = amplitudes.tolist()
+
+        # --- 找出前三大峰值 ---
+        if len(amplitudes) > 0:
+            amp_for_peaks = np.copy(amplitudes)
+            peaks_found = []
+            for _ in range(3):
+                if not np.any(np.isfinite(amp_for_peaks)) or np.max(amp_for_peaks) == float('-inf') or len(amp_for_peaks)==0:
+                    break
+                max_idx = np.argmax(amp_for_peaks)
+                if max_idx < len(xf):
+                    peaks_found.append({"frequency": xf[max_idx], "amplitude": amplitudes[max_idx]})
+                    amp_for_peaks[max_idx] = float('-inf')
+                else: break
+            channel_data_results["top_peaks"] = peaks_found
+        
+        fft_results["channels_fft_data"].append(channel_data_results)
+
+    return fft_results
+
+if __name__ == '__main__':
+    # ----- 測試設定 -----
+    # 創建一個假的 config
+    APP_CONFIG_TEST = {
+        "DEFAULT_CSV_RECOLUMNS_NAME": {
+            "EMG1_Raw": "EMG_Sensor1_Renamed", # key 是原始 CSV 中的部分字串
+            "EMG2_Raw": "EMG_Sensor2_Renamed",
+            "TimeColumn": "Time_Explicit" # 假設時間欄位也被重命名或識別
+        },
+        "DEFAULT_C3D_RECOLUMNS_NAME": {
+            "Analog.EMG.CH1": "EMG_C3D_SensorA", # key 是原始 C3D label 中的部分字串
+            "Analog.EMG.CH2": "EMG_C3D_SensorB"
+        },
+        "EMG_CHANNEL_IDENTIFIER": "EMG_", # 用於在重命名後的欄位中最終篩選EMG頻道
+        "BANDPASS_CUTOFF": [20, 250],
+        "PERFORM_NOTCH_FILTER": True,
+        "DEFAULT_CSV_NOTCH_CUTOFF_LIST": [[48, 52], [98, 102]],
+        "DEFAULT_C3D_NOTCH_CUTOFF_LIST": [[58, 62], [118, 122]],
+        "FFT_TRUNCATE_TO_POWER_OF_2": False,
+        "CSV_TIME_COLUMN_NAME": "Time_Explicit", # 明確指定重命名後的時間欄位名
+        "DEFAULT_FS_FALLBACK": 1000
+    }
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # --- 創建假的 CSV 檔案 ---
+    dummy_csv_content = """Timestamp,EMG1_Raw_Signal,OtherData,EMG2_Raw_Signal
+0.0,0.1,abc,0.5
+0.001,0.2,def,0.6
+0.002,0.15,ghi,0.55
+0.003,0.22,jkl,0.62
+0.004,0.18,mno,0.58
+0.005,0.25,pqr,0.65
+0.006,0.12,stu,0.52
+0.007,0.21,vwx,0.61
+0.008,0.19,yz,0.59
+0.009,0.23,123,0.63
+0.010,0.17,456,0.57
+"""
+    # 替換 Timestamp 為 Time_Explicit 以匹配 config 中的 CSV_TIME_COLUMN_NAME
+    dummy_csv_content_timed = dummy_csv_content.replace("Timestamp", APP_CONFIG_TEST["CSV_TIME_COLUMN_NAME"])
+
+    temp_dir = "temp_test_files"
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+    
+    dummy_csv_path = os.path.join(temp_dir, "dummy_emg_test.csv")
+    with open(dummy_csv_path, "w") as f:
+        f.write(dummy_csv_content_timed)
+    
+    print(f"創建了測試 CSV 檔案: {dummy_csv_path}")
+
+    try:
+        print("\n--- 測試 CSV 檔案 ---")
+        # 更新 config 中的 DEFAULT_CSV_RECOLUMNS_NAME 的 key 以匹配 dummy_csv_content 中的欄位名
+        APP_CONFIG_TEST_CSV = APP_CONFIG_TEST.copy()
+        APP_CONFIG_TEST_CSV["DEFAULT_CSV_RECOLUMNS_NAME"] = {
+            "EMG1_Raw_Signal": "EMG_Sensor1_Renamed", # 匹配 dummy_csv_content
+            "EMG2_Raw_Signal": "EMG_Sensor2_Renamed",
+            APP_CONFIG_TEST["CSV_TIME_COLUMN_NAME"]: APP_CONFIG_TEST["CSV_TIME_COLUMN_NAME"] # 確保時間欄位也被正確處理
+        }
+
+        results_csv = calculate_fft_for_emg_data_v2(dummy_csv_path, APP_CONFIG_TEST_CSV, "dummy_emg_test.csv")
+        print("CSV 處理結果:")
+        # 簡化輸出，只印出頻道名和是否有錯誤
+        for ch_data in results_csv.get("channels_fft_data", []):
+            print(f"  頻道: {ch_data.get('channel_name')}, 錯誤: {ch_data.get('error', '無')}, Fs: {ch_data.get('sampling_frequency_used')}")
+            if not ch_data.get('error'):
+                 print(f"    頻率點數: {len(ch_data.get('frequencies',[]))}, 振幅點數: {len(ch_data.get('amplitudes',[]))}")
+                 if ch_data.get('top_peaks'):
+                     print(f"    第一個峰值頻率: {ch_data['top_peaks'][0]['frequency']:.2f} Hz")
+
+
+        # 繪製 CSV 結果 (如果需要)
+        # from emg_fft_plotter_test import plot_fft_results_for_testing # 假設您將繪圖函式存在此檔案
+        # plot_fft_results_for_testing(results_csv)
+
+    except Exception as e:
+        print(f"CSV 測試失敗: {e}")
+    finally:
+        if os.path.exists(dummy_csv_path):
+            os.remove(dummy_csv_path)
+
+    # --- C3D 檔案測試需要一個實際的 C3D 檔案 ---
+    # 請將 'path/to/your/test.c3d' 替換為一個有效的 C3D 檔案路徑來進行測試
+    # example_c3d_path = 'path/to/your/test.c3d'
+    # if os.path.exists(example_c3d_path):
+    #     try:
+    #         print("\n--- 測試 C3D 檔案 ---")
+    #         # 確保 APP_CONFIG_TEST 中的 DEFAULT_C3D_RECOLUMNS_NAME 的 keys
+    #         # 能夠匹配 example_c3d_path 檔案中的部分 analog label
+    #         results_c3d = calculate_fft_for_emg_data_v2(example_c3d_path, APP_CONFIG_TEST)
+    #         print("C3D 處理結果:")
+    #         for ch_data in results_c3d.get("channels_fft_data", []):
+    #             print(f"  頻道: {ch_data.get('channel_name')}, 錯誤: {ch_data.get('error', '無')}, Fs: {ch_data.get('sampling_frequency_used')}")
+    #             if not ch_data.get('error'):
+    #                  print(f"    頻率點數: {len(ch_data.get('frequencies',[]))}, 振幅點數: {len(ch_data.get('amplitudes',[]))}")
+
+    #         # plot_fft_results_for_testing(results_c3d)
+    #     except Exception as e:
+    #         print(f"C3D 測試失敗: {e}")
     # else:
-    #    logger.warning(f"C3D 測試檔案 '{c3d_file_path_example}' 未找到，跳過 C3D 測試。")
+    #     print(f"\n未找到 C3D 測試檔案: {example_c3d_path}，跳過 C3D 測試。")
 
-
-
+    if os.path.exists(temp_dir) and not os.listdir(temp_dir): # 如果目錄為空則刪除
+        os.rmdir(temp_dir)
+    elif os.path.exists(temp_dir):
+        print(f"測試檔案目錄 {temp_dir} 未被完全清理。")
 
