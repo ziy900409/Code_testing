@@ -534,368 +534,15 @@ def read_c3d(path: str,
 
 
 # %% analysis spider shot
-# """
-# 1. 找出所有的Z軸局部最小值
-#     1.1.  scipy.signal.argrelextrema 找出資料中的局部極值點（最大值或最小值）
-#             order = 5
-#     1.2. 小於 (平均值 - 0.05) 的點才視為局部最小值
-#             small than 0.05
-#     1.3. 加入最小 frame 間隔條件 or 兩Z軸局部最小值差異超過閾值
-#             min_frame_gap = 8, min_z_diff = 0.2
-# """
-# def find_Zaxis_min(df, order=5, min_frame_gap=8,
-#                     min_z_diff=0.2, threshold=0.05,
-#                     show=True, showVel=True):
-#     """
-#     根據 Z 軸資料找出局部最小值點，並根據時間間隔與 Z 值變化篩選有效點
-
-#     paremeters：
-#         data: dict，包含 marker 資料的結構，例如 data["markers"]["R.I.Finger3"]
-#         order: int，局部最小值搜尋的視窗大小（預設為 5）
-#         min_frame_gap: int，兩個最小值點之間的最小 Frame 間距（預設為 8）
-#         min_z_diff: float，當 frame 間距不夠，Z 值需大於此差異才保留（預設 0.2）
-#         threshold: float，用來計算是否夠低（平均值 - threshold），預設為 0.05
-#         show: bool，是否繪製視覺化結果
-    
-#     return：
-#         final_minima_idx: list，篩選後有效的 Z 軸局部最小值 index
-#         filtered_minima_data: 包含 Z 軸局部最小值點對應視角資訊的 DataFrame
-#     """
-#     # z_values = combine_dict["markers"]["R.I.Finger3"][:, 2]
-#     # 從指定 marker 中擷取 Z 軸資料（第3維）
-#     z_values = df["Z"].values
-#     # 計算 Z 軸平均值並定義 threshold 門檻
-#     z_mean = np.mean(z_values)
-#     threshold = z_mean - threshold
-    
-#     # 使用 scipy 的 argrelextrema 尋找局部最小值
-#     local_minima_idx = argrelextrema(z_values, np.less, order=order)[0]
-    
-#     # 篩選出 Z 值必須低於門檻的極小值
-#     filtered_minima_idx = [idx for idx in local_minima_idx if z_values[idx] < threshold]
-    
-#     # === # 接著加入條件：兩點間距不能太短，或差異要夠大 ===
-#     final_minima_idx = []
-    
-#     for idx in filtered_minima_idx:
-#         # 第一次直接加入
-#         if not final_minima_idx:
-#             final_minima_idx.append(idx)
-#             continue
-#         # 計算與上一個最小值的 frame 差
-#         last_idx = final_minima_idx[-1]
-#         frame_diff = idx - last_idx
-    
-#         if frame_diff >= min_frame_gap:
-#             # 相隔夠遠，直接加入
-#             final_minima_idx.append(idx)  
-#         else:
-#             z_diff = abs(z_values[idx] - z_values[last_idx])
-#             if z_diff < min_z_diff:
-#                 # 差異小 → 只保留 Z 值較小者
-#                 if z_values[idx] < z_values[last_idx]:
-#                     final_minima_idx[-1] = idx  # 替換
-#                 # 否則不做任何處理（保留原來的）
-#             else:
-#                 # 雖然近，但差異夠大 → 一起保留
-#                 final_minima_idx.append(idx) 
-#     # === 匯出包含視角資料的最小值 ===
-#     filtered_minima_data = pd.DataFrame({
-#         "Frame": final_minima_idx,
-#         "Z Value": df["Z"][final_minima_idx],
-#         "Yaw Angle (°)": df["cum_yaw_deg"].iloc[final_minima_idx].values,
-#         "Pitch Angle (°)": df["cum_pitch_deg"].iloc[final_minima_idx].values
-#     })
-#     print(filtered_minima_data)
-#     # filtered_minima_data.to_csv("Filtered_Local_Minima_Final_ViewAngle.csv", index=False)
-    
-#     # 輸出篩選後的局部最小值數據
-#     # filtered_minima_data = pd.DataFrame({
-#     #     "Frame": filtered_minima_idx,
-#     #     "Z Value": z_values[filtered_minima_idx]
-#     # })
-    
-#     # # 存成 CSV
-#     # filtered_minima_data.to_csv("Filtered_Local_Minima.csv", index=False)
-    
-#     # 顯示篩選後的數據
-#     # print(filtered_minima_data.head())
-    
-#     # 7️⃣ 取得篩選過的 Z 軸局部最小值對應的視角位置
-#     filtered_yaw = df.loc[final_minima_idx, "cum_yaw_deg"]
-#     filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
-#     if show:
-#     # 繪製 Z 軸數據與篩選後的局部最小值
-#         plt.figure(figsize=(12, 5))
-#         plt.plot(z_values, label='Z-Axis', color='b', alpha=0.7)
-#         plt.scatter(final_minima_idx, z_values[final_minima_idx], color='r', label='Filtered Local Minima', zorder=3)
-#         plt.axhline(threshold, color='g', linestyle='--', label=f'Threshold ({threshold:.2f})')
-#         plt.xlabel("Frame")
-#         plt.ylabel("Z Value")
-#         plt.title("Filtered Local Minima of Z-Axis")
-#         plt.legend()
-#         plt.show()
-
-    
-#     # 8️⃣ 若 show=True，畫出基本視角軌跡圖（紅色標出最小值）
-#     if show:
-#     # === 視角軌跡圖（逆時針旋轉視角等價於畫 pitch vs yaw）===
-#         plt.figure(figsize=(8, 8))
-#         plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=5, label="View Angle Trajectory")
-#         plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20, label="Final Local Minima", zorder=3)
-#         plt.colorbar(label="Frame Index")
-#         plt.xlabel("Pitch Angle (Vertical) °")
-#         plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-#         plt.title("視角軌跡轉換後的 Z 軸局部最小值分析")
-#         plt.legend()
-#         plt.show()
-        
-#     # 9️⃣ 若 showVel=True，畫出以滑鼠速度作為顏色的視角軌跡圖
-#     if showVel:
-#         # === 取得局部最小值對應的視角資料 ===
-#         filtered_yaw   = df.loc[final_minima_idx, "cum_yaw_deg"]
-#         filtered_pitch = df.loc[final_minima_idx, "cum_pitch_deg"]
-
-#         # === 繪圖：以視角軌跡繪圖，使用滑鼠速度作為顏色依據 ===
-#         plt.figure(figsize=(8, 8))
-#         sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
-#                           c=df["speed"], cmap="plasma", alpha=0.7, s=5,
-#                           label="View Angle Trajectory")
-#         # 標記篩選後的局部最小值
-#         plt.scatter(filtered_pitch, filtered_yaw, color="red", s=20,
-#                     label="Final Local Minima", zorder=3)
-
-#         # 以滑鼠速度 (mm/s) 作為 colorbar 的標示
-#         plt.colorbar(sc, label="Mouse Speed (mm/s)")
-#         plt.xlabel("Pitch Angle (Vertical) °")
-#         plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-#         plt.title("View Angle Trajectory Colored by Mouse Speed")
-#         plt.legend()
-#         plt.show()
-#     return filtered_minima_data
-# %%
-
-# def find_Zaxis_min_with_baseline( # Function name kept for consistency with last step
-#         df,
-#         # --- Baseline Removal Params ---
-#         use_baseline_removal=True,
-#         baseline_window_length=51,
-#         baseline_polyorder=3,
-#         # --- Original Params (Threshold logic modified) ---
-#         order=5,
-#         min_frame_gap=8,
-#         min_z_diff=0.2,
-#         # --- New Threshold Param ---
-#         z_processed_threshold=None,
-#         # --- Output Params ---
-#         show=True,
-#         showVel=True):
-#     """
-#     Finds local minima in Z-axis data, optionally using Savitzky-Golay baseline removal,
-#     and filters them based on time interval and Z value changes.
-
-#     Parameters：
-#         df: DataFrame, containing 'Z' column and optionally 'cum_yaw_deg', 'cum_pitch_deg', 'speed' for plotting.
-#         use_baseline_removal: bool, whether to enable baseline removal.
-#         baseline_window_length: int, window size for Savitzky-Golay filter.
-#         baseline_polyorder: int, polynomial order for Savitzky-Golay filter.
-#         order: int, window size for local minima search (default 5).
-#         min_frame_gap: int, minimum frame gap between minima (default 8).
-#         min_z_diff: float, minimum Z difference required if frame gap is insufficient (default 0.2).
-#         z_processed_threshold: float or None, threshold for filtering processed Z values. Only points below are kept.
-#         show: bool, whether to plot visualization results.
-#         showVel: bool, whether to show velocity-colored view angle trajectory plot.
-
-#     Return：
-#         final_minima_idx: list, indices of the filtered valid Z-axis local minima (0-based).
-#         filtered_minima_data: DataFrame containing information about the filtered minima points.
-#     """
-#     # --- 1. Get Raw Z Values ---
-#     if 'Z' not in df.columns:
-#         print("Error: DataFrame is missing the 'Z' column.")
-#         return [], pd.DataFrame()
-#     z_values_raw = df["Z"].values.copy()
-#     data_length = len(z_values_raw)
-#     z_baseline = np.zeros_like(z_values_raw)
-
-#     # --- 2. Baseline Removal (Optional) ---
-#     if use_baseline_removal:
-#         print(f"Step 1: Applying Savitzky-Golay baseline removal (window={baseline_window_length}, order={baseline_polyorder})")
-#         # Validate window length
-#         if baseline_window_length >= data_length:
-#             original_wl = baseline_window_length
-#             baseline_window_length = data_length // 2 * 2 + 1
-#             if baseline_window_length < 3: baseline_window_length = 3
-#             if baseline_window_length <= baseline_polyorder:
-#                   baseline_window_length = baseline_polyorder + 1 if baseline_polyorder % 2 == 0 else baseline_polyorder + 2
-#             print(f"  Warning: baseline_window_length ({original_wl}) >= data length ({data_length}). Auto-adjusted to {baseline_window_length}")
-
-#         try:
-#             z_baseline = savgol_filter(z_values_raw, baseline_window_length, baseline_polyorder)
-#             z_values_processed = z_values_raw - z_baseline # Processed Z = Detrended Z
-#             print("  Baseline removal completed.")
-#         except Exception as e:
-#             print(f"  Error: Baseline removal failed: {e}. Using raw Z values for subsequent processing.")
-#             z_values_processed = z_values_raw # Fallback to raw Z
-#             use_baseline_removal = False # Update flag
-#     else:
-#         print("Step 1: Skipping baseline removal.")
-#         z_values_processed = z_values_raw # Processed Z = Raw Z
-
-#     # --- 3. Find Initial Local Minima (using argrelextrema) ---
-#     print(f"Step 2: Finding initial local minima using argrelextrema (order={order})")
-#     try:
-#         local_minima_idx = argrelextrema(z_values_processed, np.less, order=order)[0]
-#         print(f"  Found {len(local_minima_idx)} initial points.")
-#     except Exception as e:
-#         print(f"  Error: argrelextrema execution failed: {e}")
-#         local_minima_idx = np.array([], dtype=int)
-
-#     # --- 4. Filter by Processed Z Value Threshold (Optional) ---
-#     filtered_minima_idx_step4 = local_minima_idx
-#     if z_processed_threshold is not None:
-#         print(f"Step 3: Filtering points with processed Z value below {z_processed_threshold:.4f}")
-#         if len(local_minima_idx) > 0:
-#             threshold_mask = z_values_processed[local_minima_idx] < z_processed_threshold
-#             filtered_minima_idx_step4 = local_minima_idx[threshold_mask]
-#             print(f"  --> Points remaining after Z threshold filter: {len(filtered_minima_idx_step4)}")
-#         else:
-#               print("  --> No initial points to filter.")
-#     else:
-#         print("Step 3: Skipping processed Z value threshold filter.")
-
-#     # --- 5. Custom Filtering: Gap and Difference ---
-#     print(f"Step 4: Applying custom filter (min_gap={min_frame_gap}, min_z_diff={min_z_diff})")
-#     final_minima_idx = []
-#     if len(filtered_minima_idx_step4) > 0:
-#         sorted_indices = np.sort(filtered_minima_idx_step4)
-#         final_minima_idx.append(sorted_indices[0])
-#         for i in range(1, len(sorted_indices)):
-#             idx = sorted_indices[i]
-#             last_idx = final_minima_idx[-1]
-#             frame_diff = idx - last_idx
-#             if frame_diff >= min_frame_gap:
-#                 final_minima_idx.append(idx)
-#             else:
-#                 # Compare using processed Z value
-#                 z_diff = abs(z_values_processed[idx] - z_values_processed[last_idx])
-#                 if z_diff < min_z_diff:
-#                     if z_values_processed[idx] < z_values_processed[last_idx]:
-#                         final_minima_idx[-1] = idx # Replace
-#                     # else: keep the original one
-#                 else:
-#                     final_minima_idx.append(idx) # Keep both if difference is large
-#         print(f"  --> Points remaining after custom filter: {len(final_minima_idx)}")
-#     else:
-#         print("  --> No points to apply custom filter to.")
-
-#     # --- 6. Prepare Output DataFrame ---
-#     print("Step 5: Preparing output DataFrame")
-#     required_view_cols = ['cum_yaw_deg', 'cum_pitch_deg']
-#     has_view_data = all(col in df.columns for col in required_view_cols)
-
-#     if final_minima_idx and len(final_minima_idx) > 0:
-#         output_data = {
-#             "Frame": final_minima_idx,
-#             "Z Value Raw": z_values_raw[final_minima_idx],
-#             "Z Processed": z_values_processed[final_minima_idx]
-#         }
-#         if has_view_data:
-#               output_data["Yaw Angle (°)"] = df["cum_yaw_deg"].iloc[final_minima_idx].values
-#               output_data["Pitch Angle (°)"] = df["cum_pitch_deg"].iloc[final_minima_idx].values
-#         else:
-#               warnings.warn("Missing angle columns, output DataFrame will not include angle information.")
-
-#         filtered_minima_data = pd.DataFrame(output_data)
-#         print("  Final filtered minima points (first few):")
-#         print(filtered_minima_data.head())
-#     else:
-#         print("  No final minima points found meeting all criteria.")
-#         cols = ["Frame", "Z Value Raw", "Z Processed"]
-#         if has_view_data: cols.extend(["Yaw Angle (°)", "Pitch Angle (°)"])
-#         filtered_minima_data = pd.DataFrame(columns=cols)
-
-#     # --- 7. Plotting ---
-#     if show:
-#         print("Step 6: Generating plots")
-#         plt.style.use('seaborn-v0_8-paper')
-#         fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-        
-
-#         # Subplot 1: Raw Z, Baseline, Final Minima
-#         axes[0].set_facecolor('white')
-#         axes[0].plot(z_values_raw, label='Raw Z Value', color='gray', alpha=0.7, linewidth=1)
-#         if use_baseline_removal:
-#             axes[0].plot(z_baseline, label=f'Baseline (window={baseline_window_length}, order={baseline_polyorder})', color='orange', linestyle='--', linewidth=1.5)
-#         if final_minima_idx and len(final_minima_idx) > 0:
-#             axes[0].scatter(final_minima_idx, z_values_raw[final_minima_idx], color='red', label=f'Final Minima ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
-#         axes[0].set_title("Raw Z Value, Baseline, and Final Minima Points")
-#         axes[0].set_ylabel("Raw Z Value")
-#         axes[0].legend()
-#         axes[0].grid(True, which='major', axis='both', linestyle='--', linewidth=0.5)
-
-#         # Subplot 2: Processed Z, Threshold, Final Minima
-#         plot_label = 'Processed Z Value' + (' (Detrended)' if use_baseline_removal else ' (Raw)')
-#         axes[1].plot(z_values_processed, label=plot_label, color='blue', alpha=0.8, linewidth=1)
-#         if z_processed_threshold is not None:
-#             axes[1].axhline(z_processed_threshold, color='cyan', linestyle=':', label=f'Z Threshold ({z_processed_threshold:.2f})', linewidth=1.5)
-#         if final_minima_idx and len(final_minima_idx) > 0:
-#             axes[1].scatter(final_minima_idx, z_values_processed[final_minima_idx], color='red', label=f'Final Minima ({len(final_minima_idx)})', zorder=5, s=60, marker='x')
-#         axes[1].set_title("Processed Z Value and Final Minima Points")
-#         axes[1].set_ylabel("Processed Z Value")
-#         axes[1].set_xlabel("Frame")
-#         axes[1].legend()
-#         axes[1].grid(True, which='both', linestyle='--', linewidth=0.5)
-
-#         plt.tight_layout()
-#         plt.show()
-
-#         # --- View Angle Plots (English Labels) ---
-#         if has_view_data:
-#             if final_minima_idx and len(final_minima_idx) > 0:
-#                 filtered_yaw = df["cum_yaw_deg"].iloc[final_minima_idx].values
-#                 filtered_pitch = df["cum_pitch_deg"].iloc[final_minima_idx].values
-#             else:
-#                 filtered_yaw, filtered_pitch = [], []
-
-#             # Plot 8: Basic Trajectory
-#             plt.figure(figsize=(8, 8))
-#             plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], c=df.index, cmap="viridis", alpha=0.7, s=10, label="View Angle Trajectory (by Frame)")
-#             plt.scatter(filtered_pitch, filtered_yaw, color="red", s=50, label="Final Minima", zorder=3, marker='x')
-#             plt.colorbar(label="Frame Index")
-#             plt.xlabel("Pitch Angle (Vertical) °")
-#             plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-#             plt.title("View Angle Trajectory with Final Z-Axis Minima")
-#             plt.legend()
-#             plt.grid(True, linestyle='--', linewidth=0.5)
-#             plt.show()
-
-#             # Plot 9: Velocity Colored Trajectory
-#             if showVel and 'speed' in df.columns:
-#                 plt.figure(figsize=(8, 8))
-#                 sc = plt.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"],
-#                                   c=df["speed"], cmap="plasma", alpha=0.7, s=10,
-#                                   label="View Angle Trajectory (by Speed)")
-#                 plt.scatter(filtered_pitch, filtered_yaw, color="red", s=50,
-#                             label="Final Minima", zorder=3, marker='x')
-#                 plt.colorbar(sc, label="Speed (unit unknown)")
-#                 plt.xlabel("Pitch Angle (Vertical) °")
-#                 plt.ylabel("Yaw Angle (Horizontal, Rotated) °")
-#                 plt.title("View Angle Trajectory (Colored by Speed) with Final Z-Axis Minima")
-#                 plt.legend()
-#                 plt.grid(True, linestyle='--', linewidth=0.5)
-#                 plt.show()
-#             elif showVel and 'speed' not in df.columns:
-#                   warnings.warn("DataFrame is missing the 'speed' column, cannot generate velocity-colored plot.")
-#         else:
-#               print("Skipping view angle plots due to missing angle columns.")
-
-#     print("--- Analysis Finished ---")
-#     return final_minima_idx, filtered_minima_data
-
-# %%
-
-
+"""
+1. 找出所有的Z軸局部最小值
+    1.1.  scipy.signal.argrelextrema 找出資料中的局部極值點（最大值或最小值）
+            order = 5
+    1.2. 小於 (平均值 - 0.05) 的點才視為局部最小值
+            small than 0.05
+    1.3. 加入最小 frame 間隔條件 or 兩Z軸局部最小值差異超過閾值
+            min_frame_gap = 8, min_z_diff = 0.2
+"""
 
 def find_Zaxis_min_with_baseline( # Function name kept for consistency with last step
         df,
@@ -917,20 +564,32 @@ def find_Zaxis_min_with_baseline( # Function name kept for consistency with last
     and filters them based on time interval and Z value changes.
     
     Parameters：
-        df: DataFrame, containing 'Z' column and optionally 'cum_yaw_deg', 'cum_pitch_deg', 'speed' for plotting.
-        use_baseline_removal: bool, whether to enable baseline removal.
-        baseline_window_length: int, window size for Savitzky-Golay filter.
-        baseline_polyorder: int, polynomial order for Savitzky-Golay filter.
-        order: int, window size for local minima search (default 5).
-        min_frame_gap: int, minimum frame gap between minima (default 8).
-        min_z_diff: float, minimum Z difference required if frame gap is insufficient (default 0.2).
-        z_processed_threshold: float or None, threshold for filtering processed Z values. Only points below are kept.
-        show: bool, whether to plot visualization results.
-        showVel: bool, whether to show velocity-colored view angle trajectory plot.
+        df: 
+            DataFrame, containing 'Z' column and optionally 'cum_yaw_deg', 'cum_pitch_deg', 'speed' for plotting.
+        use_baseline_removal: 
+            bool, whether to enable baseline removal.
+        baseline_window_length: 
+            int, window size for Savitzky-Golay filter.
+        baseline_polyorder: 
+            int, polynomial order for Savitzky-Golay filter.
+        order: 
+            int, window size for local minima search (default 5).
+        min_frame_gap: 
+            int, minimum frame gap between minima (default 8).
+        min_z_diff: 
+            float, minimum Z difference required if frame gap is insufficient (default 0.2).
+        z_processed_threshold: 
+            float or None, threshold for filtering processed Z values. Only points below are kept.
+        show: 
+            bool, whether to plot visualization results.
+        showVel: 
+            bool, whether to show velocity-colored view angle trajectory plot.
 
     Return：
-        final_minima_idx: list, indices of the filtered valid Z-axis local minima (0-based).
-        filtered_minima_data: DataFrame containing information about the filtered minima points.
+        final_minima_idx: 
+            list, indices of the filtered valid Z-axis local minima (0-based).
+        filtered_minima_data: 
+            DataFrame containing information about the filtered minima points.
         """
     # --- 1. Get Raw Z Values ---
     if 'Z' not in df.columns:
@@ -1151,6 +810,7 @@ def find_Zaxis_min_with_baseline( # Function name kept for consistency with last
 #     # ... (Your example usage code) ...
 # %%
 def ConverUnit2Angle(combine_dict, descriptions,
+                     marker="R.I.Finger3",
                      DPI=800, sens=1, yaw=0.022):
     """
     將食指的 3D Marker 資料（單位 mm）轉換為滑鼠視角變化（°），
@@ -1170,8 +830,13 @@ def ConverUnit2Angle(combine_dict, descriptions,
     """
     
     # 1️⃣ 將 marker 中的資料轉為 DataFrame，欄位為 X, Y, Z (單位 mm)
-    df = pd.DataFrame(combine_dict["markers"]["R.I.Finger3"],
-                      columns=["X", "Y", "Z"])
+    # df = pd.DataFrame(combine_dict["markers"][marker],
+    #                   columns=["X", "Y", "Z"])
+    df = pd.DataFrame(combine_dict["markers"][marker][:, 0:2],
+                      columns=["X", "Y"])
+    df_2 = pd.DataFrame(combine_dict["markers"][marker][:, -1],
+                        columns=["Z"])
+    df = pd.concat([df, df_2], axis=1)
     # 2️⃣ 將 Y 軸反轉，以符合滑鼠視角的方向（向上為正）
     df["Y"] = -df["Y"]
     # 3️⃣ 計算相鄰 frame 的滑鼠移動距離（單位 mm）

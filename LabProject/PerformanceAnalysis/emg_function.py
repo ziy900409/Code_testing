@@ -195,8 +195,6 @@ def process_emg_core(
     if raw_data is None or raw_data.empty:
         raise ValueError("資料讀取失敗或檔案為空。")
 
-   
-
     if not num_columns_indices:
         logging.error("找不到任何 EMG 訊號欄位。")
         raise ValueError("找不到任何 EMG 訊號欄位。請檢查欄位名稱是否包含指定的識別符。")

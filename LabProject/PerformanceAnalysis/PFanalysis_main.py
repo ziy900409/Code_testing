@@ -46,7 +46,7 @@ rename_markers = {'MOS1': 'M1',
                 'RLT2': 'R.P.Finger2',                
                 }
 # Remove prefixes
-remove_prefixes = ["S06", "MarkerSet:"]   
+remove_prefixes = ["S03", "MarkerSet:"]   
 # === 參數設定 ===
 DPI = 800
 sensitivity = 1.0
@@ -57,6 +57,7 @@ yaw = 0.07 # Valorant 靈敏度
 marker_freq_cutoff = 20.0
 fp_freq_cutoff = 30.0
 analog_freq_cutoff = None # Example: Don't filter general analog
+
 # %%
 def pro_main(data_path):
     try:
@@ -71,6 +72,7 @@ def pro_main(data_path):
             analog_cutoff=analog_freq_cutoff,
             filter_order=4 # Standard 4th order Butterworth
         )
+        
         print("\n--- Output Data Structure ---")
         if processed_data:
             print("Processed Data Keys:", processed_data.keys())
@@ -99,7 +101,9 @@ def pro_main(data_path):
         print(f"\nAn unexpected error occurred during example execution: {e}")
         
     # 將單位從mm轉換成視角
-    df = pre.ConverUnit2Angle(processed_data, metadata)
+    df = pre.ConverUnit2Angle(processed_data, metadata,
+                              marker="R.I.Finger3"
+                              )
     # 2.1. 找出每一次目標擊殺的開槍數 -> 找出Z axis local minimal
     # 2.1.1. 以滑鼠點擊次數計算，使用Z軸局部最小值，如果兩次Z軸局部最小值的視角差
     #         小於某個閾值，則視為仍在瞄準同一個目標
@@ -121,8 +125,8 @@ def pro_main(data_path):
     # 2.2. 找出從中心出發的開槍軌跡
     excldueCen_grouped_df = pre.excludeCenter(df,
                                               grouped_df,
-                                              yaw_range = 10,
-                                              pitch_range = 10,
+                                              yaw_range = 5,
+                                              pitch_range = 5,
                                               show = True)
     
     # 做標準化處理
@@ -152,7 +156,10 @@ data_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Majo
 data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
 data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
 
-# data_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\1.Motion\1.Vicon\S06\250318\S06_GridShot_I_1.c3d"
+data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_EC2_3.c3d"
+data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_1.c3d"
+data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_2.c3d"
+
 df, metadata, excldueCen_grouped_df, standardized_speeds = pro_main(data_path)
 df_1, metadata_1, excldueCen_grouped_df_1, standardized_speeds_1 = pro_main(data_path_1)
 df_2, metadata_2, excldueCen_grouped_df_2, standardized_speeds_2 = pro_main(data_path_2)
@@ -175,8 +182,6 @@ df_2, metadata_2, excldueCen_grouped_df_2, standardized_speeds_2 = pro_main(data
         2.3.2. 速度達到一定閾值？ 速度與目標方向的偏差角度？
     2.4. 計算初始偏移角度
 """
-
-
 
 
 # --- 繪製 mean std cloud ---
