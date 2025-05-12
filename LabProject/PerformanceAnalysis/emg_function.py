@@ -79,7 +79,7 @@ muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brac
 # %%
 
 
-raw_data_path = r"D:\Hsin\NTSU_lab\Baseball\Raw_Data\S03\MVC\S03_MVC_Forearm_Rep_1.0.csv"
+raw_data_path = r"C:\Users\Hsin.YH.Yang\Desktop\BenQ RD Test\250512_S1_Trap_MVC_Rep_1.1.csv"
 
 # %%
 
@@ -110,10 +110,10 @@ def process_emg_core(
 ):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     raw_data = None
-    data_path = r"D:\Hsin\BenQ\testfile\S06_SpiderShot_S1_3.c3d"
+    # data_path = r"D:\Hsin\BenQ\testfile\S06_SpiderShot_S1_3.c3d"
 
-    csv_data_path = r"D:\Hsin\BenQ\testfile\S02_LargeFlick_Rep_9.25.csv"
-    raw_data_object = csv_data_path
+    raw_data_path = r"C:\Users\Hsin.YH.Yang\Desktop\BenQ RD Test\250512_S1_Trap_MVC_Rep_1.1_v1.csv"
+    raw_data_object = raw_data_path
     
     # 根據 input_file_extension 讀取 raw_data_object
     # ... (省略原始碼中檔案讀取和初步解析的部分，但改為接收檔案物件)
@@ -445,104 +445,111 @@ def process_emg_core(
         logging.warning(f"不支援的平滑方法: {smoothing_method}，預設回傳 lowpass 結果。")
         return lowpass_filtered_data_df, notch_filtered_data_df
     
+# %%
 
-
-
-@app.route('/process_emg_signal', methods=['POST'])
-def handle_emg_processing():
-    if 'file' not in request.files:
-        return jsonify({"error": "缺少檔案部分"}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "未選擇檔案"}), 400
-
-    filename = file.filename
-    file_extension = ""
-    if '.' in filename and filename.rsplit('.', 1)[1].lower() == 'csv':
-        file_extension = '.csv'
-    elif '.' in filename and filename.rsplit('.', 1)[1].lower() == 'c3d':
-        file_extension = '.c3d'
-    else:
-        return jsonify({"error": "不支援的檔案類型。請上傳 .csv 或 .c3d 檔案。"}), 400
-
-    try:
-        # 獲取請求中的參數或使用預設值
-        # 這裡可以從 request.form 中獲取用戶自訂的參數來覆蓋 APP_CONFIG 中的預設值
-        processing_params = APP_CONFIG.copy() # Start with defaults
-        for key in ['DEFAULT_DOWNSAMPLE_FREQ', 'DEFAULT_BANDPASS_CUTOFF', 'DEFAULT_LOWPASS_FREQ', 
-                    'DEFAULT_CSV_NOTCH_CUTOFF_LIST', 'DEFAULT_C3D_NOTCH_CUTOFF_LIST',
-                    'EMG_CHANNEL_IDENTIFIER']:
-            if request.form.get(key):
-                try:
-                    # 需要小心轉換類型，例如列表和數值
-                    # 簡單起見，這裡假設 request.form 中的值都是字串，需要解析
-                    # 例如: processing_params[key] = json.loads(request.form.get(key))
-                    # 這裡僅作示意，實際轉換會更複雜
-                    if key in ['DEFAULT_BANDPASS_CUTOFF', 'DEFAULT_CSV_NOTCH_CUTOFF_LIST', 'DEFAULT_C3D_NOTCH_CUTOFF_LIST']:
-                        processing_params[key] = eval(request.form.get(key)) # eval 不安全，僅為示意，應使用 json.loads 或更安全的解析
-                    elif key in ['DEFAULT_DOWNSAMPLE_FREQ', 'DEFAULT_LOWPASS_FREQ']:
-                         processing_params[key] = int(request.form.get(key))
-                    else: # EMG_CHANNEL_IDENTIFIER
-                        processing_params[key] = request.form.get(key)
-                except Exception as e:
-                    logging.warning(f"解析請求參數 {key} 失敗: {e}。將使用預設值。")
-        
-        smoothing_method = request.form.get("smoothing_method", "lowpass")
-
-        # 將檔案內容傳遞給核心處理函式
-        # 對於 CSV，可以直接傳遞 file (它是 werkzeug.datastructures.FileStorage，是 file-like)
-        # 對於 C3D，ezc3d 可能需要檔案路徑。一種方法是將上傳的檔案暫存：
-        file_object_or_path = None
-        if file_extension == '.csv':
-            # 轉換為 BytesIO 再傳給 read_csv
-            file_bytes = io.BytesIO(file.read())
-            file_object_or_path = file_bytes
-        elif file_extension == '.c3d':
-            # 為了 ezc3d，可能需要暫存檔案 (如果它不接受 file-like object)
-            # import tempfile
-            # temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.c3d')
-            # file.save(temp_file.name)
-            # file_object_or_path = temp_file.name
-            # # 記得在處理完後刪除 temp_file.name
-            # 簡化：假設 ezc3d 可以處理 file-like object (file)
-            # 查閱 ezc3d 文件確認，如果不行，則必須用暫存檔
-            file_object_or_path = file # 直接傳遞 FileStorage 物件 (需要測試 ezc3d 是否支援)
-                                       # 或者，更安全的方式是 file.stream
-
-        processed_data1, processed_data2 = process_emg_core(
+processed_data1, processed_data2 = process_emg_core(
             file_object_or_path, # 或者 temp_file.name for c3d if needed
             file_extension,
             processing_params,
             smoothing_method
         )
+# %%
+
+# @app.route('/process_emg_signal', methods=['POST'])
+# def handle_emg_processing():
+#     if 'file' not in request.files:
+#         return jsonify({"error": "缺少檔案部分"}), 400
+    
+#     file = request.files['file']
+#     if file.filename == '':
+#         return jsonify({"error": "未選擇檔案"}), 400
+
+#     filename = file.filename
+#     file_extension = ""
+#     if '.' in filename and filename.rsplit('.', 1)[1].lower() == 'csv':
+#         file_extension = '.csv'
+#     elif '.' in filename and filename.rsplit('.', 1)[1].lower() == 'c3d':
+#         file_extension = '.c3d'
+#     else:
+#         return jsonify({"error": "不支援的檔案類型。請上傳 .csv 或 .c3d 檔案。"}), 400
+
+#     try:
+#         # 獲取請求中的參數或使用預設值
+#         # 這裡可以從 request.form 中獲取用戶自訂的參數來覆蓋 APP_CONFIG 中的預設值
+#         processing_params = APP_CONFIG.copy() # Start with defaults
+#         for key in ['DEFAULT_DOWNSAMPLE_FREQ', 'DEFAULT_BANDPASS_CUTOFF', 'DEFAULT_LOWPASS_FREQ', 
+#                     'DEFAULT_CSV_NOTCH_CUTOFF_LIST', 'DEFAULT_C3D_NOTCH_CUTOFF_LIST',
+#                     'EMG_CHANNEL_IDENTIFIER']:
+#             if request.form.get(key):
+#                 try:
+#                     # 需要小心轉換類型，例如列表和數值
+#                     # 簡單起見，這裡假設 request.form 中的值都是字串，需要解析
+#                     # 例如: processing_params[key] = json.loads(request.form.get(key))
+#                     # 這裡僅作示意，實際轉換會更複雜
+#                     if key in ['DEFAULT_BANDPASS_CUTOFF', 'DEFAULT_CSV_NOTCH_CUTOFF_LIST', 'DEFAULT_C3D_NOTCH_CUTOFF_LIST']:
+#                         processing_params[key] = eval(request.form.get(key)) # eval 不安全，僅為示意，應使用 json.loads 或更安全的解析
+#                     elif key in ['DEFAULT_DOWNSAMPLE_FREQ', 'DEFAULT_LOWPASS_FREQ']:
+#                          processing_params[key] = int(request.form.get(key))
+#                     else: # EMG_CHANNEL_IDENTIFIER
+#                         processing_params[key] = request.form.get(key)
+#                 except Exception as e:
+#                     logging.warning(f"解析請求參數 {key} 失敗: {e}。將使用預設值。")
         
-        # if file_extension == '.c3d' and isinstance(file_object_or_path, str): # 如果是暫存檔案路徑
-        #    os.remove(file_object_or_path) # 清理暫存檔案
+#         smoothing_method = request.form.get("smoothing_method", "lowpass")
 
-        # 將 DataFrame 轉換為 JSON
-        # orient='records' 會產生 [{col:val}, {col:val}, ...] 的列表
-        # orient='split' 會產生 {'index': [...], 'columns': [...], 'data': [[...], [...]]}
-        result1_json = processed_data1.to_json(orient="split", double_precision=10, force_ascii=False)
-        result2_json = processed_data2.to_json(orient="split", double_precision=10, force_ascii=False)
+#         # 將檔案內容傳遞給核心處理函式
+#         # 對於 CSV，可以直接傳遞 file (它是 werkzeug.datastructures.FileStorage，是 file-like)
+#         # 對於 C3D，ezc3d 可能需要檔案路徑。一種方法是將上傳的檔案暫存：
+#         file_object_or_path = None
+#         if file_extension == '.csv':
+#             # 轉換為 BytesIO 再傳給 read_csv
+#             file_bytes = io.BytesIO(file.read())
+#             file_object_or_path = file_bytes
+#         elif file_extension == '.c3d':
+#             # 為了 ezc3d，可能需要暫存檔案 (如果它不接受 file-like object)
+#             # import tempfile
+#             # temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.c3d')
+#             # file.save(temp_file.name)
+#             # file_object_or_path = temp_file.name
+#             # # 記得在處理完後刪除 temp_file.name
+#             # 簡化：假設 ezc3d 可以處理 file-like object (file)
+#             # 查閱 ezc3d 文件確認，如果不行，則必須用暫存檔
+#             file_object_or_path = file # 直接傳遞 FileStorage 物件 (需要測試 ezc3d 是否支援)
+#                                        # 或者，更安全的方式是 file.stream
+
+#         processed_data1, processed_data2 = process_emg_core(
+#             file_object_or_path, # 或者 temp_file.name for c3d if needed
+#             file_extension,
+#             processing_params,
+#             smoothing_method
+#         )
         
-        return jsonify({
-            "message": "EMG 訊號處理成功",
-            "smoothing_method": smoothing_method,
-            "processed_smoothed_data": json.loads(result1_json), # json.loads 將字串轉回字典/列表結構
-            "processed_bandpass_notch_data": json.loads(result2_json)
-        }), 200
+#         # if file_extension == '.c3d' and isinstance(file_object_or_path, str): # 如果是暫存檔案路徑
+#         #    os.remove(file_object_or_path) # 清理暫存檔案
 
-    except ValueError as ve:
-        logging.error(f"處理請求時發生 Value Error: {ve}")
-        return jsonify({"error": str(ve)}), 400
-    except Exception as e:
-        logging.exception(f"處理請求時發生未預期錯誤: {e}") # logging.exception 會包含堆疊追蹤
-        # if file_extension == '.c3d' and isinstance(file_object_or_path, str) and os.path.exists(file_object_or_path):
-        #    os.remove(file_object_or_path) # 清理暫存檔案
-        return jsonify({"error": f"內部伺服器錯誤: {e}"}), 500
+#         # 將 DataFrame 轉換為 JSON
+#         # orient='records' 會產生 [{col:val}, {col:val}, ...] 的列表
+#         # orient='split' 會產生 {'index': [...], 'columns': [...], 'data': [[...], [...]]}
+#         result1_json = processed_data1.to_json(orient="split", double_precision=10, force_ascii=False)
+#         result2_json = processed_data2.to_json(orient="split", double_precision=10, force_ascii=False)
+        
+#         return jsonify({
+#             "message": "EMG 訊號處理成功",
+#             "smoothing_method": smoothing_method,
+#             "processed_smoothed_data": json.loads(result1_json), # json.loads 將字串轉回字典/列表結構
+#             "processed_bandpass_notch_data": json.loads(result2_json)
+#         }), 200
 
-if __name__ == '__main__':
-    # 啟動 Flask 應用 (僅用於本地測試)
-    # 在生產環境中，應使用 WSGI 伺服器如 Gunicorn 或 uWSGI
-    app.run(debug=True, host='0.0.0.0', port=5000)
+#     except ValueError as ve:
+#         logging.error(f"處理請求時發生 Value Error: {ve}")
+#         return jsonify({"error": str(ve)}), 400
+#     except Exception as e:
+#         logging.exception(f"處理請求時發生未預期錯誤: {e}") # logging.exception 會包含堆疊追蹤
+#         # if file_extension == '.c3d' and isinstance(file_object_or_path, str) and os.path.exists(file_object_or_path):
+#         #    os.remove(file_object_or_path) # 清理暫存檔案
+#         return jsonify({"error": f"內部伺服器錯誤: {e}"}), 500
+
+# if __name__ == '__main__':
+#     # 啟動 Flask 應用 (僅用於本地測試)
+#     # 在生產環境中，應使用 WSGI 伺服器如 Gunicorn 或 uWSGI
+#     app.run(debug=True, host='0.0.0.0', port=5000)
