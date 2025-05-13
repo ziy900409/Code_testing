@@ -16,13 +16,94 @@ from scipy.signal import find_peaks
 
 import matplotlib.pyplot as plt
 import os
-
+import time
 # %%
 
 ana_threshold = 4
 anc_fs = 1000
 montion_fs = 250
 # %% 處理 MVC
+r"D:\Hsin\NTSU_lab\Gymnastics\BTS_experiment\BTS_experiment\Raw_Data\Method_1\NSF\NSF1\MVC\NSF1.1_BF_MVC_50_Rep_1.6.csv"
+
+processing_data, bandpass_filtered_data = func.EMG_processing(r"D:\Hsin\NTSU_lab\Gymnastics\BTS_experiment\BTS_experiment\Raw_Data\Method_1\NSF\NSF1\MVC\NSF1.1_BF_MVC_50_Rep_1.6.csv",
+                    smoothing="lowpass")
+
+folder_path = r"D:\BenQ_Project\01_UR_lab\2024_11 上海Major\Major_Asymmetric\\"
+# folder_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\\"
+motion_folder = "1.motion\\"
+emg_folder = "2.EMG\\"
+subfolder = "2.LargeFlick\\"
+motion_type = ["Cortex\\", "Vicon\\"]
+
+
+# %%
+# 取得所有 motion data folder list
+# 去除有“.“開頭的檔案 and 只獲得資料夾路徑，排除其他可能的檔案格式
+motion_folder_list = []
+for sub in motion_type:
+    motion_folder_list = motion_folder_list + \
+        [sub + f for f in os.listdir(motion_folder_path + sub) if not f.startswith('.') \
+         and os.path.isdir(os.path.join((motion_folder_path + sub), f))]
+# 取得所有 processing data folder list
+processing_folder_path = folder_path + "\\" + processingData_folder + "\\"
+processing_folder_list = [f for f in os.listdir(processing_folder_path) if not f.startswith('.') \
+                          and os.path.isdir(os.path.join(processing_folder_path, f))]
+# %% 資料前處理 : bandpass filter, absolute value, smoothing, trunkcut data
+# 處理MVC data
+tic = time.process_time()
+for folder_name in cortex_folder:
+    tic = time.process_time()
+    MVC_folder_path = folder_path + emg_folder + folder_name
+    csv_list = func.Read_File(MVC_folder_path, ".csv")
+    MVC_file_list = [file for file in csv_list if 'MVC' in file]
+    
+    # c3d_file_path = gen.Read_File(MVC_folder_path, ".c3d")
+    # MVC_list = csv_MVC_list + c3d_file_path
+
+    fig_save_path = folder_path + processingData_folder + folder_name + "\\2.emg\\2.MVC\\"
+    print("Now processing MVC data in " + folder_name)
+    for MVC_path in MVC_file_list:
+        print(MVC_path)
+        # data = pd.read_csv(MVC_path, encoding='UTF-8')
+        data_save_path = folder_path + processingData_folder + folder_name + "\\2.emg\\2.MVC\\" 
+        # 將檔名拆開 deal with filename and add extension with _ed
+        filepath, tempfilename = os.path.split(MVC_path)
+        filename, extension = os.path.splitext(tempfilename)
+        # 畫圖
+        # 前處理EMG data
+        processing_data, bandpass_filtered_data = func.EMG_processing(MVC_path, smoothing="lowpass")
+
+        # 畫 bandpass 後之資料圖
+        func.plot_plot(bandpass_filtered_data, str(fig_save_path),
+                     filename, "_Bandpass")
+        # 畫smoothing 後之資料圖
+        func.plot_plot(processing_data, str(fig_save_path),
+                     filename, str("_" + smoothing))
+        # 畫 FFT analysis 的圖
+        func.Fourier_plot(MVC_path,
+                        (fig_save_path),
+                        filename)
+        func.Fourier_plot(MVC_path,
+                        (fig_save_path),
+                        filename,
+                        notch=True)
+
+        # writting data in worksheet
+        file_name = fig_save_path + filename + end_name + ".xlsx"
+        pd.DataFrame(processing_data).to_excel(file_name, sheet_name='Sheet1', index=False, header=True)
+    toc = time.process_time()
+    print("Total Time:",toc-tic)  
+# 找最大值
+for folder_name in cortex_folder:
+    print("To find the maximum value of all of MVC data in: " + folder_name)
+    tic = time.process_time()
+    func.Find_MVC_max(folder_path + processingData_folder + folder_name + "\\2.emg\\2.MVC\\",
+                     folder_path + processingData_folder + folder_name + "\\2.emg\\")
+    toc = time.process_time()
+    print("Total Time:",toc-tic)
+toc = time.process_time()
+print("MVC Data Total Time Spent: ",toc-tic)
+gc.collect()
 
 # %%
 """

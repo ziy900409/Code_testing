@@ -23,7 +23,7 @@ rcParams['axes.unicode_minus'] = False
 # %%
 # ---------------------前處理用--------------------------------
 # downsampling frequency
-down_freq = 1000
+down_freq = 2000
 c = 0.802
 # 帶通濾波頻率
 bandpass_cutoff = [20/0.802, 450/0.802]
@@ -74,7 +74,7 @@ c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
                      'Triceps': 'Triceps Brachii',
                      'ExtUlnar': 'Extensor Carpi Ulnaris',
                      'ExtUlnar': 'Extensor Carpi Ulnaris',
-                     'DorInter': '1st Dorsal Interosseous', 
+                     'DorInter': '1st Dorsal Interosseous', 
                      'AbdDigMin': 'Abductor Digiti Quinti',
                      #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
                      'ExtInd': 'Extensor Indicis',
@@ -90,7 +90,7 @@ muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brac
 
 
 # %% EMG data processing
-def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overlap_len=None):
+def EMG_processing(raw_data_path, smoothing="lowpass", window_width=0.02, overlap_len=0.95, down_freq=2000):
     '''
     最終修訂時間: 20240329
     note:
@@ -104,6 +104,10 @@ def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overla
         給予欲處理之資料.
     smoothing : str, optional
         設定 smoothing method,分別為 lowpass, rms, moving. The default is 'lowpass'
+    window_width : float
+        設定移動平均的窗格大小，單位為秒
+    overlap_len : float
+        設定移動平均的窗格重疊程度，單位為百分比
         
     Returns
     -------
@@ -124,7 +128,106 @@ def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overla
     3. 插入時間軸
             
     '''
-    # raw_data_path = r'D:\\BenQ_Project\\01_UR_lab\\2024_11 Shanghai CS Major\\\\1. Motion\\Major_Asymmetric\\S09\\20241202\\S09_SmallTrack_HS_3.c3d'
+    def calculate_moving_stats(abs_data, window_width_time, down_freq, overlap_len):
+        """
+        計算輸入資料中每一欄的移動平均值和移動均方根值。
+    
+        參數:
+            abs_data (pd.DataFrame or np.ndarray): 輸入的數據，假設每一列是一個時間點的樣本，每一欄是一個特徵/訊號。
+            window_width_time (float): 計算窗格的寬度，單位為秒。
+            down_freq (float): 資料的取樣頻率，單位為 Hz。
+            overlap_len (float): 窗格之間的重疊比例，範圍從 0.0 (無重疊) 到接近 1.0。
+    
+        返回:
+            tuple: (moving_data_out, rms_data_out)
+                   moving_data_out (pd.DataFrame): 包含移動平均值的 DataFrame。
+                   rms_data_out (pd.DataFrame): 包含移動 RMS 值的 DataFrame。
+        """
+    
+        # 檢查輸入資料類型
+        if not isinstance(abs_data, (pd.DataFrame, np.ndarray)):
+            raise TypeError("輸入資料 abs_data 必須是 Pandas DataFrame 或 NumPy array。")
+    
+        # 如果是一維陣列，轉換為二維（假設是單一欄位的資料）
+        if abs_data.ndim == 1:
+            if isinstance(abs_data, np.ndarray):
+                abs_data = abs_data.reshape(-1, 1)
+            elif isinstance(abs_data, pd.Series): # pd.Series 的 ndim 也是 1
+                abs_data = abs_data.to_frame()
+        
+        if abs_data.shape[0] == 0: # 如果輸入資料為空
+            # 嘗試保留原始欄位名（如果有的話）返回空的 DataFrame
+            original_cols = []
+            if isinstance(abs_data, pd.DataFrame) and abs_data.shape[1] > 0 :
+                original_cols = abs_data.columns
+            elif abs_data.ndim == 2 and abs_data.shape[1] > 0: # NumPy array
+                 original_cols = range(abs_data.shape[1])
+            return pd.DataFrame(columns=original_cols), pd.DataFrame(columns=original_cols)
+    
+        # --- 根據您的程式碼計算窗格寬度和步長（單位：樣本數） ---
+        # cal_window_width 是您程式碼中的 window_width*down_freq
+        cal_window_width_samples = int(window_width_time * down_freq)
+        
+        if cal_window_width_samples <= 0:
+            raise ValueError("計算得到的窗格寬度（樣本數）必須為正。請檢查 window_width_time 和 down_freq。")
+    
+        # cal_window_step 是您程式碼中的 int(cal_window_width*(1-overlap_len))
+        cal_window_step_samples = int(cal_window_width_samples * (1 - overlap_len))
+        
+        if cal_window_step_samples <= 0:
+            raise ValueError("計算得到的窗格步長（樣本數）必須為正。請確保 overlap_len < 1.0 且窗格寬度為正。")
+    
+        # 決定輸入資料的欄數和欄位名稱
+        if isinstance(abs_data, pd.DataFrame):
+            num_input_samples, num_cols = abs_data.shape
+            col_names = abs_data.columns
+        else:  # NumPy array
+            num_input_samples, num_cols = abs_data.shape
+            col_names = range(num_cols) # 使用數字索引作為欄位名
+    
+        # 計算輸出結果的行数 (即窗格的數量)
+        if num_input_samples < cal_window_width_samples:
+            num_output_rows = 0
+        else:
+            num_output_rows = (num_input_samples - cal_window_width_samples) // cal_window_step_samples + 1
+        
+        if num_output_rows <= 0: # 如果計算出的窗格數為0或負數
+            return pd.DataFrame(columns=col_names), pd.DataFrame(columns=col_names)
+    
+        # 初始化儲存結果的 DataFrame
+        moving_data_out = pd.DataFrame(index=range(num_output_rows), columns=col_names, dtype=np.float64)
+        rms_data_out = pd.DataFrame(index=range(num_output_rows), columns=col_names, dtype=np.float64)
+    
+        # 逐欄計算
+        for c_idx in range(num_cols):
+            # 取得當前欄位的實際名稱（用於寫入DataFrame）和數據
+            if isinstance(abs_data, pd.DataFrame):
+                current_column_name_for_output = col_names[c_idx]
+                # 使用 .iloc[:, c_idx] 獲取該欄的 Pandas Series
+                current_column_data_series = abs_data.iloc[:, c_idx]
+            else: # NumPy array
+                current_column_name_for_output = c_idx # 對於 NumPy array，欄位名即為索引
+                current_column_data_series = abs_data[:, c_idx]
+    
+            # 在該欄上滑動窗格
+            for ii in range(num_output_rows):
+                start_sample_idx = ii * cal_window_step_samples
+                end_sample_idx = start_sample_idx + cal_window_width_samples
+                
+                # 從當前欄位數據中提取窗格
+                window_slice = current_column_data_series[start_sample_idx:end_sample_idx]
+                
+                # 計算移動平均並儲存
+                moving_data_out.loc[ii, current_column_name_for_output] = np.mean(window_slice)
+                
+                # 計算 RMS 並儲存
+                # RMS = sqrt(mean(x^2))
+                rms_data_out.loc[ii, current_column_name_for_output] = np.sqrt(np.mean(np.square(window_slice)))
+                
+        return moving_data_out, rms_data_out
+    
+    # main function begin
+    raw_data_path =  r"D:\Hsin\NTSU_lab\Gymnastics\BTS_experiment\BTS_experiment\Raw_Data\Method_1\NSF\NSF1\MVC\NSF1.1_BF_MVC_50_Rep_1.6.csv"
     if '.csv' in raw_data_path:
         raw_data = pd.read_csv(raw_data_path)
     elif '.c3d' in raw_data_path:
@@ -204,12 +307,21 @@ def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overla
     # 計算各採樣頻率與計算downsample所需的位點數，並取最小的位點數
     # 1.3.-------------創建儲存EMG data的矩陣------------
     # bandpass filter used in signal
+    window_size = window_width*down_freq
+    step_size = window_size*overlap_len
+    moving_data_len = (np.shape(data_len)[0] - window_size) // step_size + 1
+    
     bandpass_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
                             columns=raw_data.iloc[:, num_columns].columns)
     notch_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
                             columns=raw_data.iloc[:, num_columns].columns)
     lowpass_filtered_data = pd.DataFrame(np.zeros([math.floor(downsample_len), len(num_columns)]),
                             columns=raw_data.iloc[:, num_columns].columns)
+    moving_data = pd.DataFrame(np.zeros([math.floor(moving_data_len), len(num_columns)]),
+                               columns=raw_data.iloc[:, num_columns].columns)
+    
+    rms_data = pd.DataFrame(np.zeros([math.floor(moving_data_len), len(num_columns)]),
+                               columns=raw_data.iloc[:, num_columns].columns)
     # 設定 moving mean 的矩陣大小、欄位名稱
     '''
     window_width = int(time_of_window*np.floor(down_freq))
@@ -304,38 +416,12 @@ def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overla
         lowpass_filtered_data.iloc[:, col] = lowpass_filtered[:int(downsample_len)]
         # -------Data smoothing. Compute Moving mean
         # window width = window length(second)*sampling rate
-        
-        # 需重新修改 moving mean 以及 RMS method
-        
-        # for col in range(columns):  # 針對不同欄位計算
-        #     for ii in range(moving_data.shape[0]):  
-        #         data_location = int(ii * (1 - overlap_len) * window_width)
-        #         if data_location + window_width > len(abs_data):  # 避免超出索引範圍
-        #             break
-        #         moving_data.iloc[ii, col] = np.mean(abs_data[data_location:data_location + window_width])  # 計算移動平均
-        
-        #     for ii in range(rms_data.shape[0]):  
-        #         data_location = int(ii * (1 - overlap_len) * window_width)
-        #         if data_location + window_width > len(abs_data):  # 避免超出索引範圍
-        #             break
-        #         rms_data.iloc[ii, col] = np.sqrt(np.mean(abs_data[data_location:data_location + window_width] ** 2))  # 計算 RMS
-        
-        
-        
-        # for ii in range(np.shape(moving_data)[0]):
-        #     data_location = int(ii*(1-overlap_len)*window_width)
-        #     # print(data_location, data_location+window_width_rms)
-        #     moving_data.iloc[int(ii), col] = (np.sum((abs_data[data_location:data_location+window_width])**2)
-        #                                   /window_width)
-            
-        # # -------Data smoothing. Compute RMS
-        # # The user should change window length and overlap length that suit for your experiment design
-        # # window width = window length(second)*sampling rate
-        # for ii in range(np.shape(rms_data)[0]):
-        #     data_location = int(ii*(1-overlap_len)*window_width)
-        #     # print(data_location, data_location+window_width_rms)
-        #     rms_data.iloc[int(ii), col] = np.sqrt(np.sum((abs_data[data_location:data_location+window_width])**2)
-        #                                   /window_width)
+        # 計算 moving mean and moving RMS
+        moving_data_out, rms_data_out = calculate_moving_stats(abs_data, window_width,
+                                                               down_freq, overlap_len)
+        # 將資料儲存至矩陣
+        moving_data.iloc[:, col] = np.asarray(moving_data_out).reshape(-1)
+        rms_data.iloc[:, col] = np.asarray(rms_data_out).reshape(-1)
         
                 
     # 3. -------------插入時間軸-------------------
@@ -351,18 +437,18 @@ def EMG_processing(raw_data_path, smoothing="lowpass", window_width=None, overla
     lowpass_filtered_data.insert(0, 'time', lowpass_time_index)
 
     # 定義moving average的時間
-    # moving_time_index = np.linspace(0, min_stop_time, np.shape(moving_data)[0])
-    # moving_data.insert(0, 'time', moving_time_index)
-    # # 定義RMS DATA的時間
-    # rms_time_index = np.linspace(0, min_stop_time, np.shape(rms_data)[0])
-    # rms_data.insert(0, 'time', rms_time_index)
+    moving_time_index = np.linspace(0, min_stop_time, np.shape(moving_data)[0])
+    moving_data.insert(0, 'time', moving_time_index)
+    # 定義RMS DATA的時間
+    rms_time_index = np.linspace(0, min_stop_time, np.shape(rms_data)[0])
+    rms_data.insert(0, 'time', rms_time_index)
     # 設定 return 參數
     if smoothing == "lowpass":
         return lowpass_filtered_data, notch_filtered_data
-    # elif smoothing == "rms":
-    #     return rms_data, bandpass_filtered_data
-    # elif smoothing == "moving":
-    #     return moving_data, bandpass_filtered_data  
+    elif smoothing == "rms":
+        return rms_data, bandpass_filtered_data
+    elif smoothing == "moving":
+        return moving_data, bandpass_filtered_data
 # %% to find maximum MVC value
 
 def Find_MVC_max(MVC_folder, MVC_save_path):
