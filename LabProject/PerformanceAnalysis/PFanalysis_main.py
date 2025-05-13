@@ -156,9 +156,9 @@ data_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Majo
 data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
 data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
 
-data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_EC2_3.c3d"
-data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_1.c3d"
-data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_2.c3d"
+# data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_EC2_3.c3d"
+# data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_1.c3d"
+# data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_2.c3d"
 
 df, metadata, excldueCen_grouped_df, standardized_speeds = pro_main(data_path)
 df_1, metadata_1, excldueCen_grouped_df_1, standardized_speeds_1 = pro_main(data_path_1)
