@@ -14,100 +14,28 @@ import io # 用於處理記憶體中的檔案
 from flask import Flask, request, jsonify
 import json
 import os
-# %%
-down_freq = 1000
-c = 0.802
-# 帶通濾波頻率
-bandpass_cutoff = [20/0.802, 450/0.802]
-# 低通濾波頻率
-lowpass_freq = 10/c
-# 設定移動平均數與移動均方根之參數
-# 更改window length, 更改overlap length
-time_of_window = 0.1 # 窗格長度 (單位 second)
-overlap_len = 0.5 # 百分比 (%)
-# 設定 notch filter cutoff frequency
 
-notch_cutoff = [[59, 61],
-                [295.5, 296.5],
-                [369.5, 370.5],
-                [179, 181],
-                [299, 301],
-                [419, 421],
-                ]
+from scipy.fft import fft, fftfreq # 使用 scipy.fft
 
-c3d_notch_cutoff = [[49, 51],
-                    [99.5, 100.5],
-                    [149.5, 150.5],
-                    [199.5, 200.5],
-                    [249.5, 250.5],
-                    [299.5, 300.5],
-                    [349.5, 350.5],
-                    [295, 297],
-                    [369, 371],
-                    [73, 75],
-                    [399, 401]
-                    ]
+from collections import defaultdict
+import matplotlib.pyplot as plt
 
-csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
-                     'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
-                     'Mini sensor 3: EMG 3': 'Triceps Brachii',
-                     'Quattro sensor 4: EMG.A 4': 'Extensor Carpi Ulnaris', 
-                     'Quattro sensor 4: EMG.B 4': '1st Dorsal Interosseous', 
-                     'Quattro sensor 4: EMG.C 4': 'Abductor Digiti Quinti', 
-                     'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
-                     'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
+from adjustText import adjust_text
+plt.rcParams['font.sans-serif'] =  ['Noto Sans TC']  # 微軟正黑體
+plt.rcParams['axes.unicode_minus'] = False  # 正常顯示負號
+from scipy.stats import linregress
+from matplotlib.ticker import MaxNLocator
 
-c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
-                     'FleRad': 'Flexor Carpi Radialis',
-                     'Triceps': 'Triceps Brachii',
-                     'Triceps': 'Triceps Brachii',
-                     'ExtUlnar': 'Extensor Carpi Ulnaris',
-                     'ExtUlnar': 'Extensor Carpi Ulnaris',
-                     'DorInter': '1st Dorsal Interosseous', 
-                     'AbdDigMin': 'Abductor Digiti Quinti',
-                     #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
-                     'ExtInd': 'Extensor Indicis',
-                     'Biceps': 'Biceps Brachii',
-                     }
-
-c3d_analog_cha = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
-                  "Biceps", "Triceps"]
-
-muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
-               'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
-               'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
 
 # %%
 
-
-data_file_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
-
-
-APP_CONFIG = {
-    "DEFAULT_DOWNSAMPLE_FREQ": 1000,
-    "DEFAULT_BANDPASS_CUTOFF": [20, 450],
-    "DEFAULT_LOWPASS_FREQ": 6,
-    "DEFAULT_CSV_NOTCH_CUTOFF_LIST": notch_cutoff, # 假設 50Hz 工頻
-    "DEFAULT_C3D_NOTCH_CUTOFF_LIST": c3d_notch_cutoff, # 假設 60Hz 工頻
-    "DEFAULT_CSV_RECOLUMNS_NAME": csv_recolumns_name, # 範例
-    "DEFAULT_C3D_RECOLUMNS_NAME": c3d_recolumns_name, # 範例
-    "EMG_CHANNEL_IDENTIFIER": muscle_name # 用於辨識 EMG 頻道的關鍵字
-}
-
-config = APP_CONFIG
-
-# %%
-
-
-    
 # --- 應用程式設定 (理想情況下從設定檔載入) ---
 # 這些可以作為 API 的預設參數，或允許用戶透過請求覆蓋
-
 
 # 核心 EMG 處理邏輯 (從原始程式碼修改而來)
 def process_emg_core(
     data_file_path, # 檔案物件的 path
-    config = APP_CONFIG, # 包含所有處理參數的字典
+    config, # 包含所有處理參數的字典
     smoothing_method="lowpass", # smoothing 參數
     original_filename=None,
     # window_width=None, # 如果需要
@@ -148,10 +76,7 @@ def process_emg_core(
             if not emg_signal_columns:
                 raise ValueError(f"在 CSV 檔案 '{original_filename}' 中，根據 DEFAULT_CSV_RECOLUMNS_NAME 的 keys 未找到任何 EMG 頻道。")
             
-            # 根據識別出的原始欄位來決定後續操作的 DataFrame
-            # 注意：這裡的重命名邏輯與 EMG_processing 不同，EMG_processing 是先選取再重命名選取後的子集
-            # 而使用者提供的 process_emg_core 是先識別，然後對整個 raw_data 進行 rename
-            # 這裡我們遵循後者，先識別，然後對整個 raw_data_full_csv 進行 rename
+            # 先識別，然後對整個 raw_data_full_csv 進行 rename
             raw_data = raw_data_full_csv.copy() # 操作副本
             raw_data.rename(columns=csv_channel_map, inplace=True)
 
@@ -224,7 +149,6 @@ def process_emg_core(
     min_stop_time_global = 0
     downsample_len_global = 0 # 降採樣後的統一長度
     
-
     if '.csv' in data_file_path:
         # ... 原碼中 CSV 的 Fs, data_len, all_stop_time, downsample_len 計算邏輯 ...
         # 注意：原碼中 data_time = raw_data.iloc[:,num_columns[col]-1].dropna()
@@ -301,7 +225,6 @@ def process_emg_core(
     lowpass_filtered_data_df = pd.DataFrame(np.zeros([downsample_len_global, len(num_columns_indices)]),
                                            columns=processed_emg_columns)
    
-    
     # ----- 2. 濾波與訊號處理 (逐頻道) -----
     bandpass_cutoff_freqs = config.get("DEFAULT_BANDPASS_CUTOFF")
     
@@ -446,13 +369,812 @@ def process_emg_core(
         return lowpass_filtered_data_df, notch_filtered_data_df
     
 # %%
+def calculate_fft_for_emg(
+    data_file_path, # 檔案的完整路徑
+    config,
+    original_filename=None # 原始檔案名稱，用於記錄
+):
+    """
+    計算 EMG 數據的 FFT 並回傳頻譜數據。ˇ
 
-processed_data1, processed_data2 = process_emg_core(
-            file_object_or_path, # 或者 temp_file.name for c3d if needed
-            file_extension,
-            processing_params,
-            smoothing_method
-        )
+    參數:
+    - data_file_path (str): 原始資料檔案的完整路徑。
+    - config (dict): 包含所有處理參數的字典。
+    - original_filename (str, optional): 原始檔案名稱，用於記錄。
+
+    回傳:
+    - dict: 包含 FFT 結果的字典。
+    """
+    if not os.path.exists(data_file_path):
+        logging.error(f"檔案路徑不存在: {data_file_path}")
+        raise FileNotFoundError(f"檔案路徑不存在: {data_file_path}")
+
+    file_extension = ""
+    if '.' in data_file_path:
+        file_extension = '.' + data_file_path.rsplit('.', 1)[1].lower()
+
+    if not original_filename:
+        original_filename = os.path.basename(data_file_path)
+
+    raw_data = None
+    c3d_instance = None
+    # 儲存根據 config key 匹配到的原始欄位索引和名稱
+
+    # ----- 檔案讀取與初步頻道識別 -----
+    if file_extension == '.csv':
+        try:
+            raw_data_full_csv = pd.read_csv(data_file_path) # 先完整讀取
+            csv_channel_map = config.get("DEFAULT_CSV_RECOLUMNS_NAME", {})
+            
+            num_columns_indices = []
+            emg_signal_columns = []
+            for key_identifier in csv_channel_map.keys(): # key_identifier 是 config 中定義的搜索字串
+                for i, actual_col_name in enumerate(raw_data_full_csv.columns):
+                    if key_identifier in actual_col_name:
+                        if i not in num_columns_indices:
+                            num_columns_indices.append(i)
+                            emg_signal_columns.append(actual_col_name)
+                        # break # 假設一個 key_identifier 只對應一個最先匹配到的頻道
+                                # 如果一個 key 可能匹配多個，則不應 break
+
+            if not emg_signal_columns:
+                raise ValueError(f"在 CSV 檔案 '{original_filename}' 中，根據 DEFAULT_CSV_RECOLUMNS_NAME 的 keys 未找到任何 EMG 頻道。")
+            
+            # 先識別，然後對整個 raw_data_full_csv 進行 rename
+            raw_data = raw_data_full_csv.copy() # 操作副本
+            raw_data.rename(columns=csv_channel_map, inplace=True)
+
+
+        except Exception as e:
+            logging.error(f"讀取或初步處理 CSV 檔案 '{original_filename}' 時發生錯誤: {e}")
+            raise ValueError(f"無法解析或處理 CSV 檔案 '{original_filename}': {e}")
+
+    elif file_extension == '.c3d':
+        try:
+            c3d_instance = ezc3d.c3d(data_file_path)
+            c3d_analog_labels_original = c3d_instance['parameters']['ANALOG']['LABELS']['value']
+            c3d_channel_map = config.get("DEFAULT_C3D_RECOLUMNS_NAME", {})
+
+            num_columns_indices = []
+            emg_signal_columns = [] # 儲存原始 C3D 標籤名
+            
+            for key_identifier in c3d_channel_map.keys(): # key_identifier 是 config 中定義的搜索字串
+                for i, actual_c3d_label in enumerate(c3d_analog_labels_original):
+                    if key_identifier in actual_c3d_label:
+                        if i not in num_columns_indices:
+                            num_columns_indices.append(i)
+                            emg_signal_columns.append(actual_c3d_label)
+                        # break # 同上，取決於一個 key 是否只匹配一個
+
+            if not num_columns_indices:
+                raise ValueError(f"在 C3D 檔案 '{original_filename}' 中，根據 DEFAULT_C3D_RECOLUMNS_NAME 的 keys 未找到任何 EMG 頻道。")
+            
+            analog_data_subset = c3d_instance['data']['analogs'][0, num_columns_indices, :]
+            # 使用原始 C3D 標籤名創建 DataFrame，然後再重命名
+            raw_data_from_c3d = pd.DataFrame(np.transpose(analog_data_subset), columns=emg_signal_columns)
+            
+            # 進行重命名
+            raw_data = raw_data_from_c3d.copy()
+            raw_data.rename(columns=c3d_channel_map, inplace=True)
+            
+            # 插入時間軸
+            analog_time = np.linspace(
+                0,
+                (c3d_instance['header']['analogs']['last_frame']) / c3d_instance['header']['analogs']['frame_rate'],
+                num=(np.shape(c3d_instance['data']['analogs'])[-1])
+            )
+            raw_data.insert(0, 'Frame', analog_time)
+            # 欄位重命名 (C3D)
+            raw_data.rename(columns=config.get("DEFAULT_C3D_RECOLUMNS_NAME", {}), inplace=True)
+
+        except Exception as e:
+            logging.error(f"處理 C3D 檔案 '{original_filename}' 時發生錯誤: {e}")
+            raise ValueError(f"無法解析或處理 C3D 檔案 '{original_filename}': {e}")
+    else:
+        raise ValueError(f"不支援的檔案類型 '{file_extension}'。請上傳 .csv 或 .c3d 檔案。")
+
+    if raw_data is None or raw_data.empty:
+        raise ValueError(f"資料讀取失敗或檔案 '{original_filename}' 為空或未成功轉換。")
+
+    # ----- 逐頻道處理 -----
+    bandpass_cutoff_freqs = config.get("BANDPASS_CUTOFF", [20, 450])
+    perform_notch = config.get("PERFORM_NOTCH_FILTER", True)
+    truncate_fft = config.get("FFT_TRUNCATE_TO_POWER_OF_2", False)
+    # csv_time_column_explicit = config.get("CSV_TIME_COLUMN_NAME", None) # 明確的CSV時間欄位名
+    # MDF 相關設定
+    mdf_window_duration = config.get("MDF_WINDOW_DURATION", 1.0) # 秒
+    # MDF 窗格的 FFT 是否截斷，與主 FFT 設定一致
+    mdf_truncate_segment_fft = config.get("MDF_TRUNCATE_SEGMENT_FFT", truncate_fft)
+
+    down_freq = config.get("DEFAULT_DOWNSAMPLE_FREQ")
+
+    Fs_global = 0
+    data_len_global = 0 # 這裡指降採樣前的長度
+    min_stop_time_global = 0
+    downsample_len_global = 0 # 降採樣後的統一長度
+    
+    if '.csv' in data_file_path:
+        # ... 原碼中 CSV 的 Fs, data_len, all_stop_time, downsample_len 計算邏輯 ...
+        # 注意：原碼中 data_time = raw_data.iloc[:,num_columns[col]-1].dropna()
+ 
+        all_fs_csv = []
+        all_data_len_csv = []
+        all_stop_times_csv = []
+        all_downsample_len_csv = []
+
+        for emg_col_idx in num_columns_indices:
+            # 原碼的 num_columns[col]-1 邏輯比較脆弱
+            # 如果每個EMG頻道有獨立的時間欄，那結構會更複雜
+            data_time_series = raw_data.iloc[:, emg_col_idx-1]
+            # data_time_series = raw_data.iloc[:, emg_col_idx].dropna()
+            if len(data_time_series) < 11:
+                raise ValueError(f"時間欄 '{raw_data.columns[num_columns_indices-1]}' 的數據不足以計算取樣頻率。")
+
+            current_fs = (1 / np.mean(np.array(data_time_series[2:11]) - np.array(data_time_series[1:10])))
+            all_fs_csv.append(current_fs)
+            
+            emg_data_series = raw_data.iloc[:, emg_col_idx]
+            # 計算 data_len (有效數據長度)
+            non_zero_indices = (emg_data_series[::-1] != 0)
+            # non_zero_indices = (data_time_series[::-1] != 0)
+            if not non_zero_indices.any(): # 如果全是0
+                 first_non_zero_from_end_pos = len(emg_data_series)
+            else:
+                first_non_zero_from_end_pos = non_zero_indices.argmax()
+
+            current_data_len = int(len(emg_data_series) - first_non_zero_from_end_pos)
+            all_data_len_csv.append(current_data_len)
+
+            if current_data_len > 0:
+                 current_stop_time = data_time_series.iloc[current_data_len -1]
+            else: # 如果頻道全是0或空
+                current_stop_time = 0 # 或者 NaN，取決於如何處理
+            all_stop_times_csv.append(current_stop_time)
+            
+            all_downsample_len_csv.append(current_data_len / current_fs * down_freq if current_fs > 0 else 0)
+
+        # 清理 NaN 的 stop_time (如果有的話)
+        valid_stop_times = [x for x in all_stop_times_csv if not math.isnan(x)]
+        if not valid_stop_times:
+            raise ValueError("所有頻道的截止時間均無效。")
+        
+        min_stop_time_csv = np.min(valid_stop_times)
+        
+        Fs_global = min(all_fs_csv) if all_fs_csv else 0
+        # data_len_global 應該是基於 min_stop_time 和 Fs_global 重新計算，或者取最小的有效長度
+        # downsample_len_global 取最小的，並確保是整數
+        downsample_len_global = math.floor(min(all_downsample_len_csv)) if all_downsample_len_csv else 0
+        min_stop_time_global = min_stop_time_csv
+
+    elif '.c3d' in data_file_path:
+        Fs_global = c3d_instance['header']['analogs']['frame_rate']
+        # data_len_global 是原始 c3d 數據的長度 (影格數)
+        data_len_global = np.shape(c3d_instance['data']['analogs'])[-1] # 或 raw_data.shape[0] 如果 'Frame' 欄已移除
+        min_stop_time_global = (c3d_instance['header']['analogs']['last_frame']) / Fs_global
+        downsample_len_global = math.floor(data_len_global / Fs_global * down_freq)
+
+    if Fs_global <= 0 or downsample_len_global <= 0:
+        raise ValueError("無法計算有效的取樣頻率或降採樣長度。")
+
+    logging.info(f"全局取樣頻率 (估計/實際): {Fs_global}, 降採樣後長度: {downsample_len_global}, 統一截止時間: {min_stop_time_global}")
+
+    # ----- 初始化結果 DataFrame -----
+    # 欄位名稱使用處理後的 EMG 欄位名
+    processed_emg_columns = emg_signal_columns
+    
+    # ----- 2. 濾波與訊號處理 (逐頻道) -----
+    bandpass_cutoff_freqs = config.get("DEFAULT_BANDPASS_CUTOFF")
+    
+    fft_results = defaultdict(dict)
+    fft_results["filename"] = original_filename
+    # channel_data_results = {}
+    # 這裡的 col 應該是迭代 processed_emg_columns 的索引，或者直接迭代欄位名
+    for i, emg_col_name in enumerate(processed_emg_columns):
+        emg_col_original_idx = raw_data.columns.get_loc(emg_col_name) # 獲取在 raw_data 中的實際索引
+        
+        current_sample_freq = 0
+        data_to_filter = None
+
+        if '.csv' in data_file_path:
+            # 重新計算該頻道的 sample_freq (或者使用之前計算的 Fs_global，如果假設所有頻道一致)
+            # 原碼中是重新計算的
+            time_series_for_fs = raw_data.iloc[:, emg_col_original_idx-1] # 再次獲取時間序列
+            if len(time_series_for_fs) < 11:
+                current_sample_freq = Fs_global # Fallback or raise error
+            else:
+                current_sample_freq = (1 / np.mean(np.array(time_series_for_fs[2:11]) - np.array(time_series_for_fs[1:10])))
+
+            # 準備數據並處理 NaN
+            # 原碼中 indi_data_len 的邏輯比較複雜，與 data_len 的更新有關
+            # 簡化：直接取該欄位的數據
+            series_data = raw_data.iloc[:, emg_col_original_idx].copy() # 使用 .copy() 避免 SettingWithCopyWarning
+            
+            nan_indices = np.where(np.isnan(series_data))[0]
+            if nan_indices.size == 0:
+                pass # No NaN
+            elif nan_indices.size > 0.1 * current_sample_freq:
+                logging.warning(f"頻道 {emg_col_name} 總訊號斷訊 (NaN) 超過 0.1 秒。已將 NaN 替換為 0。")
+                series_data.fillna(0, inplace=True)
+            else:
+                logging.warning(f"頻道 {emg_col_name} 共發現 {nan_indices.size} 個缺值, 位置為 {nan_indices.tolist()}。已將 NaN 替換為 0。")
+                series_data.fillna(0, inplace=True)
+            
+            data_values = series_data.values
+
+            # 截斷數據到 min_stop_time_global
+            # 需要找到 min_stop_time_global 在該頻道時間序列中的索引
+            # 假設時間序列是 raw_data[time_column_name]
+            non_zero_indices = (data_values[::-1] != 0).argmax()
+          
+            # time_points = raw_data[time_column_name].fillna(0) # 處理時間中的 NaN
+            end_index_for_channel = int(len(data_values) - non_zero_indices)
+            data_to_filter = data_values[:end_index_for_channel]
+            
+            notch_freq_list = config.get("DEFAULT_CSV_NOTCH_CUTOFF_LIST")
+
+        elif '.c3d' in data_file_path:
+            current_sample_freq = Fs_global # c3d 的 Fs 是固定的
+            # c3d 資料在轉換時已處理過長度，理論上所有頻道長度一致
+            data_to_filter = raw_data.iloc[:, emg_col_original_idx].values
+            notch_freq_list = config.get("DEFAULT_C3D_NOTCH_CUTOFF_LIST")
+        
+        if data_to_filter is None or len(data_to_filter) == 0:
+            logging.warning(f"頻道 {emg_col_name} 沒有數據進行濾波，跳過。")
+            continue
+
+        # --- 執行濾波 ---
+        # Bandpass
+        try:
+            bandpass_sos = signal.butter(2, bandpass_cutoff_freqs, btype='bandpass', fs=current_sample_freq, output='sos')
+            bandpassed_signal = signal.sosfiltfilt(bandpass_sos, data_to_filter)
+        except ValueError as e: # 例如 fs 太低導致的 Nyquist 問題
+            logging.error(f"頻道 {emg_col_name} Bandpass 濾波失敗: {e}。Fs={current_sample_freq}, Cutoff={bandpass_cutoff_freqs}")
+            # 可以選擇跳過此頻道或填充預設值
+            continue
+
+        # Notch
+        notched_signal = bandpassed_signal # 起始訊號
+        for notch_cutoff in notch_freq_list:
+            try:
+                # 檢查 notch_cutoff 是否在 Nyquist 頻率內
+                if any(f >= current_sample_freq / 2 for f in notch_cutoff) or any(f <= 0 for f in notch_cutoff):
+                    logging.warning(f"頻道 {emg_col_name} 的 Notch 頻率 {notch_cutoff} 超出範圍 (Fs={current_sample_freq})，跳過此 Notch。")
+                    continue
+                if notch_cutoff[0] >= notch_cutoff[1]: # 確保 Wn[0] < Wn[1]
+                    logging.warning(f"頻道 {emg_col_name} 的 Notch 頻率範圍不正確 {notch_cutoff}，跳過此 Notch。")
+                    continue
+                notch_sos = signal.butter(2, notch_cutoff, btype='bandstop', fs=current_sample_freq, output='sos')
+                notched_signal = signal.sosfiltfilt(notch_sos, notched_signal)
+            except ValueError as e:
+                 logging.error(f"頻道 {emg_col_name} Notch 濾波 ({notch_cutoff}) 失敗: {e}。Fs={current_sample_freq}")
+                 continue # 跳過這個壞掉的 notch
+        
+        if perform_notch:
+            fft_input_data = notched_signal.copy()
+        else:
+            fft_input_data = bandpassed_signal.copy()
+
+        # --- FFT 計算 ---
+        N = len(fft_input_data)
+        if N == 0:
+            fft_results["error"] = "Data length for FFT is zero after filtering."
+            # fft_results["channels_fft_data"].append(channel_data_results)
+            continue
+
+        if truncate_fft:
+            N_truncated = 2**(N.bit_length() - 1) if N > 1 else N # 避免 N=1 時 N_truncated=0
+            if N_truncated > 0 and N_truncated < N : # 只在有意義截斷時才截斷
+                fft_input_data = fft_input_data[:N_truncated]
+                N = N_truncated
+            elif N_truncated == 0 and N > 0: # N=1 的情況
+                 logging.warning(f"頻道 '{emg_col_name}' ({original_filename}) 數據長度 {len(fft_input_data)} 過短，無法截斷到2的冪次方，將使用原始長度。")
+            # else N_truncated == N, 不用做任何事
+
+        T = 1.0 / current_sample_freq
+        yf = fft(fft_input_data, n=N)
+        xf = fftfreq(N, T)[:N // 2]
+        amplitudes = (2.0 / N) * np.abs(yf[0:N // 2])
+        fft_results["SamplingRate"][emg_col_name] = current_sample_freq
+        fft_results["frequencies"][emg_col_name] = xf.tolist()
+        fft_results["amplitudes"][emg_col_name] = amplitudes.tolist()
+
+        # --- 找出前三大峰值 ---
+        if len(amplitudes) > 0:
+            amp_for_peaks = np.copy(amplitudes)
+            peaks_found = []
+            for _ in range(3):
+                if not np.any(np.isfinite(amp_for_peaks)) or np.max(amp_for_peaks) == float('-inf') or len(amp_for_peaks)==0:
+                    break
+                max_idx = np.argmax(amp_for_peaks)
+                if max_idx < len(xf):
+                    peaks_found.append({"frequency": xf[max_idx], "amplitude": amplitudes[max_idx]})
+                    amp_for_peaks[max_idx] = float('-inf')
+                else: break
+            fft_results["top_peaks"][emg_col_name] = peaks_found
+        
+        # 3. 每一個 duration 計算一次 FFT
+        med_freq_list_for_channel = [] # 儲存此頻道隨時間變化的 MDF
+        # ----- MDF 計算 (時域中頻數率) -----
+        if mdf_window_duration > 0 and current_sample_freq > 0:
+            fft_step_mdf = int(current_sample_freq * mdf_window_duration)
+            if fft_step_mdf > 0 and len(fft_input_data) >= fft_step_mdf : # 確保至少有一個完整窗格
+                num_windows_mdf = len(fft_input_data) // fft_step_mdf
+                
+                for win_idx in range(num_windows_mdf):
+                    segment = fft_input_data[win_idx * fft_step_mdf : (win_idx + 1) * fft_step_mdf]
+                    N_segment_orig = len(segment)
+                    if N_segment_orig == 0: continue
+
+                    N_fft_segment = N_segment_orig
+                    if mdf_truncate_segment_fft: # 使用MDF特定的截斷設定或與主FFT一致
+                        N_temp_segment = 2**(N_segment_orig.bit_length() - 1) if N_segment_orig > 1 else N_segment_orig
+                        if N_temp_segment > 0: N_fft_segment = N_temp_segment
+                    
+                    segment_for_fft = segment[:N_fft_segment] if N_fft_segment < N_segment_orig else segment
+                    
+                    yf_segment = fft(segment_for_fft, n=N_fft_segment)
+                    # T_segment is 1.0 / freq
+                    xf_segment = fftfreq(N_fft_segment, 1.0 / current_sample_freq)[:N_fft_segment // 2]
+                    # 計算功率譜密度 (PSD) 而不是單純的振幅譜，通常MDF基於PSD
+                    # PSD_segment = (1.0 / (current_sample_freq * N_fft_segment)) * np.abs(yf_segment[0:N_fft_segment // 2])**2 # 單邊PSD
+                    # 或者，如果仍用振幅譜的定義：
+                    amplitudes_segment = (2.0 / N_fft_segment) * np.abs(yf_segment[0:N_fft_segment // 2])
+
+                    if len(amplitudes_segment) == 0: # 如果窗格FFT結果為空
+                        med_freq_list_for_channel.append(np.nan) # 或 0.0
+                        continue
+
+                    total_power_segment = np.sum(amplitudes_segment) # 或 np.sum(PSD_segment)
+                    if total_power_segment <= 1e-9: # 避免除零或極小功率的情況
+                        med_freq_list_for_channel.append(0.0) # 或 np.nan
+                        continue
+                        
+                    cumulative_power = 0.0
+                    found_mdf_for_window = False
+                    for freq_idx, power_val in enumerate(amplitudes_segment): # 或 PSD_segment
+                        cumulative_power += power_val
+                        if cumulative_power >= total_power_segment / 2.0:
+                            if freq_idx < len(xf_segment):
+                                med_freq_list_for_channel.append(xf_segment[freq_idx])
+                                found_mdf_for_window = True
+                                break
+                            else: # 索引超出 xf_segment 範圍
+                                logging.warning(f"MDF: 頻道 {emg_col_name}, 窗格 {win_idx}, freq_idx 越界。")
+                                med_freq_list_for_channel.append(np.nan)
+                                found_mdf_for_window = True
+                                break
+                    if not found_mdf_for_window: # 如果循環結束仍未找到 (例如所有功率集中在最後)
+                        med_freq_list_for_channel.append(xf_segment[-1] if len(xf_segment) > 0 else 0.0)
+            else:
+                logging.info(f"頻道 '{emg_col_name}' ({original_filename}) 資料長度不足以進行MDF計算 (窗格長度 {fft_step_mdf} vs 資料長度 {len(fft_input_data)})。")
+        # 儲存 Median Frequency 的結果
+        fft_results["MedianFreq"][emg_col_name] = med_freq_list_for_channel
+        
+        time_axis = np.arange(len(med_freq_list_for_channel))
+        # 計算趨勢線的斜率
+        slope, intercept, r_value, p_value, std_err = linregress(time_axis, med_freq_list_for_channel)
+        fft_results["MedianFreq_Slope"][emg_col_name] = slope
+
+    return fft_results
+# %%
+def plot_fft_data_output(fft_results, max_subplot_cols=2,
+                         title_name=None):
+    """
+    接收來自 calculate_fft_for_emg_data_v2 的結果，並繪製頻譜圖。
+
+    參數:
+    - fft_results_data (dict): 包含 FFT 分析結果的字典，
+                               其結構應為 calculate_fft_for_emg_data_v2 的輸出。
+    - max_subplot_cols (int): 子圖每行最大欄數。
+    """
+    if not fft_results or "amplitudes" not in fft_results or not fft_results["amplitudes"]:
+        print("沒有有效的頻道數據可以繪製。")
+        return
+
+    num_channels = len(fft_results["amplitudes"])
+
+    if num_channels == 0:
+        print("頻道數據為空，無法繪製。")
+        return
+    
+    # 計算子圖的行數和列數
+    cols = min(max_subplot_cols, num_channels)
+    rows = math.ceil(num_channels / cols)
+
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 7, rows * 5), squeeze=False)
+    # squeeze=False 確保 axs 總是一個二維陣列，即使只有一行或一列
+    if title_name:
+        fig_title = f"FFT Analysis: {title_name}"
+    else:
+        fig_title = f"FFT Analysis: {fft_results.get('filename', '未知檔案')}"
+    
+    fig.suptitle(fig_title, fontsize=24)
+    # 存放所有標註（避免重疊用）
+    all_texts = []
+
+    for i, channel_info in enumerate(fft_results["amplitudes"].keys()):
+        print(channel_info)
+        
+        row_idx = i // cols
+        col_idx = i % cols
+        ax = axs[row_idx, col_idx]
+        texts = []
+
+        frequencies = fft_results.get("frequencies", {}).get(channel_info, None)
+        amplitudes = fft_results.get("amplitudes").get(channel_info, None)
+        top_peaks = fft_results.get("top_peaks", []).get(channel_info, None)
+        fs_used = fft_results.get("SamplingRate").get(channel_info, None)
+
+        ax.set_title(f"{channel_info}\n(Fs used: {fs_used if fs_used else 'N/A'} Hz)", fontsize=16)
+
+        if frequencies is None or amplitudes is None or len(frequencies) == 0 or len(amplitudes) == 0:
+            ax.text(0.5, 0.5, "數據不足", ha='center', va='center', color='gray', fontsize=14)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            continue
+
+        # 繪製頻譜
+        ax.plot(frequencies, amplitudes, linewidth=0.7, color='dodgerblue')
+        ax.ticklabel_format(axis='y', style='scientific', scilimits=(-2, 3),
+                            useMathText=True) # Y軸科學記號
+
+        # 標註峰值
+        for peak_idx, peak in enumerate(top_peaks):
+            peak_freq = peak.get("frequency")
+            peak_amp = peak.get("amplitude")
+            if peak_freq is not None and peak_amp is not None:
+                ax.plot(peak_freq, peak_amp, 'o', color='red', markersize=4)
+                # 稍微錯開標註位置以避免重疊
+                offset_y = (peak_idx % 3 -1) * (0.1 * max(amplitudes) if amplitudes else 0.01)
+                text = ax.annotate(f'{peak_freq:.1f}Hz',
+                                xy=(peak_freq, peak_amp),
+                                xytext=(5, 5 + offset_y*100), textcoords='offset points', # 調整 xytext
+                                fontsize=12, color='crimson',
+                                arrowprops=dict(arrowstyle="->", color='gray', connectionstyle="arc3,rad=.2"))
+
+                texts.append(text)
+        
+        ax.grid(True, linestyle=':', linewidth=0.5, alpha=0.7)
+        ax.tick_params(axis='both', labelsize=12)
+
+        # 設定 X 軸範圍
+        if frequencies and fs_used:
+            # 通常顯示到奈奎斯特頻率，或者一個感興趣的上限
+            display_max_freq = fs_used / 2
+            # 如果數據中的最大頻率遠小於奈奎斯特頻率，可以適當調整
+            if max(frequencies) < display_max_freq / 2 and max(frequencies) > 0:
+                display_max_freq = min(display_max_freq, max(frequencies) * 1.5) # 給一些緩衝
+            ax.set_xlim(0, min(display_max_freq, 500)) # 例如最多顯示到500Hz或奈奎斯特頻率
+        elif frequencies:
+             ax.set_xlim(0, min(max(frequencies) if len(frequencies) > 1 else 500, 500))
+        else:
+            ax.set_xlim(0, 500) # 預設
+
+    # 如果有未使用的子圖，隱藏它們
+    for i in range(num_channels, rows * cols):
+        row_idx = i // cols
+        col_idx = i % cols
+        if row_idx < axs.shape[0] and col_idx < axs.shape[1]: # 確保索引在範圍內
+            fig.delaxes(axs[row_idx, col_idx])
+            
+    plt.tight_layout(rect=[0.03, 0.03, 1.01, 0.98])  # 預留空間給 suptitle 和共用標籤
+    # plt.tight_layout()
+    fig.supxlabel("Frequency (Hz)", fontsize=20)
+    fig.supylabel("Amplitude", fontsize=20)
+    # 自動調整所有標註位置避免重疊
+    adjust_text(all_texts, arrowprops=dict(arrowstyle="->", color='gray'))
+    plt.show()
+# %%
+
+def plot_mdf_over_time(fft_results_data, config, 
+                       max_subplot_cols=2, title_name=None):
+    """
+    接收來自 calculate_fft_for_emg_data_v3 的結果，並繪製 MDF 時程圖。
+
+    參數:
+    - fft_results_data (dict): 包含 FFT 分析結果及 MDF 分析的字典。
+                               其結構應為 calculate_fft_for_emg_data_v3 的輸出。
+    - max_subplot_cols (int): 子圖每行最大欄數。
+    """
+    # fft_results_data = fft_results
+    if not fft_results_data or "MedianFreq" not in fft_results_data:
+        print("沒有有效的 MDF 分析數據可以繪製。")
+        return
+
+    mdf_analysis_data = fft_results_data.get("MedianFreq", {})
+    if not mdf_analysis_data:
+        print("MDF 分析數據為空，無法繪製。")
+        return
+
+    # 篩選出實際有 MDF 數據的頻道
+    channels_with_mdf = {
+        name: data for name, data in mdf_analysis_data.items() if data and any(not np.isnan(x) for x in data)
+    }
+    
+    if not channels_with_mdf:
+        print("所有頻道的 MDF 數據均為空或 NaN，無法繪製。")
+        return
+
+    num_channels = len(channels_with_mdf)
+
+    # 計算子圖的行數和列數
+    cols = min(max_subplot_cols, num_channels)
+    rows = math.ceil(num_channels / cols)
+
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 7, rows * 4), squeeze=False)
+    # squeeze=False 確保 axs 總是一個二維陣列
+    if title_name:
+        fig_title = f"Median Frequency (MDF) Over Time: {title_name}"
+    else:
+        fig_title = f"Median Frequency (MDF) Over Time: {fft_results_data.get('filename', '未知檔案')}"
+    fig.suptitle(fig_title, fontsize=24, y=1 - 0.02 * rows)
+
+    plot_idx = 0
+    for channel_name, mdf_values in channels_with_mdf.items():
+        row_idx = plot_idx // cols
+        col_idx = plot_idx % cols
+        ax = axs[row_idx, col_idx]
+
+        
+        # fs_used = None
+        mdf_window_duration = None # 需要從 config 或 fft_results_data 中獲取
+
+        # 嘗試從主 FFT 結果中找到對應頻道的 fs_used (如果有的話)
+        # 並假設 MDF 的 config 參數 (如 MDF_WINDOW_DURATION) 也許可以間接得知
+        # 這裡簡化，如果需要精確時間軸，MDF 計算時應同時儲存時間點
+        for ch_fft_data in fft_results_data.get("channels_fft_data", []):
+            if ch_fft_data.get("channel_name") == channel_name:
+                # fs_used = ch_fft_data.get("sampling_frequency_used")
+                mdf_window_duration = config.get("DURATION", 1)
+                break
+        # 嘗試從 channels_fft_data 中獲取該頻道的取樣頻率，以推算時間軸
+        # 這部分是可選的，如果沒有，則 x 軸就是窗格索引
+        time_axis = np.arange(0, #start
+                              len(mdf_values)*mdf_window_duration, # stop
+                              mdf_window_duration) # step
+
+        ax.plot(time_axis, mdf_values, marker='o', linestyle='-', linewidth=1, markersize=3, label="MDF")
+        
+        # 計算趨勢線的斜率
+        slope, intercept, r_value, p_value, std_err = linregress(time_axis, mdf_values)
+        trendline = intercept + slope * np.array(time_axis)
+
+        # 畫趨勢線
+        ax.plot(time_axis, trendline, linewidth=1, color='red', linestyle='--',
+                label='Slope: {:.2f}'.format(slope))
+        # annotation_text = 'Slope: {:.2f}'.format(slope)
+        # ax.annotate(annotation_text, xy=(0.5, 0.9), xycoords='axes fraction', ha='center', fontsize=12)
+        ax.legend(fontsize=10)
+        
+        title_str = f"{channel_name}"
+
+        ax.set_title(title_str, fontsize=16)
+        ax.tick_params(axis='both', labelsize=12)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        
+        ax.grid(True, linestyle=':', linewidth=0.5, alpha=0.7)
+        # 設定 X 軸範圍
+        if time_axis.any():
+            ax.set_xlim(0, max(time_axis)) 
+        plot_idx += 1
+
+    # 如果有未使用的子圖，隱藏它們
+    for i in range(plot_idx, rows * cols):
+        row_idx = i // cols
+        col_idx = i % cols
+        if row_idx < axs.shape[0] and col_idx < axs.shape[1]:
+            fig.delaxes(axs[row_idx, col_idx])
+
+    plt.tight_layout(rect=[0.03, 0.03, 1.01, 0.92])
+    fig.supxlabel("Time (s)", fontsize=16)
+    fig.supylabel("Median Frequency (Hz)", fontsize=16)
+    plt.show()
+# %%
+def plot_multiple_mdf_over_time(list_of_fft_results_data,
+                                configs,
+                                max_subplot_cols=2,
+                                title_name=None,
+                                dataset_labels=None):
+    """
+    接收一個或多個 FFT 分析結果的列表，並繪製 MDF 時程圖。
+    每個頻道一個子圖，每個子圖可包含來自多個數據集的 MDF 時程線及趨勢線。
+
+    參數:
+    - list_of_fft_results_data (list or dict): 包含一個或多個 FFT 分析結果字典的列表。
+                                              每個字典的結構應包含 "MedianFreq" 鍵。
+    - configs (dict or list of dict): 單個配置字典 (適用於所有數據集) 或配置字典列表。
+                                     每個配置字典應包含 "DURATION" (MDF 窗口持續時間)。
+    - max_subplot_cols (int): 子圖每行最大欄數。
+    - title_name (str, optional): 圖表的整體標題。
+    - dataset_labels (list of str, optional): 每個數據集的標籤，用於圖例。
+    """
+
+    if not list_of_fft_results_data:
+        print("沒有提供 FFT 結果數據。")
+        return
+    if not configs:
+        print("沒有提供配置信息 (configs)。")
+        return
+
+    # --- 1. 輸入標準化與數據有效性檢查 ---
+    if isinstance(list_of_fft_results_data, dict):
+        list_of_fft_results_data = [list_of_fft_results_data]
+        if dataset_labels and not isinstance(dataset_labels, list):
+            dataset_labels = [dataset_labels]
+    
+    if isinstance(configs, dict):
+        configs = [configs] * len(list_of_fft_results_data) # 複製配置給每個數據集
+
+    if len(configs) != len(list_of_fft_results_data):
+        print("警告: configs 列表長度與 list_of_fft_results_data 長度不匹配。請檢查輸入。")
+        return
+
+    # 準備數據集標籤
+    if dataset_labels:
+        if len(dataset_labels) != len(list_of_fft_results_data):
+            print("警告: dataset_labels 數量與數據集數量不符。將使用自動標籤。")
+            dataset_labels = None
+    if not dataset_labels:
+        dataset_labels = [fft_res.get('filename', f'Dataset {i+1}')
+                          for i, fft_res in enumerate(list_of_fft_results_data)]
+
+    # --- 2. 收集所有唯一的、包含有效 MDF 數據的頻道名稱 ---
+    all_valid_channel_names = set()
+    # 先收集所有數據集中所有可能的頻道
+    temp_all_channel_names = set()
+    for fft_results in list_of_fft_results_data:
+        if "MedianFreq" in fft_results and fft_results["MedianFreq"]:
+            temp_all_channel_names.update(fft_results["MedianFreq"].keys())
+    
+    # 對於每個潛在頻道，檢查是否至少有一個數據集包含該頻道的有效MDF數據
+    for channel_name in temp_all_channel_names:
+        has_valid_data_for_channel = False
+        for fft_results in list_of_fft_results_data:
+            mdf_values = fft_results.get("MedianFreq", {}).get(channel_name)
+            if mdf_values is not None and isinstance(mdf_values, (list, np.ndarray)) and \
+               len(mdf_values) > 0 and any(not np.isnan(x) for x in mdf_values if x is not None): # 檢查非空且至少有一個非NaN值
+                has_valid_data_for_channel = True
+                break
+        if has_valid_data_for_channel:
+            all_valid_channel_names.add(channel_name)
+
+    if not all_valid_channel_names:
+        print("在所有數據集中均未找到有效的 MDF 數據頻道。")
+        return
+
+    sorted_channel_names = sorted(list(all_valid_channel_names))
+    num_unique_channels = len(sorted_channel_names)
+
+    # --- 3. 子圖佈局 ---
+    cols = min(max_subplot_cols, num_unique_channels)
+    rows = math.ceil(num_unique_channels / cols)
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 7, rows * 5), squeeze=False)
+
+    # 設定整體標題
+    if title_name:
+        fig_title_text = f"Median Frequency (MDF) Over Time: {title_name}"
+    elif len(list_of_fft_results_data) == 1:
+        fig_title_text = f"Median Frequency (MDF) Over Time: {dataset_labels[0]}"
+    else:
+        fig_title_text = "Median Frequency (MDF) Over Time: Multiple Datasets"
+    
+    title_y_adjust = 0.98 # 初始y位置
+    if rows > 1:
+        title_y_adjust = 1 - 0.04 * (1/rows + 0.05) # 根據行數調整，避免與子圖標題太近
+    elif num_unique_channels == 0 : # 雖然前面有檢查，但以防萬一
+        title_y_adjust = 0.95
+
+    fig.suptitle(fig_title_text, fontsize=20, y=title_y_adjust)
+
+
+    # --- 4. 顏色和繪圖循環 ---
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    plot_colors = [prop_cycle.by_key()['color'][i % len(prop_cycle.by_key()['color'])] 
+                   for i in range(len(list_of_fft_results_data))]
+
+    for i, channel_name in enumerate(sorted_channel_names):
+        row_idx = i // cols
+        col_idx = i % cols
+        ax = axs[row_idx, col_idx]
+        ax.set_title(f"{channel_name}", fontsize=16)
+        
+        max_time_for_subplot = 0 # 用於設定 xlim
+        found_data_for_channel_in_any_dataset = False
+
+        for dataset_idx, (fft_results, config_item) in enumerate(zip(list_of_fft_results_data, configs)):
+            dataset_label = dataset_labels[dataset_idx]
+            color = plot_colors[dataset_idx % len(plot_colors)]
+
+            mdf_values_list = fft_results.get("MedianFreq", {}).get(channel_name)
+
+            if mdf_values_list is not None and isinstance(mdf_values_list, (list, np.ndarray)) and \
+               len(mdf_values_list) > 0:
+                
+                mdf_values = np.array([val for val in mdf_values_list if val is not None]) # 過濾掉 None
+                
+                # 移除 NaN 以便繪製和計算趨勢線
+                valid_indices = ~np.isnan(mdf_values)
+                if not np.any(valid_indices): # 如果過濾後沒有有效數據點
+                    # print(f"數據集 '{dataset_label}' 的頻道 '{channel_name}' MDF 數據全為 NaN 或 None。")
+                    continue
+
+                mdf_values_clean = mdf_values[valid_indices]
+                
+                mdf_window_duration = config_item.get("DURATION", 1) # 預設為1秒
+                if not isinstance(mdf_window_duration, (int, float)) or mdf_window_duration <= 0:
+                    print(f"警告: 數據集 '{dataset_label}' 的 DURATION ({mdf_window_duration}) 無效，將使用1秒。")
+                    mdf_window_duration = 1
+
+                # 生成對應有效點的時間軸
+                original_indices = np.arange(len(mdf_values))
+                time_axis_full = original_indices * mdf_window_duration
+                time_axis_clean = time_axis_full[valid_indices]
+
+                if len(mdf_values_clean) < 2: # 需要至少兩個點來畫線和計算趨勢
+                    # print(f"數據集 '{dataset_label}' 的頻道 '{channel_name}' 有效 MDF 數據點不足 (<2)。")
+                    ax.plot(time_axis_clean, mdf_values_clean, marker='o', linestyle='', markersize=3, 
+                            color=color, label=f"{dataset_label} - MDF (Data points)")
+                    if time_axis_clean.any():
+                         max_time_for_subplot = max(max_time_for_subplot, time_axis_clean.max())
+                    found_data_for_channel_in_any_dataset = True
+                    continue
+
+                found_data_for_channel_in_any_dataset = True
+                max_time_for_subplot = max(max_time_for_subplot, time_axis_clean.max())
+
+                # 繪製 MDF 線
+                ax.plot(time_axis_clean, mdf_values_clean, marker='o', linestyle='-', linewidth=1, 
+                        markersize=3, color=color, alpha=0.6)
+
+                # 計算並繪製趨勢線
+                try:
+                    # Scipy >= 1.6.0 支持 nan_policy='omit'. 若舊版, 前面已手動清理NaN
+                    slope, intercept, r_value, p_value, std_err = linregress(time_axis_clean, mdf_values_clean)
+                    trendline = intercept + slope * time_axis_clean
+                    ax.plot(time_axis_clean, trendline, linewidth=3, color=color, linestyle='--',
+                            label=f"{dataset_label} - Slope: {slope:.2f}", alpha=0.6)
+                except ValueError as e:
+                    print(f"計算頻道 '{channel_name}' 數據集 '{dataset_label}' 的趨勢線時出錯: {e}")
+            # else:
+                # print(f"數據集 '{dataset_label}' 中頻道 '{channel_name}' 的 MDF 數據缺失或格式不正確。")
+
+
+        if not found_data_for_channel_in_any_dataset:
+            ax.text(0.5, 0.5, "無有效MDF數據", ha='center', va='center', color='gray', fontsize=12)
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.tick_params(axis='both', labelsize=10)
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=7, integer=False)) # 允許非整數時間點
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=6, integer=False)) # MDF可以是浮點數
+            ax.grid(True, linestyle=':', linewidth=0.5, alpha=0.7)
+            # ax.legend(fontsize=8)
+            ax.tick_params(axis='both', labelsize=12)
+            if max_time_for_subplot > 0 :
+                ax.set_xlim(0, max_time_for_subplot) # 加一點緩衝
+            else: # 如果只有單點或沒有時間軸
+                ax.set_xlim(0,1) 
+
+
+    # --- 5. 清理和顯示 ---
+    # 隱藏未使用的子圖
+    for i in range(num_unique_channels, rows * cols):
+        row_idx = i // cols
+        col_idx = i % cols
+        if row_idx < axs.shape[0] and col_idx < axs.shape[1]:
+            fig.delaxes(axs[row_idx, col_idx])
+
+    plt.tight_layout(rect=[0.03, 0.03, 0.97, 0.98]) # 調整rect以適應suptitle
+    
+    if rows > 0 and cols > 0:
+        try:
+            fig.supxlabel("Time (s)", fontsize=20, y=0.01)
+            fig.supylabel("Median Frequency (Hz)", fontsize=20, x=0.01 if cols >1 else 0.04)
+        except Exception as e:
+            print(f"設置 supxlabel/supylabel 時出錯: {e}")
+            
+    plt.show()
 # %%
 
 # @app.route('/process_emg_signal', methods=['POST'])
