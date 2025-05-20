@@ -1925,7 +1925,12 @@ def pro_main(data_path, motion_config, emg_config):
     for ch_data in results_c3d.get("filename", []):
         print(f"  頻道: {results_c3d.get('amplitudes').keys()}")
     
-    return df, metadata, excldueCen_grouped_df, standardized_speeds, results_c3d
+    emg_results = emg.process_emg_core(data_path, # 檔案物件的 path
+                                       emg_config, # 包含所有處理參數的字典
+                                       smoothing_method="lowpass", # smoothing 參數
+                                       original_filename=None)
+    
+    return df, metadata, excldueCen_grouped_df, standardized_speeds, results_c3d, emg_results
 
 
 

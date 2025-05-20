@@ -31,7 +31,8 @@ from matplotlib.ticker import MaxNLocator
 
 # --- 應用程式設定 (理想情況下從設定檔載入) ---
 # 這些可以作為 API 的預設參數，或允許用戶透過請求覆蓋
-
+# data_file_path = data_path
+# config = EMG_CONFIG
 # 核心 EMG 處理邏輯 (從原始程式碼修改而來)
 def process_emg_core(
     data_file_path, # 檔案物件的 path
@@ -135,12 +136,12 @@ def process_emg_core(
     # ----- 逐頻道處理 -----
     bandpass_cutoff_freqs = config.get("BANDPASS_CUTOFF", [20, 450])
     perform_notch = config.get("PERFORM_NOTCH_FILTER", True)
-    truncate_fft = config.get("FFT_TRUNCATE_TO_POWER_OF_2", True)
+    # truncate_fft = config.get("FFT_TRUNCATE_TO_POWER_OF_2", True)
     # csv_time_column_explicit = config.get("CSV_TIME_COLUMN_NAME", None) # 明確的CSV時間欄位名
     # MDF 相關設定
-    mdf_window_duration = config.get("MDF_WINDOW_DURATION", 1.0) # 秒
-    # MDF 窗格的 FFT 是否截斷，與主 FFT 設定一致
-    mdf_truncate_segment_fft = config.get("MDF_TRUNCATE_SEGMENT_FFT", truncate_fft)
+    # mdf_window_duration = config.get("MDF_WINDOW_DURATION", 1.0) # 秒
+    # # MDF 窗格的 FFT 是否截斷，與主 FFT 設定一致
+    # mdf_truncate_segment_fft = config.get("MDF_TRUNCATE_SEGMENT_FFT", truncate_fft)
 
     down_freq = config.get("DEFAULT_DOWNSAMPLE_FREQ")
 
@@ -216,21 +217,39 @@ def process_emg_core(
 
     # ----- 初始化結果 DataFrame -----
     # 欄位名稱使用處理後的 EMG 欄位名
-    processed_emg_columns = emg_signal_columns
-    
     bandpass_filtered_data_df = pd.DataFrame(np.zeros([downsample_len_global, len(num_columns_indices)]),
-                                           columns=processed_emg_columns)
+                                           columns=emg_signal_columns)
     notch_filtered_data_df = pd.DataFrame(np.zeros([downsample_len_global, len(num_columns_indices)]),
-                                         columns=processed_emg_columns)
+                                         columns=emg_signal_columns)
     lowpass_filtered_data_df = pd.DataFrame(np.zeros([downsample_len_global, len(num_columns_indices)]),
-                                           columns=processed_emg_columns)
+                                           columns=emg_signal_columns)
+    
+    # ----- 新增：初始化平均值 DataFrame -----
+    averaged_data_df = None
+    # 時間窗口設置與 MDF 相同
+    avg_window_duration_config = config.get("MDF_WINDOW_DURATION", 1)
+    num_averaged_points_global = 0
+
+    if avg_window_duration_config > 0 and down_freq > 0:
+        samples_per_avg_window_global = int(down_freq * avg_window_duration_config)
+        if samples_per_avg_window_global > 0:
+            num_averaged_points_global = downsample_len_global // samples_per_avg_window_global
+            if num_averaged_points_global > 0:
+                averaged_data_df = pd.DataFrame(np.zeros([num_averaged_points_global, len(emg_signal_columns)]),
+                                                columns=emg_signal_columns)
+                logging.info(f"將計算 {avg_window_duration_config}s 窗格平均值，產生 {num_averaged_points_global} 點。")
+            else:
+                logging.warning(f"訊號總長度不足以產生至少一個 {avg_window_duration_config}s 的平均窗格 (基於降採樣後數據)。")
+        else:
+            logging.warning(f"平均窗格時長 {avg_window_duration_config}s 相對於降採樣頻率 {down_freq}Hz 過短，無法定義窗格樣本數。")
    
     # ----- 2. 濾波與訊號處理 (逐頻道) -----
     bandpass_cutoff_freqs = config.get("DEFAULT_BANDPASS_CUTOFF")
-    
+    emg_results = defaultdict(dict)
+    emg_results["filename"] = original_filename
     # channel_data_results = {}
-    # 這裡的 col 應該是迭代 processed_emg_columns 的索引，或者直接迭代欄位名
-    for i, emg_col_name in enumerate(processed_emg_columns):
+    # 這裡的 col 應該是迭代 emg_signal_columns 的索引，或者直接迭代欄位名
+    for i, emg_col_name in enumerate(emg_signal_columns):
         emg_col_original_idx = raw_data.columns.get_loc(emg_col_name) # 獲取在 raw_data 中的實際索引
         
         current_sample_freq = 0
@@ -309,10 +328,13 @@ def process_emg_core(
             except ValueError as e:
                  logging.error(f"頻道 {emg_col_name} Notch 濾波 ({notch_cutoff}) 失敗: {e}。Fs={current_sample_freq}")
                  continue # 跳過這個壞掉的 notch
-        
         # Abs
-        abs_signal = np.abs(notched_signal)
-        lowpass_cutoff_freq = config.get("DEFAULT_LOWPASS_FREQ")
+        if perform_notch:
+            abs_signal = np.abs(notched_signal)
+        else:
+            abs_signal = np.abs(bandpassed_signal)
+            
+        lowpass_cutoff_freq = config.get("DEFAULT_LOWPASS_FREQ", 6)
 
         # Lowpass
         try:
@@ -343,9 +365,63 @@ def process_emg_core(
         if len(lowpassed_signal) > 0:
             resampled_lowpass = signal.resample(lowpassed_signal, downsample_len_global)
             lowpass_filtered_data_df.iloc[:, i] = resampled_lowpass[:downsample_len_global]
+            emg_results["Smoothing"][emg_col_name] = resampled_lowpass[:downsample_len_global]
         else:
             lowpass_filtered_data_df.iloc[:, i] = np.zeros(downsample_len_global)
+        
+        # ----- 新增：計算時間窗格平均值 -----
+        if averaged_data_df is not None and num_averaged_points_global > 0:
+            signal_to_average = resampled_lowpass # 此時長度為 downsample_len_global
+            # current_effective_fs_for_avg = down_freq # 降採樣後的有效 Fs
+            
+            # samples_per_avg_window_global 已在前面計算過
+            # num_averaged_points_global 也已在前面計算過 (即 num_windows)
 
+            averaged_values_for_channel = []
+            if samples_per_avg_window_global > 0 and len(signal_to_average) >= samples_per_avg_window_global :
+                for win_idx in range(num_averaged_points_global): # 迭代預期數量的窗格
+                    segment_start = win_idx * samples_per_avg_window_global
+                    segment_end = (win_idx + 1) * samples_per_avg_window_global
+                    # 確保 segment_end 不超過 signal_to_average 的長度
+                    # 雖然理論上 num_averaged_points_global * samples_per_avg_window_global <= len(signal_to_average)
+                    window_segment = signal_to_average[segment_start:min(segment_end, len(signal_to_average))]
+                    
+                    if len(window_segment) > 0:
+                        # 處理窗格內可能的 NaN 值 (例如來自失敗的降採樣)
+                        if np.all(np.isnan(window_segment)):
+                            mean_value = np.nan
+                        else:
+                            mean_value = np.nanmean(window_segment) # nanmean 會忽略 NaN
+                        averaged_values_for_channel.append(mean_value)
+                    else:
+                        # 如果因邊界條件導致窗格為空(理論上不應發生在此循環結構)
+                        averaged_values_for_channel.append(np.nan) 
+            else: # 訊號不足一個窗格，或窗格樣本數為0 (前面已有log)
+                 averaged_values_for_channel = [np.nan] * num_averaged_points_global
+
+
+            # 填充到 DataFrame，確保長度一致
+            if len(averaged_values_for_channel) == num_averaged_points_global:
+                averaged_data_df.iloc[:, i] = averaged_values_for_channel
+                emg_results["AverageData"][emg_col_name] = averaged_values_for_channel
+                time_axis = np.arange(len(averaged_values_for_channel))
+                # 計算趨勢線的斜率
+                slope, intercept, r_value, p_value, std_err = linregress(time_axis, averaged_values_for_channel)
+            elif len(averaged_values_for_channel) < num_averaged_points_global: # 如果產生值較少
+                temp_array = np.full(num_averaged_points_global, np.nan)
+                temp_array[:len(averaged_values_for_channel)] = averaged_values_for_channel
+                averaged_data_df.iloc[:, i] = temp_array
+                emg_results["AverageData"][emg_col_name] = temp_array
+                time_axis = np.arange(len(temp_array))
+                # 計算趨勢線的斜率
+                slope, intercept, r_value, p_value, std_err = linregress(time_axis, temp_array)
+            else: # 如果產生值較多 (不應發生)
+                averaged_data_df.iloc[:, i] = averaged_values_for_channel[:num_averaged_points_global]
+        
+        emg_results["SamplingRate"][emg_col_name] = current_sample_freq
+        # 儲存趨勢線的斜率
+        emg_results["Amplitudes_Slope"][emg_col_name] = slope
+        
 
     # ----- 3. 插入時間軸 -----
     # down_freq 是降採樣後的目標頻率
@@ -359,14 +435,14 @@ def process_emg_core(
 
     # ----- 回傳 -----
     if smoothing_method == "lowpass":
-        return lowpass_filtered_data_df, notch_filtered_data_df
+        return emg_results
     # elif smoothing_method == "rms":
     #     # return rms_data, bandpass_filtered_data_df (需要實作 RMS)
     # elif smoothing_method == "moving":
     #     # return moving_data, bandpass_filtered_data_df (需要實作 Moving Mean)
     else:
         logging.warning(f"不支援的平滑方法: {smoothing_method}，預設回傳 lowpass 結果。")
-        return lowpass_filtered_data_df, notch_filtered_data_df
+        # return lowpass_filtered_data_df, notch_filtered_data_df
     
 # %%
 def calculate_fft_for_emg(
@@ -560,7 +636,7 @@ def calculate_fft_for_emg(
 
     # ----- 初始化結果 DataFrame -----
     # 欄位名稱使用處理後的 EMG 欄位名
-    processed_emg_columns = emg_signal_columns
+    emg_signal_columns = emg_signal_columns
     
     # ----- 2. 濾波與訊號處理 (逐頻道) -----
     bandpass_cutoff_freqs = config.get("DEFAULT_BANDPASS_CUTOFF")
@@ -568,16 +644,15 @@ def calculate_fft_for_emg(
     fft_results = defaultdict(dict)
     fft_results["filename"] = original_filename
     # channel_data_results = {}
-    # 這裡的 col 應該是迭代 processed_emg_columns 的索引，或者直接迭代欄位名
-    for i, emg_col_name in enumerate(processed_emg_columns):
+    # 這裡的 col 應該是迭代 emg_signal_columns 的索引，或者直接迭代欄位名
+    for i, emg_col_name in enumerate(emg_signal_columns):
         emg_col_original_idx = raw_data.columns.get_loc(emg_col_name) # 獲取在 raw_data 中的實際索引
         
         current_sample_freq = 0
         data_to_filter = None
 
         if '.csv' in data_file_path:
-            # 重新計算該頻道的 sample_freq (或者使用之前計算的 Fs_global，如果假設所有頻道一致)
-            # 原碼中是重新計算的
+            # 重新計算該頻道的 sample_freq 
             time_series_for_fs = raw_data.iloc[:, emg_col_original_idx-1] # 再次獲取時間序列
             if len(time_series_for_fs) < 11:
                 current_sample_freq = Fs_global # Fallback or raise error
@@ -1149,7 +1224,7 @@ def plot_multiple_mdf_over_time(list_of_fft_results_data,
             ax.xaxis.set_major_locator(MaxNLocator(nbins=7, integer=False)) # 允許非整數時間點
             ax.yaxis.set_major_locator(MaxNLocator(nbins=6, integer=False)) # MDF可以是浮點數
             ax.grid(True, linestyle=':', linewidth=0.5, alpha=0.7)
-            # ax.legend(fontsize=8)
+            ax.legend(fontsize=10)
             ax.tick_params(axis='both', labelsize=12)
             if max_time_for_subplot > 0 :
                 ax.set_xlim(0, max_time_for_subplot) # 加一點緩衝
@@ -1174,6 +1249,198 @@ def plot_multiple_mdf_over_time(list_of_fft_results_data,
         except Exception as e:
             print(f"設置 supxlabel/supylabel 時出錯: {e}")
             
+    plt.show()
+# %%
+# list_of_averaged_data = [averaged_df, averaged_df_1, averaged_df_2]
+# dataset_labels = ['55g', '65g', "60g"]
+def plot_multiple_averaged_data_over_time(
+    list_of_averaged_data,
+    configs,
+    max_subplot_cols=2,
+    title_name=None,
+    dataset_labels=None,
+    y_axis_label="Averaged EMG Amplitude (AU)",
+    show_trendline=True # New parameter to control trendline plotting
+):
+    """
+    Plots time-windowed averaged EMG data from multiple datasets.
+
+    Parameters:
+    - list_of_averaged_data (list or pd.DataFrame): A list of Pandas DataFrames,
+        where each DataFrame is an 'averaged_data_df' (e.g., from process_emg_core).
+        Each DataFrame must have a 'time' column as the first column, and
+        subsequent columns representing EMG channels with their averaged values.
+        If a single DataFrame is passed, it will be treated as a single dataset.
+    - max_subplot_cols (int): Maximum number of subplots per row.
+    - title_name (str, optional): Overall title for the figure.
+    - dataset_labels (list of str, optional): Labels for each dataset, for the legend.
+        Should match the order and number of DataFrames in list_of_averaged_data.
+    - y_axis_label (str): Label for the Y-axis of the subplots.
+    - show_trendline (bool): If True, calculates and plots a linear trendline for each series.
+    """
+
+    # --- 1. Input Validation and Standardization ---
+    if not list_of_averaged_data:
+        print("No averaged data provided for plotting.")
+        return
+
+    if isinstance(list_of_averaged_data, dict):
+        list_of_averaged_data = [list_of_averaged_data]
+        if dataset_labels and not isinstance(dataset_labels, list):
+            dataset_labels = [dataset_labels]
+        elif dataset_labels and len(dataset_labels) != 1:
+            print("Warning: dataset_labels count mismatch for a single DataFrame input. Ignoring labels.")
+            dataset_labels = None
+
+    # if not all(isinstance(df, dict) for df in list_of_averaged_data):
+    #     print("Error: All items in list_of_averaged_data must be Pandas DataFrames.")
+    #     return
+
+    # Prepare dataset labels
+    if dataset_labels:
+        if len(dataset_labels) != len(list_of_averaged_data):
+            print("Warning: dataset_labels count does not match the number of datasets. Using default labels.")
+            dataset_labels = None
+    if not dataset_labels:
+        dataset_labels = [f'Dataset {i+1}' for i in range(len(list_of_averaged_data))]
+
+    
+    # --- 2. 收集所有唯一的、包含有效 MDF 數據的頻道名稱 ---
+    # 先收集所有數據集中所有可能的頻道
+    
+    all_valid_channel_names = set()
+    for emg_results in list_of_averaged_data:
+        if "AverageData" in emg_results and emg_results["AverageData"]:
+            all_valid_channel_names.update(emg_results["AverageData"].keys())
+       
+    # 對於每個潛在頻道，檢查是否至少有一個數據集包含該頻道的有效MDF數據
+    for channel_name in all_valid_channel_names:
+        has_valid_data_for_channel = False
+        for emg_results in list_of_averaged_data:
+            mdf_values = emg_results.get("AverageData", {}).get(channel_name)
+            if mdf_values is not None and isinstance(mdf_values, (list, np.ndarray)) and \
+               len(mdf_values) > 0 and any(not np.isnan(x) for x in mdf_values if x is not None): # 檢查非空且至少有一個非NaN值
+                has_valid_data_for_channel = True
+                break
+        if has_valid_data_for_channel:
+            all_valid_channel_names.add(channel_name)
+    
+    if not all_valid_channel_names:
+        print("在所有數據集中均未找到有效的 MDF 數據頻道。")
+        return
+
+    sorted_channel_names = sorted(list(all_valid_channel_names))
+    num_unique_channels = len(sorted_channel_names)
+
+    # --- 3. Subplot Layout Calculation ---
+    cols = min(max_subplot_cols, num_unique_channels)
+    rows = math.ceil(num_unique_channels / cols)
+
+    # --- 4. Figure and Axes Creation ---
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 7, rows * 5), squeeze=False)
+
+    # Overall figure title
+    if title_name:
+        fig_title_text = f"Time-Windowed Averaged EMG: {title_name}"
+    elif len(list_of_averaged_data) == 1 and dataset_labels:
+        fig_title_text = f"Time-Windowed Averaged EMG: {dataset_labels[0]}"
+    else:
+        fig_title_text = "Time-Windowed Averaged EMG: Multiple Datasets"
+    
+    title_y_adjust = 0.98
+    if rows > 1: title_y_adjust = 1 - 0.04 * (1/rows + 0.05)
+    elif num_unique_channels == 0: title_y_adjust = 0.95
+    fig.suptitle(fig_title_text, fontsize=20, y=title_y_adjust)
+
+
+    # --- 5. Main Plotting Loop ---
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    plot_colors = [prop_cycle.by_key()['color'][i % len(prop_cycle.by_key()['color'])]
+                   for i in range(len(list_of_averaged_data))]
+
+    for i, channel_name in enumerate(sorted_channel_names):
+        row_idx = i // cols
+        col_idx = i % cols
+        ax = axs[row_idx, col_idx]
+        ax.set_title(f"{channel_name}", fontsize=16)
+
+        max_time_for_subplot = 0
+        found_data_for_channel_in_any_dataset = False
+
+        # for dataset_idx, avg_df in enumerate(list_of_averaged_data):
+        for dataset_idx, (emg_results, config_item) in enumerate(zip(list_of_averaged_data, configs)):
+            dataset_label = dataset_labels[dataset_idx]
+            color = plot_colors[dataset_idx % len(plot_colors)]
+
+            if channel_name in avg_df["AverageData"].keys():
+                duration = config_item.get("DURATION", 1) 
+                time_axis = np.arange(0, duration, len(avg_df[channel_name])//duration)
+                mdf_values_list = emg_results.get("AverageData", {}).get(channel_name)
+                # channel_data = avg_df[channel_name]
+
+                # Remove NaNs for plotting and trendline
+                valid_indices = ~np.isnan(channel_data) & ~np.isnan(time_axis) # also ensure time is not nan
+                time_clean = time_axis[valid_indices]
+                data_clean = channel_data[valid_indices]
+
+                if not data_clean.empty:
+                    found_data_for_channel_in_any_dataset = True
+                    if not time_clean.empty:
+                         max_time_for_subplot = max(max_time_for_subplot, time_clean.max())
+
+                    # Plot the averaged data
+                    ax.plot(time_clean, data_clean, marker='o', linestyle='-', linewidth=1,
+                            markersize=3, color=color, label=f"{dataset_label}", alpha=0.8)
+
+                    # Calculate and plot trendline if enabled and enough data
+                    if show_trendline and len(data_clean) >= 2:
+                        try:
+                            slope, intercept, r_value, p_value, std_err = linregress(time_clean, data_clean)
+                            trendline = intercept + slope * time_clean
+                            ax.plot(time_clean, trendline, linewidth=1.5, color=color, linestyle='--',
+                                    label=f"{dataset_label} - Slope: {slope:.2f}", alpha=0.6)
+                        except ValueError as e:
+                            print(f"Could not calculate trendline for {dataset_label}, {channel_name}: {e}")
+                # else:
+                #     print(f"No valid data for {dataset_label}, channel {channel_name} after NaN removal.")
+            # else:
+            #     print(f"Channel {channel_name} or 'time' not found in dataset {dataset_label}.")
+
+
+        if not found_data_for_channel_in_any_dataset:
+            ax.text(0.5, 0.5, "No valid data", ha='center', va='center', color='gray', fontsize=12)
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.tick_params(axis='both', labelsize=10)
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=7, integer=False))
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=6)) # Y-axis might be float
+            ax.grid(True, linestyle=':', linewidth=0.5, alpha=0.7)
+            ax.legend(fontsize=8)
+            if max_time_for_subplot > 0:
+                ax.set_xlim(0, max_time_for_subplot * 1.05)
+            else: # If only one point or no time extent
+                ax.set_xlim(0, 1)
+
+
+    # --- 6. Clean Up Unused Subplots ---
+    for i in range(num_unique_channels, rows * cols):
+        row_idx = i // cols
+        col_idx = i % cols
+        if row_idx < axs.shape[0] and col_idx < axs.shape[1]: # Check bounds
+            fig.delaxes(axs[row_idx, col_idx])
+
+    # --- 7. Add Super Labels and Adjust Layout ---
+    plt.tight_layout(rect=[0.02, 0.03, 0.98, title_y_adjust - 0.03]) # Adjust rect for suptitle
+
+    if rows > 0 and cols > 0 :
+        try:
+            fig.supxlabel("Time (s)", fontsize=16, y=0.01)
+            fig.supylabel(y_axis_label, fontsize=16, x=0.01 if cols > 1 else 0.04)
+        except Exception as e:
+            print(f"Error setting sup-labels: {e}")
+
+    # --- 8. Show Plot ---
     plt.show()
 # %%
 

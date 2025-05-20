@@ -168,9 +168,9 @@ data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Ma
 # data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_1.c3d"
 # data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_2.c3d"
 
-df, metadata, excldueCen_grouped_df, standardized_speeds, results_c3d = pre.pro_main(data_path, MOTION_CONFIG, EMG_CONFIG)
-df_1, metadata_1, excldueCen_grouped_df_1, standardized_speeds_1, results_c3d_1 = pre.pro_main(data_path_1, MOTION_CONFIG, EMG_CONFIG)
-df_2, metadata_2, excldueCen_grouped_df_2, standardized_speeds_2, results_c3d_2 = pre.pro_main(data_path_2, MOTION_CONFIG, EMG_CONFIG)
+df, metadata, excldueCen_df, standardized_speeds, results_c3d, averaged_df = pre.pro_main(data_path, MOTION_CONFIG, EMG_CONFIG)
+df_1, metadata_1, excldueCen_df_1, standardized_speeds_1, results_c3d_1, averaged_df_1 = pre.pro_main(data_path_1, MOTION_CONFIG, EMG_CONFIG)
+df_2, metadata_2, excldueCen_df_2, standardized_speeds_2, results_c3d_2, averaged_df_2 = pre.pro_main(data_path_2, MOTION_CONFIG, EMG_CONFIG)
 
 # %%
 
@@ -180,11 +180,11 @@ all_configs = [EMG_CONFIG, EMG_CONFIG, EMG_CONFIG]
 labels = ['55g', '65g', "60g"] # 可選的自定義標籤
 
 # 繪圖 median frequency
-emg.plot_multiple_mdf_over_time(all_fft_data, 
-                                all_configs, 
+emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[results_c3d, results_c3d_1, results_c3d_2], 
+                                configs=[EMG_CONFIG, EMG_CONFIG, EMG_CONFIG], 
                                 max_subplot_cols=2, 
                                 title_name="Muscle Fatigue Analysis",
-                                dataset_labels=labels)
+                                dataset_labels=['55g', '65g', "60g"])
 # 繪製瞄準速度取線
 pre.plot_standardized_signals_cloud_compare(
     datasets=[standardized_speeds, standardized_speeds_1, standardized_speeds_2],
@@ -196,7 +196,17 @@ pre.plot_standardized_signals_cloud_compare(
     labels=['55g', '65g', "60g"],
     # labels=None,                
     # color_indices=[0, 2, 4]          
-      )    
+      )
+
+emg.plot_multiple_averaged_data_over_time(
+    list_of_averaged_data = [averaged_df, averaged_df_1, averaged_df_2],
+    configs=[EMG_CONFIG, EMG_CONFIG, EMG_CONFIG],
+    max_subplot_cols=2,
+    title_name=None,
+    dataset_labels=['55g', '65g', "60g"],
+    y_axis_label="Averaged EMG Amplitude (AU)",
+    show_trendline=True # New parameter to control trendline plotting
+)
 # %%
 
 """
