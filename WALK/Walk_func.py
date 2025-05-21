@@ -8,98 +8,14 @@ import re
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-import seaborn as sns # 可選，用於更美觀的圖表
 import numpy as np
+from scipy.signal import butter, filtfilt 
 
 plt.rcParams['font.sans-serif'] =  ['Noto Sans TC']  # 微軟正黑體
 plt.rcParams['axes.unicode_minus'] = False  # 正常顯示負號
 
-# %%
-
-INPUT_DIRECTORY = r'C:\Users\User\Downloads\範例檔-20250519T142424Z-1-001\範例檔\S1皮爾森相關分析範例'  # 例如: 'C:/Users/YourUser/Documents/ExcelData'
-OUTPUT_DIRECTORY = r'C:\Users\User\Downloads\範例檔-20250519T142424Z-1-001\範例檔\S1_ProcessedData'      # 例如: 'C:/Users/YourUser/Documents/ProcessedData'
-FILENAME_KEYWORD = 'GOLF'                     # 例如: 檔名中包含 'report' 的才處理
 
 
-
-# 定義要繪圖的欄位及圖表類型
-# x_col: X軸欄位
-# y_col: Y軸欄位
-# plot_type: 'scatter' (散佈圖), 'line' (折線圖)
-# title_suffix: 圖表標題的後綴
-
-# --- 設定結束 ---
-
-# --- 如何在您的主流程中使用 ---
-
-# 假設這是您定義的公式字典
-CAL_FORMULAS = {
-    "right 前後": "=(D2-D$2)+J$2",
-    "right 左右": "=-(C2-C$2)+I2",
-    "left 前後": "=(F2-F$2)+H$2", # 假設 D$2 已被正確解析並放入環境
-    "left 左右": "=(E2-E$2)+G$2"
-}
-col_name_map = { 
-    "D": "plate 1 COPY analog",
-    "J": "right_cop_y(mm)",
-    "C": "plate 1 COPX analog",
-    "I": "right_cop_x(mm)",
-    "F": "plate 2 COPY analog",
-    "H": "left_cop_y(mm)",
-    "E": "plate 2 COPX analog",
-    "G": "left_cop_x(mm)",
-    "O": "right 前後",      # "right 前後" 是 DataFrame 中的一個欄位名
-    "J": "right_cop_y(mm)", # "right_cop_y(mm)" 是 DataFrame 中的一個欄位名
-    "Q": "right 左右",      # "right 左右" 是 DataFrame 中的一個欄位名
-    "I": "right_cop_x(mm)",  # "right_cop_x(mm)" 是 DataFrame 中的一個欄位名
-    "B": "SI time(s)",
-    "S": "left 前後",
-    "U": "left 左右",
-    
-    }
-
-person_corr = {
-    "right 前後_cor": ["O", "J"], # 這裡的 "O", "J" 是您定義的代號
-    "right 左右_cor": ["Q", "I"],  # 這裡的 "Q", "I" 是您定義的代號
-    "left 前後_cor": ["S", "G"],
-    "left 左右_cor": ["U", "G"]
-}
-
-# 繪圖設定字典範例
-PLOTS_CONFIG = {
-    "right 前後": { # 這個鍵會部分用於子圖標題或檔案名
-        "x_col_key": "SI time(s)",      # 對應 col_name_map 中的 X 軸欄位代號
-        "y1_col_key": "right 前後",  # 對應 col_name_map 中的 Y1 軸欄位代號
-        "y2_col_key": "right_cop_y(mm)",  # 對應 col_name_map 中的 Y2 軸欄位代號
-        "title": "right 前後", # 子圖的完整標題
-        "xlabel": "時間 (秒)",             # X 軸標籤 (可選)
-        # "ylabel": "感測器讀數"             # Y 軸標籤 (可選)
-    },
-    "right 左右": {
-        "x_col_key": "SI time(s)",
-        "y1_col_key": "right 左右",
-        "y2_col_key": "right_cop_x(mm)",
-        "title": "right 左右"
-    },
-    
-    "left 前後": {
-        "x_col_key": "SI time(s)",
-        "y1_col_key": "left 前後",
-        "y2_col_key": "left_cop_y(mm)",
-        "title": "left 前後"
-    },
-    
-    "left 左右": {
-        "x_col_key": "SI time(s)",
-        "y1_col_key": "left 左右",
-        "y2_col_key": "left_cop_x(mm)",
-        "title": "left 前後",
-    }
-    
-}
-
-col_name_mapping = col_name_map
-plots_config = PLOTS_CONFIG
 # %%
 
 def parse_excel_expression_recursively(expression_str, df, eval_locals, col_name_map): # <--- 新增 col_name_map
@@ -186,7 +102,7 @@ def find_if_components(expression_if_body):
     false_str = expression_if_body[comma_indices[1]+1:].strip()
     return cond_str, true_str, false_str
 
-
+# %%
 def apply_excel_formulas_v4(df_input, formulas_dict, col_name_map): # <--- 新增 col_name_map
     df = df_input.copy()
     # 建立 eval 函式的局部變數環境
@@ -333,7 +249,7 @@ def calculate_custom_correlations(df, person_corr_config, col_name_mapping):
     print("自訂相關係數計算完成。")
     return all_correlation_results
 # %%
-def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, original_filename_base):
+def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, filename):
     """
     根據提供的設定，為 DataFrame 中的資料建立包含多個子圖的圖表，
     每個子圖可以繪製兩條線。
@@ -345,7 +261,7 @@ def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, origi
                              "xlabel", "ylabel" 的字典。
         col_name_mapping (dict): 將 plots_config 中的 *_col_key 映射到 df 中實際欄位名稱的字典。
         output_dir (str): 儲存輸出圖片的資料夾路徑。
-        original_filename_base (str): 原始檔案的基本名稱 (不含副檔名)，用於命名輸出的圖片。
+        filename (str): 原始檔案的基本名稱 (不含副檔名)，用於命名輸出的圖片。
 
     Returns:
         str or None: 成功儲存圖片則回傳圖片檔案路徑，否則回傳 None。
@@ -483,16 +399,17 @@ def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, origi
     # 自動調整子圖佈局以避免重疊
     try:
         fig.tight_layout(rect=[0, 0, 1, 0.96]) # rect=[0, 0, 1, 0.96] 為了給主標題留空間
-        fig.suptitle(f"{original_filename_base} - 圖表分析", fontsize=16)
+        fig.suptitle(f"{filename} - 圖表分析", fontsize=16)
     except Exception as e:
         print(f"  警告: tight_layout 失敗: {e}")
 
 
     # 儲存整個圖表
-    plot_output_filename = f"{original_filename_base}_custom_plots.png"
+    plot_output_filename = f"{filename}_custom_plots.png"
     plot_output_path = os.path.join(output_dir, plot_output_filename)
     try:
         plt.savefig(plot_output_path)
+        plt.show()
         print(f"  多子圖圖表已儲存至: {plot_output_path}")
         plt.close(fig) # 關閉圖形以釋放記憶體
         return plot_output_path
@@ -548,22 +465,141 @@ def Read_File(file_path, file_type, subfolder=None):
 
 
 # %%
-df = df.iloc[:, :10]
-excel_path = r"C:\Users\User\Downloads\範例檔-20250519T142424Z-1-001\範例檔\S1皮爾森相關分析範例\S1_GOLF_1 FP&SI extra v2.xlsx"
+
+
+def apply_butterworth_filter(df, columns_to_filter_keys, col_name_mapping,
+                             cutoff_freq, sampling_freq, order=4, filter_type='low'):
+    """
+    對 DataFrame 中的指定欄位應用 Butterworth 濾波器。
+
+    Args:
+        df (pd.DataFrame): 輸入的 DataFrame。
+        columns_to_filter_keys (set or list): 包含要濾波的欄位「代號」的集合或列表。
+                                             這些代號將透過 col_name_mapping 轉換。
+        col_name_mapping (dict): 將代號映射到 DataFrame 中實際欄位名稱的字典。
+        cutoff_freq (float): 濾波器的截止頻率 (Hz)。
+        sampling_freq (float): 訊號的取樣頻率 (Hz)。
+        order (int, optional): 濾波器的階數。預設為 4。
+        filter_type (str, optional): 濾波器類型，可以是 'low' (低通), 'high' (高通),
+                                     'bandpass' (帶通), 或 'bandstop' (帶阻)。
+                                     如果是 'bandpass' 或 'bandstop'，cutoff_freq 應為
+                                     一個包含兩個元素的列表或元組 [lowcut, highcut]。
+                                     預設為 'low' (低通)。
+
+    Returns:
+        pd.DataFrame: 包含濾波後欄位的 DataFrame 副本。
+                      濾波後的欄位會覆蓋原始欄位。
+    """
+    print(f"\n執行 Butterworth {filter_type}pass 濾波...")
+    df_filtered = df.copy()
+    # df_filtered = df_1.copy()
+    nyquist_freq = 0.5 * sampling_freq
+
+    if not isinstance(columns_to_filter_keys, (set, list)):
+        print("  錯誤: 'columns_to_filter_keys' 必須是集合或列表。")
+        return df # 回傳原始 df
+    if not isinstance(col_name_mapping, dict):
+        print("  錯誤: 'col_name_mapping' 必須是字典。")
+        return df
+
+    for key in columns_to_filter_keys:
+        actual_col_name = key
+
+        if not actual_col_name:
+            print(f"  警告: 代號 '{key}' 在 col_name_mapping 中找不到對應的實際欄位名，跳過濾波。")
+            continue
+
+        if actual_col_name not in df_filtered.columns:
+            print(f"  警告: 實際欄位 '{actual_col_name}' (代號 '{key}') 在 DataFrame 中找不到，跳過濾波。")
+            continue
+
+        if not pd.api.types.is_numeric_dtype(df_filtered[actual_col_name]):
+            print(f"  警告: 實際欄位 '{actual_col_name}' (代號 '{key}') 非數值型，無法濾波，已跳過。")
+            continue
+        
+        # 處理 NaN 值，例如使用前一個有效值填充或插值
+        # 這裡使用 forward fill 然後 backfill，您也可以選擇其他策略如 .interpolate()
+        # filtfilt 對 NaN 敏感
+        original_series = df_filtered[actual_col_name].copy()
+        if original_series.isnull().any():
+            print(f"  資訊: 欄位 '{actual_col_name}' 包含 NaN 值，將嘗試使用 ffill 和 bfill 填充後進行濾波。")
+            df_filtered[actual_col_name] = df_filtered[actual_col_name].ffill().bfill()
+            if df_filtered[actual_col_name].isnull().any(): # 如果填充後仍有 NaN (例如整欄都是 NaN)
+                print(f"  警告: 欄位 '{actual_col_name}' 填充後仍包含 NaN，無法濾波，已跳過。")
+                df_filtered[actual_col_name] = original_series # 還原
+                continue
+
+
+        # 設計濾波器
+        # 對於低通和高通，wn 是單個值；對於帶通和帶阻，wn 是 [lowcut, highcut]
+        if filter_type in ['low', 'high']:
+            if not isinstance(cutoff_freq, (int, float)):
+                print(f"  錯誤: 對於 '{filter_type}' 濾波器，cutoff_freq 必須是單個數值。跳過欄位 '{actual_col_name}'。")
+                df_filtered[actual_col_name] = original_series # 還原
+                continue
+            normalized_cutoff = cutoff_freq / nyquist_freq
+            if not (0 < normalized_cutoff < 1):
+                print(f"  錯誤: 正規化截止頻率 ({normalized_cutoff:.4f}) 必須介於 0 和 1 之間。請檢查 cutoff_freq ({cutoff_freq} Hz) 和 sampling_freq ({sampling_freq} Hz)。跳過欄位 '{actual_col_name}'。")
+                df_filtered[actual_col_name] = original_series # 還原
+                continue
+            b, a = butter(order, normalized_cutoff, btype=filter_type, analog=False)
+        elif filter_type in ['bandpass', 'bandstop']:
+            if not (isinstance(cutoff_freq, (list, tuple)) and len(cutoff_freq) == 2):
+                print(f"  錯誤: 對於 '{filter_type}' 濾波器，cutoff_freq 必須是包含兩個數值的列表/元組 [low, high]。跳過欄位 '{actual_col_name}'。")
+                df_filtered[actual_col_name] = original_series # 還原
+                continue
+            lowcut, highcut = cutoff_freq
+            normalized_low = lowcut / nyquist_freq
+            normalized_high = highcut / nyquist_freq
+            if not (0 < normalized_low < 1 and 0 < normalized_high < 1 and normalized_low < normalized_high):
+                print(f"  錯誤: 正規化截止頻率 ([{normalized_low:.4f}, {normalized_high:.4f}]) 必須介於 0 和 1 之間，且 low < high。請檢查 cutoff_freq ({cutoff_freq} Hz) 和 sampling_freq ({sampling_freq} Hz)。跳過欄位 '{actual_col_name}'。")
+                df_filtered[actual_col_name] = original_series # 還原
+                continue
+            b, a = butter(order, [normalized_low, normalized_high], btype=filter_type, analog=False)
+        else:
+            print(f"  錯誤: 不支援的濾波器類型 '{filter_type}'。跳過欄位 '{actual_col_name}'。")
+            df_filtered[actual_col_name] = original_series # 還原
+            continue
+        
+        # (可選) 繪製頻率響應曲線
+        # w, h = freqz(b, a, worN=8000)
+        # plt.figure()
+        # plt.plot(0.5*sampling_freq*w/np.pi, np.abs(h), 'b')
+        # plt.title(f"Butterworth Filter Frequency Response for {actual_col_name}")
+        # plt.xlabel('Frequency [Hz]')
+        # plt.ylabel('Gain')
+        # plt.grid()
+        # plt.show()
+
+        # 應用濾波器 (filtfilt 進行零相位濾波)
+        try:
+            filtered_signal = filtfilt(b, a, df_filtered[actual_col_name])
+            df_filtered[actual_col_name] = filtered_signal
+            print(f"  欄位 '{actual_col_name}' (代號 '{key}') 已成功濾波。")
+        except ValueError as ve: # filtfilt 對輸入資料長度有要求
+            print(f"  錯誤: 對欄位 '{actual_col_name}' (代號 '{key}') 應用 filtfilt 時發生錯誤: {ve}。資料長度可能太短。跳過濾波。")
+            df_filtered[actual_col_name] = original_series # 還原
+            
+    print("Butterworth 濾波完成。")
+    return df_filtered
+
 # %%
 
-def process_file(excel_path, CAL_FORMULAS, col_name_map):
+def process_file(data_path, CAL_FORMULAS, col_name_map,
+                 person_corr, PLOTS_CONFIG, filter_col,
+                 OUTPUT_DIRECTORY,
+                 NeedFilter=True):
     """
     處理單個 Excel 檔案：欄位運算、計算相關係數、輸出結果、繪圖。
     """
     # print(f"--- 正在處理檔案: {original_filename} ---")
     try:
-        df = pd.read_excel(excel_path)
+        df = pd.read_excel(data_path)
     except FileNotFoundError:
-        print(f"錯誤: 找不到檔案 {excel_path}")
+        print(f"錯誤: 找不到檔案 {data_path}")
         return
     except Exception as e:
-        print(f"讀取 Excel 檔案 {excel_path} 時發生錯誤: {e}")
+        print(f"讀取 Excel 檔案 {data_path} 時發生錯誤: {e}")
         return
     
     if df is not None and CAL_FORMULAS: # 確保 df 已載入且有公式要處理
@@ -572,14 +608,29 @@ def process_file(excel_path, CAL_FORMULAS, col_name_map):
             df_1 = apply_excel_formulas_v4(df, CAL_FORMULAS, col_name_map)
         except Exception as e:
             print(f"  處理自動化公式時發生嚴重錯誤: {e}")
-
+    # 取得含副檔名的檔名
+    file_name_with_ext = os.path.basename(data_path)  # → "S1_GOLF_1 FP&SI extra v2.xlsx"
+    
+    # 取得不含副檔名的檔名
+    file_name = os.path.splitext(file_name_with_ext)[0]  # → "S1_GOLF_1 FP&SI extra v2"
+    # 2. 將資料濾波
+    if NeedFilter:
+        df_1 = apply_butterworth_filter(df_1,
+                                        filter_col,
+                                        col_name_map,
+                                        cutoff_freq = 25,
+                                        sampling_freq = 100,
+                                        order=4,
+                                        filter_type='low')
+        processed_output_filename = f"{os.path.splitext(file_name)[0]}_Filtered.xlsx"
+    else:
+        processed_output_filename = f"{os.path.splitext(file_name)[0]}_NoFiltered.xlsx"
     # 3. 計算其中數個欄位間的相關係數
     all_correlation_results = calculate_custom_correlations(df_1, person_corr, col_name_map)
 
-
     # 4. 輸出欄位運算後的資料
     print("\n輸出運算後的資料...")
-    processed_output_filename = f"{os.path.splitext(original_filename)[0]}_processed.xlsx"
+    
     processed_output_path = os.path.join(OUTPUT_DIRECTORY, processed_output_filename)
     try:
         df.to_excel(processed_output_path, index=False)
@@ -588,6 +639,6 @@ def process_file(excel_path, CAL_FORMULAS, col_name_map):
         print(f"  儲存運算後的資料時發生錯誤: {e}")
     
     # 資料繪圖 
-    create_custom_subplots(df_1, PLOTS_CONFIG, col_name_map, OUTPUT_DIRECTORY, original_filename_base="123")
+    create_custom_subplots(df_1, PLOTS_CONFIG, col_name_map, OUTPUT_DIRECTORY, filename=processed_output_filename)
     
     return all_correlation_results
