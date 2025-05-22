@@ -24,7 +24,8 @@ import Walk_func as func
 # --- 請修改以下設定 ---
 INPUT_DIRECTORY = r'D:\Hsin\NTSU_lab\WALK\範例檔-20250519T142424Z-1-001\範例檔\S1皮爾森相關分析範例\\'  # 例如: 'C:/Users/YourUser/Documents/ExcelData'
 OUTPUT_DIRECTORY = r'D:\Hsin\NTSU_lab\WALK\範例檔-20250519T142424Z-1-001\範例檔\S1_ProcessedData\\'      # 例如: 'C:/Users/YourUser/Documents/ProcessedData'
-FILENAME_KEYWORD = ['GOLF', 'WALK']                     # 例如: 檔名中包含 'report' 的才處理
+FILENAME_KEYWORD = ['GOLF', 'WALK', "JUMP"]                     # 例如: 檔名中包含 'report' 的才處理
+FILENAME_KEYWORD = ['GOLF', 'WALK', "JUMP"]                     # 例如: 檔名中包含 'report' 的才處理
 
 # excel_path = r"C:\Users\User\Downloads\範例檔-20250519T142424Z-1-001\範例檔\S1皮爾森相關分析範例\S1_GOLF_1 FP&SI extra v2.xlsx"
 
@@ -66,10 +67,10 @@ filter_col = {
 
 # Person correleration setting
 person_corr = {
-    "right 前後_cor": ["O", "J"], # 這裡的 "O", "J" 是您定義的代號
-    "right 左右_cor": ["Q", "I"],  # 這裡的 "Q", "I" 是您定義的代號
-    "left 前後_cor": ["S", "G"],
-    "left 左右_cor": ["U", "G"]
+    "right 前後_cor": ["N", "J"], # 這裡的 "O", "J" 是您定義的代號
+    "right 左右_cor": ["P", "I"],  # 這裡的 "Q", "I" 是您定義的代號
+    "left 前後_cor": ["R", "H"],
+    "left 左右_cor": ["T", "G"]
 }
 
 # 繪圖設定字典範例

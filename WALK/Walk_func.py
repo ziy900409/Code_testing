@@ -604,7 +604,7 @@ def process_file(data_path, CAL_FORMULAS, col_name_map,
     
     if df is not None and CAL_FORMULAS: # 確保 df 已載入且有公式要處理
         try:
-            df = df.iloc[:, :10]
+            # df = df.iloc[:, :10]
             df_1 = apply_excel_formulas_v4(df, CAL_FORMULAS, col_name_map)
         except Exception as e:
             print(f"  處理自動化公式時發生嚴重錯誤: {e}")
