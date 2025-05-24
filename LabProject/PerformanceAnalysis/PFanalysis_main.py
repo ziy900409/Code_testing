@@ -7,7 +7,8 @@ Created on Mon May  5 13:38:36 2025
 
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
+# sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
+sys.path.append(r"D:\git\Code_testing\LabProject\PerformanceAnalysis")
 import pandas as pd
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -18,7 +19,7 @@ import numpy as np
 import pre_processing as pre
 import calculate_func as cal
 import emg_function as emg
-
+import PFanalysis_core as core
 
 # %% parameters setting
 
@@ -104,9 +105,9 @@ csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
                      'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
 
 c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
-                     'FleRad': 'Flexor Carpi Radialis',
+                      'FleRad': 'Flexor Carpi Radialis',
                      'Triceps': 'Triceps Brachii',
-                     'Triceps': 'Triceps Brachii',
+                      'Triceps': 'Triceps Brachii',
                      'ExtUlnar': 'Extensor Carpi Ulnaris',
                      'ExtUlnar': 'Extensor Carpi Ulnaris',
                      'DorInter': '1st Dorsal Interosseous', 
@@ -116,18 +117,16 @@ c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
                      'Biceps': 'Biceps Brachii',
                      }
 
-c3d_analog_cha = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
-                  "Biceps", "Triceps"]
+c3d_analog_cha = [#"ExtRad", "FleRad",
+                  "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
+                  #"Biceps", "Triceps"
+                  ]
 
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
                'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
 
 # %%
-
-
-data_file_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
-
 
 EMG_CONFIG = {
     "DEFAULT_DOWNSAMPLE_FREQ": 1000,
@@ -155,58 +154,105 @@ MOTION_CONFIG = {
 # config = APP_CEMG_CONFIGONFIG
 
 # %%
+"""
+單一滑鼠
 
+選擇檔案模式
+mouse A
+1. before file: spider shot 30s
+2. fatigue test: spider shot 180s
+3. after file: spider shot
+
+mouse B
+1. before file: spider shot 30s
+2. fatigue test: spider shot 180s
+3. after file: spider shot
+
+mouse C
+1. before file: spider shot 30s
+2. fatigue test: spider shot 180s
+3. after file: spider shot
+
+mouse D
+1. before file: spider shot 30s
+2. fatigue test: spider shot 180s
+3. after file: spider shot
+"""
 
 
 # %%
 
-data_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
-data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
-data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
+# before_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
+# fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
+# after_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
 
+pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
+fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
+pos_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
 # data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_EC2_3.c3d"
 # data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_1.c3d"
 # data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_2.c3d"
 
-df, metadata, excldueCen_df, standardized_speeds, results_c3d, averaged_df = pre.pro_main(data_path, MOTION_CONFIG, EMG_CONFIG)
-df_1, metadata_1, excldueCen_df_1, standardized_speeds_1, results_c3d_1, averaged_df_1 = pre.pro_main(data_path_1, MOTION_CONFIG, EMG_CONFIG)
-df_2, metadata_2, excldueCen_df_2, standardized_speeds_2, results_c3d_2, averaged_df_2 = pre.pro_main(data_path_2, MOTION_CONFIG, EMG_CONFIG)
+pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path, MOTION_CONFIG, EMG_CONFIG)
+fati_results_c3d, fati_emg_results = core.fatigue_main(fatigue_path, MOTION_CONFIG, EMG_CONFIG)
+pos_df, pos_metadata, pos_excldueCen_df, pos_standardized_speeds, pos_fft_results, pos_emg_results = core.pro_main(pos_path, MOTION_CONFIG, EMG_CONFIG)
 
-# %%
+# %% 單個結果
+"""
+單支滑鼠
+fig:
+    A. 時序圖
+        1. 視角移動速度曲線
+        2. 肌肉活化時序圖
+    B. 柱狀圖
+        1. 肌肉活化程度斜率
+        2. 中頻率斜率
+    
+"""
 
 # 將多個結果放入列表
-all_fft_data = [results_c3d, results_c3d_1, results_c3d_2]
-all_configs = [EMG_CONFIG, EMG_CONFIG, EMG_CONFIG]
-labels = ['55g', '65g', "60g"] # 可選的自定義標籤
+all_fft_data = [pre_fft_results, pos_fft_results]
+all_configs = [EMG_CONFIG, EMG_CONFIG]
+labels = ['55g', '60g'] # 可選的自定義標籤
 
 # 繪圖 median frequency
-emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[results_c3d, results_c3d_1, results_c3d_2], 
-                                configs=[EMG_CONFIG, EMG_CONFIG, EMG_CONFIG], 
+emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[pre_fft_results, pos_fft_results], 
+                                configs=[EMG_CONFIG, EMG_CONFIG], 
                                 max_subplot_cols=2, 
                                 title_name="Muscle Fatigue Analysis",
-                                dataset_labels=['55g', '65g', "60g"])
+                                dataset_labels=['55g', "60g"])
+
+
+# 繪圖 median frequency
+emg.plot_multiple_emg_data_over_time(list_of_emg_data=[pre_emg_results, pos_emg_results], 
+                                configs=[EMG_CONFIG, EMG_CONFIG], 
+                                max_subplot_cols=2, 
+                                title_name="Muscle Fatigue Analysis",
+                                dataset_labels=['55g', "60g"])
 # 繪製瞄準速度取線
 pre.plot_standardized_signals_cloud_compare(
-    datasets=[standardized_speeds, standardized_speeds_1, standardized_speeds_2],
+    datasets=[pre_standardized_speeds, pos_standardized_speeds],
     target_length=101,
     title="Comparison of Mean ± Std Dev Clouds",
     xlabel="Normalized Time (%)",
     ylabel="Signal Value (°/s or other units)",
     # title="Sine Group Mean ± Std Dev",
-    labels=['55g', '65g', "60g"],
+    labels=['55g', "60g"],
     # labels=None,                
     # color_indices=[0, 2, 4]          
       )
 
 emg.plot_multiple_averaged_data_over_time(
-    list_of_averaged_data = [averaged_df, averaged_df_1, averaged_df_2],
-    configs=[EMG_CONFIG, EMG_CONFIG, EMG_CONFIG],
+    list_of_averaged_data = [pre_emg_results, pos_emg_results],
+    configs=[EMG_CONFIG, EMG_CONFIG],
     max_subplot_cols=2,
     title_name=None,
-    dataset_labels=['55g', '65g', "60g"],
+    dataset_labels=['55g', "60g"],
     y_axis_label="Averaged EMG Amplitude (AU)",
     show_trendline=True # New parameter to control trendline plotting
 )
+
+
 # %%
 
 """

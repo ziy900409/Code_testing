@@ -1253,8 +1253,8 @@ def plot_multiple_mdf_over_time(list_of_fft_results_data,
 # %%
 # list_of_averaged_data = [averaged_df, averaged_df_1, averaged_df_2]
 # dataset_labels = ['55g', '65g', "60g"]
-def plot_multiple_averaged_data_over_time(
-    list_of_averaged_data,
+def plot_multiple_emg_data_over_time(
+    list_of_emg_data,
     configs,
     max_subplot_cols=2,
     title_name=None,
@@ -1280,12 +1280,12 @@ def plot_multiple_averaged_data_over_time(
     """
 
     # --- 1. Input Validation and Standardization ---
-    if not list_of_averaged_data:
+    if not list_of_emg_data:
         print("No averaged data provided for plotting.")
         return
 
-    if isinstance(list_of_averaged_data, dict):
-        list_of_averaged_data = [list_of_averaged_data]
+    if isinstance(list_of_emg_data, dict):
+        list_of_emg_data = [list_of_emg_data]
         if dataset_labels and not isinstance(dataset_labels, list):
             dataset_labels = [dataset_labels]
         elif dataset_labels and len(dataset_labels) != 1:
@@ -1298,25 +1298,25 @@ def plot_multiple_averaged_data_over_time(
 
     # Prepare dataset labels
     if dataset_labels:
-        if len(dataset_labels) != len(list_of_averaged_data):
+        if len(dataset_labels) != len(list_of_emg_data):
             print("Warning: dataset_labels count does not match the number of datasets. Using default labels.")
             dataset_labels = None
     if not dataset_labels:
-        dataset_labels = [f'Dataset {i+1}' for i in range(len(list_of_averaged_data))]
+        dataset_labels = [f'Dataset {i+1}' for i in range(len(list_of_emg_data))]
 
     
     # --- 2. 收集所有唯一的、包含有效 MDF 數據的頻道名稱 ---
     # 先收集所有數據集中所有可能的頻道
     
     all_valid_channel_names = set()
-    for emg_results in list_of_averaged_data:
+    for emg_results in list_of_emg_data:
         if "AverageData" in emg_results and emg_results["AverageData"]:
             all_valid_channel_names.update(emg_results["AverageData"].keys())
        
     # 對於每個潛在頻道，檢查是否至少有一個數據集包含該頻道的有效MDF數據
     for channel_name in all_valid_channel_names:
         has_valid_data_for_channel = False
-        for emg_results in list_of_averaged_data:
+        for emg_results in list_of_emg_data:
             mdf_values = emg_results.get("AverageData", {}).get(channel_name)
             if mdf_values is not None and isinstance(mdf_values, (list, np.ndarray)) and \
                len(mdf_values) > 0 and any(not np.isnan(x) for x in mdf_values if x is not None): # 檢查非空且至少有一個非NaN值
@@ -1342,7 +1342,7 @@ def plot_multiple_averaged_data_over_time(
     # Overall figure title
     if title_name:
         fig_title_text = f"Time-Windowed Averaged EMG: {title_name}"
-    elif len(list_of_averaged_data) == 1 and dataset_labels:
+    elif len(list_of_emg_data) == 1 and dataset_labels:
         fig_title_text = f"Time-Windowed Averaged EMG: {dataset_labels[0]}"
     else:
         fig_title_text = "Time-Windowed Averaged EMG: Multiple Datasets"
@@ -1356,7 +1356,7 @@ def plot_multiple_averaged_data_over_time(
     # --- 5. Main Plotting Loop ---
     prop_cycle = plt.rcParams['axes.prop_cycle']
     plot_colors = [prop_cycle.by_key()['color'][i % len(prop_cycle.by_key()['color'])]
-                   for i in range(len(list_of_averaged_data))]
+                   for i in range(len(list_of_emg_data))]
 
     for i, channel_name in enumerate(sorted_channel_names):
         row_idx = i // cols
@@ -1367,25 +1367,25 @@ def plot_multiple_averaged_data_over_time(
         max_time_for_subplot = 0
         found_data_for_channel_in_any_dataset = False
 
-        # for dataset_idx, avg_df in enumerate(list_of_averaged_data):
-        for dataset_idx, (emg_results, config_item) in enumerate(zip(list_of_averaged_data, configs)):
+        # for dataset_idx, avg_df in enumerate(list_of_emg_data):
+        for dataset_idx, (emg_results, config_item) in enumerate(zip(list_of_emg_data, configs)):
             dataset_label = dataset_labels[dataset_idx]
             color = plot_colors[dataset_idx % len(plot_colors)]
 
-            if channel_name in avg_df["AverageData"].keys():
+            if channel_name in all_valid_channel_names:
                 duration = config_item.get("DURATION", 1) 
-                time_axis = np.arange(0, duration, len(avg_df[channel_name])//duration)
+                time_axis = np.arange(0, len(emg_results["AverageData"][channel_name]), duration)
                 mdf_values_list = emg_results.get("AverageData", {}).get(channel_name)
-                # channel_data = avg_df[channel_name]
+                channel_data = np.array(emg_results["AverageData"][channel_name])
 
                 # Remove NaNs for plotting and trendline
-                valid_indices = ~np.isnan(channel_data) & ~np.isnan(time_axis) # also ensure time is not nan
+                valid_indices = ~np.isnan(channel_data)
                 time_clean = time_axis[valid_indices]
                 data_clean = channel_data[valid_indices]
 
-                if not data_clean.empty:
+                if len(data_clean) > 0:
                     found_data_for_channel_in_any_dataset = True
-                    if not time_clean.empty:
+                    if len(time_clean) > 0:
                          max_time_for_subplot = max(max_time_for_subplot, time_clean.max())
 
                     # Plot the averaged data
