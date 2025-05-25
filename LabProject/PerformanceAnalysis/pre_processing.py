@@ -1456,8 +1456,10 @@ def standardize_group_signals(df, filtered_grouped_df, signal_column_name,
 
 # %%
 
-def excludeCenter(df: pd.DataFrame, grouped_df: pd.DataFrame,
-                  yaw_range: float = 10, pitch_range: float = 10,
+def excludeCenter(df: pd.DataFrame,
+                  grouped_df: pd.DataFrame,
+                  yaw_range: float = 10,
+                  pitch_range: float = 10,
                   show: bool = True) -> pd.DataFrame:
     """
     Filters kill action groups, retaining only those whose endpoint is outside the central view area.

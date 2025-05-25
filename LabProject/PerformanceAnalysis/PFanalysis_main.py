@@ -20,6 +20,7 @@ import pre_processing as pre
 import calculate_func as cal
 import emg_function as emg
 import PFanalysis_core as core
+import plot_table as ta
 
 # %% parameters setting
 
@@ -215,20 +216,10 @@ all_fft_data = [pre_fft_results, pos_fft_results]
 all_configs = [EMG_CONFIG, EMG_CONFIG]
 labels = ['55g', '60g'] # 可選的自定義標籤
 
-# 繪圖 median frequency
-emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[pre_fft_results, pos_fft_results], 
-                                configs=[EMG_CONFIG, EMG_CONFIG], 
-                                max_subplot_cols=2, 
-                                title_name="Muscle Fatigue Analysis",
-                                dataset_labels=['55g', "60g"])
+oneshot_df = pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]
 
 
-# 繪圖 median frequency
-emg.plot_multiple_emg_data_over_time(list_of_emg_data=[pre_emg_results, pos_emg_results], 
-                                configs=[EMG_CONFIG, EMG_CONFIG], 
-                                max_subplot_cols=2, 
-                                title_name="Muscle Fatigue Analysis",
-                                dataset_labels=['55g', "60g"])
+
 # 繪製瞄準速度取線
 pre.plot_standardized_signals_cloud_compare(
     datasets=[pre_standardized_speeds, pos_standardized_speeds],
@@ -242,17 +233,98 @@ pre.plot_standardized_signals_cloud_compare(
     # color_indices=[0, 2, 4]          
       )
 
-emg.plot_multiple_averaged_data_over_time(
-    list_of_averaged_data = [pre_emg_results, pos_emg_results],
-    configs=[EMG_CONFIG, EMG_CONFIG],
+# 繪圖 median frequency
+emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[fati_results_c3d], 
+                                configs=[EMG_CONFIG], 
+                                max_subplot_cols=2, 
+                                title_name="Muscle Fatigue Analysis",
+                                dataset_labels=['fatigue'],
+                                selected_keys = [
+                                'Biceps.IM EMG8', 'Triceps.IM EMG9', 'DorInter_1st.IM EMG4', 'AbdDigMin.IM EMG5'
+                                ]
+                                )
+
+emg.plot_multiple_emg_data_over_time(
+    list_of_emg_data = [fati_emg_results],
+    configs=[EMG_CONFIG],
     max_subplot_cols=2,
     title_name=None,
-    dataset_labels=['55g', "60g"],
+    dataset_labels=['fatigue'],
     y_axis_label="Averaged EMG Amplitude (AU)",
-    show_trendline=True # New parameter to control trendline plotting
+    show_trendline=True, # New parameter to control trendline plotting
+    selected_keys = [
+        'Biceps.IM EMG8', 'Triceps.IM EMG9', 'DorInter_1st.IM EMG4', 'AbdDigMin.IM EMG5'
+        ]
 )
 
+interpolated_data = emg.process_emg_data_with_direction(oneshot_df,
+                                                        pre_emg_results,
+                                                        dataset_labels=None,
+                                                        selected_keys = None)
+# %% 繪製肌肉活化程度曲線
+    
+plotter_instance = emg.EMGPlotter(interpolated_data,
+                                  target_length=141)
 
+# --- 調用新的多行雲圖繪製功能 ---
+
+# 示例 1: 只有一組肌肉 (一行，兩個子圖 Left/Right)
+# muscles_to_plot_fig1 = {
+#     "Arm Muscles": ['Biceps.IM EMG8', 'Triceps.IM EMG9', 'NonExistentMuscle'] # 包含一個不存在的肌肉以測試過濾
+# }
+# print(f"\nPlotting cloud summary for: {muscles_to_plot_fig1}")
+# plotter_instance.plot_emg_summary_by_direction_with_cloud(
+#     muscle_groups_to_plot=muscles_to_plot_fig1,
+#     main_title="EMG Activity: Arm Muscles (X: -40 to 100)",
+#     share_y_axis=True
+# )
+
+# 示例 2: 兩組肌肉 (兩行，每行兩個子圖 Left/Right)
+muscles_to_plot_fig2 = {
+    "Upper Limb": ['Biceps.IM EMG8', 'Triceps.IM EMG9'],
+    "Hand Intrinsic": ['DorInter.IM EMG4', 'AbdDigMin.IM EMG5']
+}
+print(f"\nPlotting cloud summary for: {muscles_to_plot_fig2}")
+plotter_instance.plot_emg_summary_by_direction_with_cloud(
+    muscle_groups_to_plot=muscles_to_plot_fig2,
+    main_title="EMG Activity: Upper Limb & Hand (X: -40 to 100)",
+    share_y_axis=False # 嘗試 share_y_axis=False 來看看效果
+)
+
+# 示例 3: 包含空肌肉列表的行 (應跳過該行)
+# muscles_to_plot_fig3 = {
+#     "Valid Arm Muscles": ['Biceps.IM EMG8'],
+#     "Empty Hand Group": [],
+#     "Another Valid Group": ['Triceps.IM EMG9']
+# }
+# print(f"\nPlotting cloud summary for: {muscles_to_plot_fig3}")
+# plotter_instance.plot_emg_summary_by_direction_with_cloud(
+#     muscle_groups_to_plot=muscles_to_plot_fig3,
+#     main_title="EMG Activity: Testing Empty Group (X: -40 to 100)",
+#     # share_y_axis=True
+# )
+# %% 繪製柱狀圖
+
+group1 = pre_fft_results["MedianFreq_Slope"]
+group2 = pos_fft_results["MedianFreq_Slope"]
+
+ta.plot_median_freq_slope_comparison(group1, group2,
+                                     selected_keys=[
+                                         "ExtRad.IM EMG1", "Triceps.IM EMG9", "Biceps.IM EMG8"
+                                         ],
+                                     title="Median Frequency Slope Comparison",
+                                     label_list=["pre", "pos"],
+                                     show_values=False)
+
+group1 = pre_emg_results["Amplitudes_Slope"]
+group2 = pos_emg_results["Amplitudes_Slope"]
+ta.plot_median_freq_slope_comparison(group1, group2,
+                                     selected_keys=[
+                                         "ExtRad.IM EMG1", "Triceps.IM EMG9", "Biceps.IM EMG8"
+                                         ],
+                                     title="Muscle Activation Slope Comparison",
+                                     label_list=["pre", "pos"],
+                                     show_values=False)
 # %%
 
 """

@@ -14,7 +14,7 @@ import io # 用於處理記憶體中的檔案
 from flask import Flask, request, jsonify
 import json
 import os
-
+from typing import List, Dict, Optional, Any, Set, Tuple  # Added Set for type hinting
 from scipy.fft import fft, fftfreq # 使用 scipy.fft
 
 from collections import defaultdict
@@ -25,6 +25,7 @@ plt.rcParams['font.sans-serif'] =  ['Noto Sans TC']  # 微軟正黑體
 plt.rcParams['axes.unicode_minus'] = False  # 正常顯示負號
 from scipy.stats import linregress
 from matplotlib.ticker import MaxNLocator
+from scipy.interpolate import interp1d # 需要導入
 
 
 # %%
@@ -1050,7 +1051,8 @@ def plot_multiple_mdf_over_time(list_of_fft_results_data,
                                 configs,
                                 max_subplot_cols=2,
                                 title_name=None,
-                                dataset_labels=None):
+                                dataset_labels=None,
+                                selected_keys: list = None):
     """
     接收一個或多個 FFT 分析結果的列表，並繪製 MDF 時程圖。
     每個頻道一個子圖，每個子圖可包含來自多個數據集的 MDF 時程線及趨勢線。
@@ -1118,7 +1120,13 @@ def plot_multiple_mdf_over_time(list_of_fft_results_data,
         print("在所有數據集中均未找到有效的 MDF 數據頻道。")
         return
 
-    sorted_channel_names = sorted(list(all_valid_channel_names))
+    # 可以設定需要繪圖的keys()
+    if selected_keys:
+        sorted_channel_names = [k for k in selected_keys if k in all_valid_channel_names]
+    else:
+        # sorted_channel_names = sorted(valid_channels)
+        sorted_channel_names = sorted(list(all_valid_channel_names))    
+
     num_unique_channels = len(sorted_channel_names)
 
     # --- 3. 子圖佈局 ---
@@ -1260,7 +1268,8 @@ def plot_multiple_emg_data_over_time(
     title_name=None,
     dataset_labels=None,
     y_axis_label="Averaged EMG Amplitude (AU)",
-    show_trendline=True # New parameter to control trendline plotting
+    show_trendline=True, # New parameter to control trendline plotting
+    selected_keys: list = None
 ):
     """
     Plots time-windowed averaged EMG data from multiple datasets.
@@ -1328,8 +1337,15 @@ def plot_multiple_emg_data_over_time(
     if not all_valid_channel_names:
         print("在所有數據集中均未找到有效的 MDF 數據頻道。")
         return
+    
+    # 可以設定需要繪圖的keys()
+    if selected_keys:
+        sorted_channel_names = [k for k in selected_keys if k in all_valid_channel_names]
+    else:
+        # sorted_channel_names = sorted(valid_channels)
+        sorted_channel_names = sorted(list(all_valid_channel_names))
 
-    sorted_channel_names = sorted(list(all_valid_channel_names))
+    
     num_unique_channels = len(sorted_channel_names)
 
     # --- 3. Subplot Layout Calculation ---
@@ -1390,7 +1406,7 @@ def plot_multiple_emg_data_over_time(
 
                     # Plot the averaged data
                     ax.plot(time_clean, data_clean, marker='o', linestyle='-', linewidth=1,
-                            markersize=3, color=color, label=f"{dataset_label}", alpha=0.8)
+                            markersize=3, color=color, alpha=0.8)
 
                     # Calculate and plot trendline if enabled and enough data
                     if show_trendline and len(data_clean) >= 2:
@@ -1444,6 +1460,714 @@ def plot_multiple_emg_data_over_time(
     plt.show()
 # %%
 
+
+
+
+def process_emg_data_with_direction(pre_excldueCen_df,
+                                     emg_results,
+                                     dataset_labels=None, # 未使用
+                                     selected_keys: list = None):
+
+    # --- 2. 收集所有唯一的、包含有效 MDF 數據的頻道名稱 ---
+    # 先收集所有數據集中所有可能的頻道
+    all_valid_channel_names = set()
+    
+    # 步驟 2.1: 從 emg_results["Smoothing"] 獲取基礎頻道列表
+    if "Smoothing" in emg_results and emg_results["Smoothing"] and isinstance(emg_results["Smoothing"], dict):
+        all_valid_channel_names.update(emg_results["Smoothing"].keys())
+    else:
+        print("錯誤：emg_results 中缺少 'Smoothing' 鍵，或者其值無效。無法繼續處理。")
+        return {} # 返回空字典表示處理失敗
+
+    # 步驟 2.2: (此部分邏輯有問題，如後續分析)
+    # 對於每個潛在頻道，檢查是否至少有一個數據集包含該頻道的有效MDF數據
+    # --- 問題點 1 & 2 開始 ---
+    # 這段邏輯看起來是想根據 emg_results["AverageData"] 來驗證頻道，但存在幾個問題。
+    # 1. `break` 會導致循環提前終止，只檢查一個頻道。
+    # 2. `all_valid_channel_names.add(channel_name)` 的意圖不明確，因為集合已經包含了來自 "Smoothing" 的鍵。
+    # 3. 如果這個檢查的目的是過濾 `all_valid_channel_names`，則應該創建一個新的集合。
+    # 鑒於後續的插值主要依賴 "Smoothing" 中的數據，此段 AverageData 檢查可能需要重寫或移除，
+    # 除非它有特定且正確實現的用途。
+    # 目前，我將假設主要頻道列表來自 "Smoothing"。
+
+    # 假設我們只基於 "Smoothing" 的鍵和 "selected_keys" 來確定要處理的頻道：
+    # (移除了有問題的 AverageData 檢查循環)
+
+    if not all_valid_channel_names: # 檢查 "Smoothing" 是否提供了任何頻道
+        print("在 emg_results['Smoothing'] 中未找到任何 EMG 頻道。")
+        return {}
+    
+    # 步驟 2.3: 根據 selected_keys 過濾頻道
+    if selected_keys:
+        # 確保 selected_keys 中的頻道確實存在於從 "Smoothing" 獲取的頻道列表中
+        processed_channel_names = [k for k in selected_keys if k in all_valid_channel_names]
+        if not processed_channel_names:
+            print(f"警告：提供的 selected_keys ({selected_keys}) 中的頻道均未在可用頻道中找到。將處理所有可用頻道。")
+            processed_channel_names = sorted(list(all_valid_channel_names))
+    else:
+        processed_channel_names = sorted(list(all_valid_channel_names))
+    
+    if not processed_channel_names:
+        print("沒有可供處理的 EMG 頻道。")
+        return {}
+    # --- 問題點 1 & 2 結束 ---
+
+    pre_emg_results_smoothing = emg_results["Smoothing"] # 確保這是個字典
+
+    # 步驟 3: 找出 pre_excldueCen_df ["Shot Count"] == 1 的欄位
+    # --- 問題點 4 開始 ---
+    # df_shot_one = pre_excldueCen_df # 原始程式碼缺少過濾
+    # 修正：應該根據 'Shot Count' == 1 進行過濾
+    if 'Shot Count' not in pre_excldueCen_df.columns:
+        print("錯誤：'pre_excldueCen_df' 中缺少 'Shot Count' 欄位。")
+        return {}
+    df_shot_one = pre_excldueCen_df[pre_excldueCen_df['Shot Count'] == 1].copy()
+    if df_shot_one.empty:
+        print("在 'pre_excldueCen_df' 中沒有找到 'Shot Count' == 1 的記錄。")
+        return {"right": {}, "left": {}} # 雖然沒有數據，但返回期望的結構
+    # --- 問題點 4 結束 ---
+
+    # 步驟 4: 數據提取、插值與分類
+    interpolated_data = {"right": defaultdict(dict), "left": defaultdict(dict)} # 使用 defaultdict 以簡化後續賦值
+    num_points_interpolated = 141 # 這是您指定的插值點數
+
+    for index, row in df_shot_one.iterrows():
+        group_id = row.get('Group ID', f"UnknownGroup_{index}") # 使用 .get() 避免 KeyError
+        frame_info_val = row.get('Frames')
+        direction_quadrant = row.get('Direction Quadrant')
+        
+        # 統一使用 group_id 作為最外層鍵，符合 EMGPlotter 的預期結構
+        # data_key 將用於 target_group_dict[group_id]
+        
+        if not isinstance(frame_info_val, list) or len(frame_info_val) < 2:
+            print(f"警告：跳過 Group ID {group_id}，因 'Frames' 格式不正確: {frame_info_val}")
+            continue
+        
+        # 新的影格索引起始條件和計算
+        # 確保 frame_info_val[0] 和 frame_info_val[1] 是數字
+        try:
+            start_frame = float(frame_info_val[0])
+            end_frame = float(frame_info_val[1])
+        except (ValueError, TypeError):
+            print(f"警告：跳過 Group ID {group_id}，因 'Frames' 包含非數字值: {frame_info_val}")
+            continue
+
+        if start_frame < 20:
+            print(f"警告：跳過 Group ID {group_id}，因起始影格 ({start_frame}) < 20。")
+            continue
+        
+        emg_start_index = int((start_frame - 20) * 10)
+        emg_end_index = int(end_frame * 10)
+
+        target_group_storage_key = None # "right" or "left"
+        if direction_quadrant in ['Q1', 'Q4']:
+            target_group_storage_key = "right"
+        elif direction_quadrant in ['Q2', 'Q3']:
+            target_group_storage_key = "left"
+        else:
+            print(f"警告：Group ID {group_id} 的方向象限 '{direction_quadrant}' 無效。跳過此 Group。")
+            continue
+        
+        # 創建一個臨時字典來存儲此 group_id 下所有 EMG 通道的插值結果
+        # 結構: {"EMGChannelName1": array, "EMGChannelName2": array}
+        current_group_interpolated_emgs = {}
+
+        # --- 問題點 3 開始 ---
+        # 應遍歷 `processed_channel_names` 而不是 `pre_emg_results_smoothing.items()`
+        # 以確保 `selected_keys` 的過濾生效。
+        for emg_key in processed_channel_names: # 遍歷經過篩選的頻道名稱
+            if emg_key not in pre_emg_results_smoothing:
+                print(f"警告：選擇的頻道 {emg_key} 未在 emg_results['Smoothing'] 中找到。跳過此頻道於 Group {group_id}。")
+                continue
+            emg_full_signal = pre_emg_results_smoothing[emg_key]
+        # --- 問題點 3 結束 ---
+
+            if not isinstance(emg_full_signal, np.ndarray): # 確保信號是 numpy array
+                print(f"警告：頻道 {emg_key} 的數據不是 NumPy 陣列。跳過此頻道於 Group {group_id}。")
+                continue
+
+            actual_end_index = min(emg_end_index + 1, len(emg_full_signal)) # Python 切片不包含末端
+            actual_start_index = min(emg_start_index, actual_end_index) # 確保 start 不超過 end
+            
+            segment = emg_full_signal[actual_start_index:actual_end_index]
+            
+            # cleaned_emg_key 未被使用，emg_key 直接作為字典鍵
+            # cleaned_emg_key = emg_key.replace(' ', '_').replace('.', '') 
+
+            interpolated_sequence = np.full(num_points_interpolated, np.nan) # 預設為 NaN
+
+            if len(segment) < 4: # 三次樣條插值至少需要4個點
+                # print(f"警告：Group {group_id}, EMG {emg_key} 的數據片段長度 ({len(segment)}) < 4。填充為 NaN。")
+                pass # 減少重複的警告信息，因為已經預設為 NaN
+            elif len(segment) == 0:
+                # print(f"警告：Group {group_id}, EMG {emg_key} 的數據片段為空。填充為 NaN。")
+                pass
+            else:
+                x_original = np.linspace(0, 1, num=len(segment))
+                x_new = np.linspace(0, 1, num=num_points_interpolated)
+                try:
+                    interpolator = interp1d(x_original, segment, kind='cubic',
+                                            bounds_error=False, fill_value="extrapolate")
+                    interpolated_sequence = interpolator(x_new)
+                except ValueError as e:
+                    print(f"錯誤：Group {group_id}, EMG {emg_key} 插值失敗: {e}。片段長度: {len(segment)}。填充為 NaN。")
+            
+            current_group_interpolated_emgs[emg_key] = interpolated_sequence # 使用原始 emg_key
+        
+        # 將此 Group 的所有 EMG 插值結果存儲到對應的方向和 Group ID下
+        # 結構: interpolated_data["right"]["Group_1"] = {"EMG1": array, "EMG2": array}
+        if current_group_interpolated_emgs: # 僅當該 group 有處理成功的 EMG 通道時才添加
+            interpolated_data[target_group_storage_key][f"Group_{group_id}"] = current_group_interpolated_emgs
+            
+    return interpolated_data
+
+# # 執行處理
+# processed_data_directional = process_emg_data_with_direction()
+
+# # 輸出結果 (部分範例)
+# print("\n--- Processed Interpolated Data with Direction (Sample) ---")
+# for direction, data_group in processed_data_directional.items():
+#     print(f"\nData for '{direction}' group:")
+#     if not data_group:
+#         print("  No data in this group.")
+#         continue
+#     count = 0
+#     for key, value in data_group.items():
+#         print(f"  '{key}': Array of float64, shape {value.shape}, first 3 values: {np.round(value[:3], 3)}")
+#         count += 1
+#         if count >= 3: # 每個方向組只印出前3個結果作為範例
+#             print("  ...")
+#             break
+# if not any(processed_data_directional.values()):
+#      print("No data was processed. Check filters and input data.")
+     
+# %%
+
+
+
+# -----------------------------------------------------------------------------
+# SECTION 1: CORE PLOTTING FUNCTION (plot_standardized_signals_cloud_compare)
+# -----------------------------------------------------------------------------
+
+def plot_standardized_signals_cloud_compare(
+    datasets: List[Dict[str, np.ndarray]],
+    target_length: int,
+    title: str = "Comparison of Mean ± Std Dev Clouds",
+    xlabel: str = "Normalized Time (-40% to 100%)", # MODIFIED XLABEL to reflect new range
+    ylabel: str = "Signal Value",
+    labels: Optional[List[str]] = None,
+    color_indices: Optional[List[int]] = None
+) -> None:
+    """ Plots mean ± std dev for multiple datasets of standardized signals. """
+    def _calculate_stats(signals_dict: Dict[str, np.ndarray], length: int) -> Optional[tuple]:
+        if not signals_dict or not isinstance(signals_dict, dict): return None
+        
+        valid_signals = [s for s in signals_dict.values() if isinstance(s, np.ndarray) and s.ndim == 1 and s.size == length and not np.all(np.isnan(s))]
+        if not valid_signals: return None
+
+        try:
+            stacked = np.stack(valid_signals, axis=0) 
+            avg = np.nanmean(stacked, axis=0)
+            std = np.nanstd(stacked, axis=0)
+            return avg, avg - std, avg + std, len(valid_signals)
+        except Exception: 
+            return None
+
+    if not isinstance(datasets, list) or not datasets:
+        print("Plotting Error: 'datasets' must be a non-empty list of signal dictionaries.")
+        return
+    
+    num_datasets = len(datasets)
+    if labels is None or len(labels) != num_datasets:
+        labels = [f'Dataset {i+1}' for i in range(num_datasets)]
+    
+    palette = plt.get_cmap('tab10') 
+
+    fig, ax = plt.subplots(figsize=(12, 7)) # Slightly wider for new x-axis range
+    
+    # MODIFICATION: Change x_axis generation and limits
+    x_axis = np.linspace(-40, 100, target_length) # X-axis from -40 to 100
+    
+    plotted_any = False
+
+    for i, signal_collection in enumerate(datasets):
+        stats = _calculate_stats(signal_collection, target_length)
+        if stats:
+            avg_signal, lower_bound, upper_bound, num_trials = stats
+            if color_indices and i < len(color_indices):
+                 color_val = palette(color_indices[i] % palette.N)
+            else: 
+                 color_val = palette(i % palette.N)
+
+            ax.plot(x_axis, avg_signal, color=color_val, label=f'{labels[i]} (n={num_trials})', linewidth=2)
+            ax.fill_between(x_axis, lower_bound, upper_bound, color=color_val, alpha=0.2)
+            plotted_any = True
+        else:
+            print(f"Plotting Info: Could not compute statistics for {labels[i]}. Skipping.")
+
+    if plotted_any:
+        ax.set_title(title, fontsize=15, fontweight='bold')
+        ax.legend(loc="best", fontsize=10)
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.set_xlabel(xlabel, fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=12)
+        
+        # MODIFICATION: Change x-axis limits
+        ax.set_xlim(-40, 100) 
+        
+        ax.tick_params(labelsize=11)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("Plotting Error: No data could be plotted for any dataset.")
+        plt.close(fig)
+
+# -----------------------------------------------------------------------------
+# SECTION 2: EMG PLOTTER CLASS 
+# (Assume __init__, _extract_unique_emg_channels, _calculate_signal_stats are defined as before)
+# Only showing the modified plot_emg_summary_by_direction_with_cloud method
+# and the parts of the class needed for context.
+# -----------------------------------------------------------------------------
+
+# class EMGPlotter:
+#     def __init__(self, processed_data_directional: Dict[str, Dict[str, Dict[str, np.ndarray]]], target_length: int = 101):
+#         if not isinstance(processed_data_directional, dict):
+#             raise ValueError("processed_data_directional must be a dictionary.")
+#         self.data_directional = processed_data_directional
+#         self.target_length = target_length
+#         self._unique_emg_channels = self._extract_unique_emg_channels()
+#         if not self._unique_emg_channels:
+#             print("EMGPlotter Warning: No unique EMG channels found in the provided data.")
+#         else:
+#             print(f"EMGPlotter initialized. Found unique EMG channels: {self._unique_emg_channels}")
+
+#     def _extract_unique_emg_channels(self) -> List[str]:
+#         emg_channels_set: Set[str] = set()
+#         for direction_key, groups_data in self.data_directional.items():
+#             if isinstance(groups_data, dict):
+#                 for group_id, emg_signals_dict in groups_data.items():
+#                     if isinstance(emg_signals_dict, dict):
+#                         for emg_channel_name in emg_signals_dict.keys():
+#                             emg_channels_set.add(emg_channel_name)
+#         return sorted(list(emg_channels_set))
+        
+#     def _calculate_signal_stats(self, signals_dict: Dict[str, np.ndarray]) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, int]]:
+#         if not signals_dict or not isinstance(signals_dict, dict):
+#             return None
+        
+#         valid_signals = [
+#             s for s in signals_dict.values() 
+#             if isinstance(s, np.ndarray) and s.ndim == 1 and s.size == self.target_length and not np.all(np.isnan(s))
+#         ]
+
+#         if not valid_signals:
+#             return None
+
+#         try:
+#             stacked_signals = np.stack(valid_signals, axis=0)
+#             num_valid_signals = stacked_signals.shape[0]
+#             with np.errstate(all='ignore'):
+#                 mean_signal = np.nanmean(stacked_signals, axis=0)
+#                 std_signal = np.nanstd(stacked_signals, axis=0)
+            
+#             if np.all(np.isnan(mean_signal)):
+#                 return None
+#             std_signal = np.nan_to_num(std_signal)
+#             lower_bound = mean_signal - std_signal
+#             upper_bound = mean_signal + std_signal
+#             return mean_signal, lower_bound, upper_bound, num_valid_signals
+#         except Exception as e:
+#             print(f"Plotter Error (_calculate_signal_stats): Could not stack/calculate stats: {e}")
+#             return None
+
+#     def plot_emg_summary_by_direction_with_cloud(
+#         self,
+#         selected_emg_channels: List[str],
+#         main_title: str = "EMG Activity Summary (Mean ± Std Dev)",
+#         y_axis_label: str = "EMG Amplitude (AU)",
+#         x_axis_label: str = "Time (-40 to 100 units)", # MODIFIED XLABEL
+#         share_y_axis: bool = True
+#     ) -> None:
+#         """
+#         繪製兩張子圖 (Right/Left)，每張子圖上以雲圖形式顯示多條選定肌肉的平均 EMG 活動 ± 標準差。
+#         X 軸範圍為 -40 到 100。
+#         """
+#         if not selected_emg_channels:
+#             print("Plotter Info: No EMG channels selected for cloud summary plot.")
+#             return
+        
+#         valid_selected_channels = [ch for ch in selected_emg_channels if ch in self._unique_emg_channels]
+#         if not valid_selected_channels:
+#             print(f"Plotter Info: None of the selected EMG channels {selected_emg_channels} are valid or found.")
+#             return
+        
+#         print(f"Plotter Info: Plotting cloud summary for muscles: {valid_selected_channels}")
+
+#         fig, axs = plt.subplots(1, 2, figsize=(20, 7), sharey=share_y_axis) # Wider figure for new x-axis
+        
+#         # MODIFICATION: Change time_axis generation
+#         time_axis = np.linspace(-40, 100, self.target_length) # X-axis from -40 to 100
+        
+#         palette = plt.get_cmap('tab10')
+
+#         for i, direction in enumerate(["left", "right"]): # Changed order to Left then Right, as per typical subplot indexing
+#             ax = axs[i]
+#             ax.set_title(f"{direction.capitalize()} Group Activity", fontsize=16)
+#             plotted_anything_on_ax = False
+            
+#             current_direction_data = self.data_directional.get(direction, {})
+
+#             for color_idx, emg_channel in enumerate(valid_selected_channels):
+#                 trials_for_this_emg_and_direction: Dict[str, np.ndarray] = {}
+#                 if isinstance(current_direction_data, dict):
+#                     for group_id, group_emg_data in current_direction_data.items():
+#                         if isinstance(group_emg_data, dict) and emg_channel in group_emg_data:
+#                             signal = group_emg_data[emg_channel]
+#                             if isinstance(signal, np.ndarray) and signal.size == self.target_length and not np.all(np.isnan(signal)):
+#                                 trials_for_this_emg_and_direction[group_id] = signal
+                
+#                 if trials_for_this_emg_and_direction:
+#                     stats_result = self._calculate_signal_stats(trials_for_this_emg_and_direction)
+                    
+#                     if stats_result:
+#                         mean_signal, lower_bound, upper_bound, num_trials = stats_result
+#                         color = palette(color_idx % palette.N)
+                        
+#                         ax.plot(time_axis, mean_signal, color=color, label=f'{emg_channel} (n={num_trials})', linewidth=2)
+#                         ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.2)
+#                         plotted_anything_on_ax = True
+
+#             if plotted_anything_on_ax:
+#                 ax.legend(fontsize=9, loc='best')
+#                 ax.set_xlabel(x_axis_label, fontsize=12)
+#                 ax.grid(True, linestyle=':', alpha=0.6)
+                
+#                 # MODIFICATION: Change x-axis limits
+#                 ax.set_xlim(-40, 100)
+                
+#                 ax.tick_params(axis='x', labelsize=10)
+#                 ax.tick_params(axis='y', labelsize=10)
+#                 if i == 0: 
+#                     ax.set_ylabel(y_axis_label, fontsize=12)
+#                 elif share_y_axis: 
+#                     ax.tick_params(axis='y', labelleft=False)
+#             else:
+#                 ax.text(0.5, 0.5, "No data for selected channels", ha="center", va="center", transform=ax.transAxes, color="grey")
+#                 ax.set_xlim(-40, 100) # Also set xlim if no data, for consistency
+#                 if i == 0: ax.set_ylabel(y_axis_label, fontsize=12)
+
+#         fig.suptitle(main_title, fontsize=18, fontweight='bold', y=0.98)
+#         plt.tight_layout(rect=[0.03, 0.03, 0.97, 0.93])
+#         plt.show()
+
+
+
+# # --- 示例數據和用法 ---
+# if __name__ == '__main__':
+#     # (此處應有 plot_multiple_emg_data_over_time 和舊的 plot_standardized_signals_cloud_compare 的完整定義，
+#     #  或者您的 EMGPlotter 類別包含所有需要的方法，如 plot_time_comparison 和
+#     #  plot_cloud_comparison_per_emg_channel（也應更新其 X 軸）。為簡潔起見，這裡省略這些函數的重複粘貼。)
+
+#     processed_data_directional_example = {
+#         "left": { # Changed order for axs[0] to be "left" in the loop
+#             "Group_L1": defaultdict(lambda: np.full(101, np.nan),{
+#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) * 0.8 + 0.4 + np.random.rand(101)*0.15,
+#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) * 0.9 + 0.5 + np.random.rand(101)*0.2,
+#             }),
+#              "Group_L2": defaultdict(lambda: np.full(101, np.nan),{
+#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) -0.1) * 0.85 + 0.45 + np.random.rand(101)*0.22,
+#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101) -0.2) * 0.95 + 0.55 + np.random.rand(101)*0.28,
+#             })
+#         },
+#         "right": {
+#             "Group_R1": defaultdict(lambda: np.full(101, np.nan), {
+#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) + 0.5 + np.random.rand(101)*0.2,
+#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) + 0.6 + np.random.rand(101)*0.3,
+#             }),
+#             "Group_R2": defaultdict(lambda: np.full(101, np.nan),{
+#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) + 0.2) + 0.55 + np.random.rand(101)*0.25,
+#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101) + 0.1) + 0.65 + np.random.rand(101)*0.35,
+#             })
+#         }
+#     }
+#     # processed_data_directional_example = interpolated_data
+#     plotter_instance = EMGPlotter(processed_data_directional_example, target_length=141)
+#     available_channels = plotter_instance._unique_emg_channels
+#     print(f"Available EMG channels: {available_channels}")
+
+#     muscles_to_plot_cloud = []
+#     if "Biceps.IM EMG8" in available_channels: muscles_to_plot_cloud.append("Biceps.IM EMG8")
+#     if "Triceps.IM EMG9" in available_channels: muscles_to_plot_cloud.append("Triceps.IM EMG9")
+    
+#     if not muscles_to_plot_cloud and available_channels:
+#         muscles_to_plot_cloud = available_channels[:1] # Plot first available if selection is empty
+
+#     if muscles_to_plot_cloud:
+#         print(f"\nPlotting new cloud summary for selected muscles: {muscles_to_plot_cloud}")
+#         plotter_instance.plot_emg_summary_by_direction_with_cloud(
+#             selected_emg_channels=muscles_to_plot_cloud,
+#             main_title="EMG Activity Clouds (X-axis: -40 to 100)",
+#             x_axis_label="Time (-40 to 100 units)", # Explicitly set new label
+#             share_y_axis=True
+#         )
+#     else:
+#         print("\nNo suitable EMG channels found in example data.")
+
+    # 重要提示: 如果您也希望 EMGPlotter 類別中的 `plot_cloud_comparison_per_emg_channel`
+    # (為每個肌肉生成單獨圖表，比較 Right vs Left) 方法使用相同的 X 軸範圍 (-40 到 100)，
+    # 您也需要對該方法進行類似的修改 (即更新其內部的 x_axis 和 ax.set_xlim)。
+    # 同樣，如果您在 EMGPlotter 外部直接使用 `plot_standardized_signals_cloud_compare`，
+    # 它現在已經更新。
+    
+import numpy as np
+import matplotlib.pyplot as plt
+# from scipy.stats import linregress # Not used in this specific method, but kept if other methods need it
+import math
+from typing import List, Dict, Optional, Any, Set, Tuple
+from collections import defaultdict
+
+# --- 假設 plot_standardized_signals_cloud_compare (如果您的 EMGPlotter 內部有其他方法直接調用它) ---
+# --- 以及 EMGPlotter 類別的先前定義 (包括 __init__, _extract_unique_emg_channels, _calculate_signal_stats) ---
+# --- 都已經存在於您的程式碼環境中。為簡潔起見，這裡不再重複它們。 ---
+# --- 請確保從前一個回應中複製這些定義。 ---
+
+class EMGPlotter:
+    def __init__(self, processed_data_directional: Dict[str, Dict[str, Dict[str, np.ndarray]]], target_length: int = 101):
+        if not isinstance(processed_data_directional, dict):
+            raise ValueError("processed_data_directional must be a dictionary.")
+        self.data_directional = processed_data_directional
+        self.target_length = target_length
+        self._unique_emg_channels = self._extract_unique_emg_channels()
+        if not self._unique_emg_channels:
+            print("EMGPlotter Warning: No unique EMG channels found in the provided data.")
+        else:
+            print(f"EMGPlotter initialized. Found unique EMG channels: {self._unique_emg_channels}")
+
+    def _extract_unique_emg_channels(self) -> List[str]:
+        emg_channels_set: Set[str] = set()
+        for direction_key, groups_data in self.data_directional.items():
+            if isinstance(groups_data, dict):
+                for group_id, emg_signals_dict in groups_data.items():
+                    if isinstance(emg_signals_dict, dict): # Handles dict or defaultdict
+                        for emg_channel_name in emg_signals_dict.keys():
+                            emg_channels_set.add(emg_channel_name)
+        return sorted(list(emg_channels_set))
+        
+    def _calculate_signal_stats(self, signals_dict: Dict[str, np.ndarray]) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, int]]:
+        if not signals_dict or not isinstance(signals_dict, dict):
+            return None
+        
+        valid_signals = [
+            s for s in signals_dict.values() 
+            if isinstance(s, np.ndarray) and s.ndim == 1 and s.size == self.target_length and not np.all(np.isnan(s))
+        ]
+
+        if not valid_signals:
+            return None
+
+        try:
+            stacked_signals = np.stack(valid_signals, axis=0)
+            num_valid_signals = stacked_signals.shape[0]
+            with np.errstate(all='ignore'): # Suppress warnings for slices with all NaNs
+                mean_signal = np.nanmean(stacked_signals, axis=0)
+                std_signal = np.nanstd(stacked_signals, axis=0)
+            
+            if np.all(np.isnan(mean_signal)): # If mean is all NaNs
+                return None
+            std_signal = np.nan_to_num(std_signal) # Replace NaN std (e.g., if only 1 trial) with 0
+            lower_bound = mean_signal - std_signal
+            upper_bound = mean_signal + std_signal
+            return mean_signal, lower_bound, upper_bound, num_valid_signals
+        except Exception as e:
+            print(f"Plotter Error (_calculate_signal_stats): Could not stack/calculate stats: {e}")
+            return None
+
+    # --- 修改後的繪圖方法 ---
+    def plot_emg_summary_by_direction_with_cloud(
+        self,
+        muscle_groups_to_plot: Dict[str, List[str]], # 新的參數格式
+        main_title: str = "EMG Activity Summary (Mean ± Std Dev)",
+        y_axis_label: str = "EMG Amplitude (AU)",
+        x_axis_label: str = "Time (-40 to 100 units)",
+        share_y_axis: bool = True # Applies to all subplots in the figure if True
+    ) -> None:
+        """
+        根據提供的 muscle_groups_to_plot 字典，繪製多行子圖。
+        每行包含兩個子圖 (Left/Right)，每張子圖上以雲圖形式顯示該行指定的多條肌肉的 EMG 活動。
+        X 軸範圍為 -40 到 100。
+        """
+        if not muscle_groups_to_plot or not isinstance(muscle_groups_to_plot, dict):
+            print("Plotter Info: 'muscle_groups_to_plot' must be a non-empty dictionary.")
+            return
+        
+        num_rows = len(muscle_groups_to_plot)
+        if num_rows == 0:
+            print("Plotter Info: No muscle groups provided for plotting.")
+            return
+
+        fig, axs = plt.subplots(num_rows, 2, 
+                                figsize=(18, 6 * num_rows), # 調整高度以適應行數
+                                sharey=share_y_axis, 
+                                squeeze=False) # squeeze=False 確保 axs 始終是 2D 陣列
+        
+        time_axis = np.linspace(-40, 100, self.target_length) # X-axis from -40 to 100
+        palette = plt.get_cmap('tab10') # Colormap
+
+        for row_idx, (row_title, emg_channels_for_row) in enumerate(muscle_groups_to_plot.items()):
+            if not emg_channels_for_row or not isinstance(emg_channels_for_row, list):
+                print(f"Plotter Warning: Skipping row '{row_title}' due to empty or invalid EMG channel list.")
+                # 可以選擇隱藏這一行的子圖
+                if axs.shape[0] > row_idx: # 檢查 axs 是否已創建足夠的行
+                    if axs.shape[1] > 0: axs[row_idx, 0].set_visible(False)
+                    if axs.shape[1] > 1: axs[row_idx, 1].set_visible(False)
+                continue
+
+            valid_emg_channels_for_row = [ch for ch in emg_channels_for_row if ch in self._unique_emg_channels]
+            if not valid_emg_channels_for_row:
+                print(f"Plotter Info: None of the selected EMG channels for row '{row_title}' ({emg_channels_for_row}) are valid or found. Skipping this row.")
+                if axs.shape[0] > row_idx:
+                    if axs.shape[1] > 0: axs[row_idx, 0].set_visible(False)
+                    if axs.shape[1] > 1: axs[row_idx, 1].set_visible(False)
+                continue
+            
+            print(f"Plotter Info: Plotting row '{row_title}' for muscles: {valid_emg_channels_for_row}")
+
+            for col_idx, direction in enumerate(["left", "right"]):
+                ax = axs[row_idx, col_idx]
+                ax.set_title(f"{direction.capitalize()} Group - {row_title}", fontsize=14)
+                plotted_anything_on_ax = False
+                
+                current_direction_data = self.data_directional.get(direction, {})
+
+                for color_c_idx, emg_channel in enumerate(valid_emg_channels_for_row):
+                    trials_for_this_emg_and_direction: Dict[str, np.ndarray] = {}
+                    if isinstance(current_direction_data, dict):
+                        for group_id, group_emg_data in current_direction_data.items():
+                            if isinstance(group_emg_data, dict) and emg_channel in group_emg_data:
+                                signal = group_emg_data[emg_channel]
+                                if isinstance(signal, np.ndarray) and signal.size == self.target_length and not np.all(np.isnan(signal)):
+                                    trials_for_this_emg_and_direction[group_id] = signal
+                    
+                    if trials_for_this_emg_and_direction:
+                        stats_result = self._calculate_signal_stats(trials_for_this_emg_and_direction)
+                        
+                        if stats_result:
+                            mean_signal, lower_bound, upper_bound, num_trials = stats_result
+                            color = palette(color_c_idx % palette.N) # Color by EMG channel index within this row's list
+                            
+                            ax.plot(time_axis, mean_signal, color=color, label=f'{emg_channel} (n={num_trials})', linewidth=2)
+                            ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.2)
+                            plotted_anything_on_ax = True
+
+                if plotted_anything_on_ax:
+                    ax.legend(fontsize=9, loc='best')
+                    ax.grid(True, linestyle=':', alpha=0.6)
+                    ax.set_xlim(-40, 100)
+                    ax.tick_params(axis='y', labelsize=10)
+                    if row_idx == num_rows - 1: # X 軸標籤只顯示在最底部的子圖
+                        ax.set_xlabel(x_axis_label, fontsize=12)
+                        ax.tick_params(axis='x', labelsize=10)
+                    else: # 隱藏非底部子圖的 X 軸刻度標籤
+                        ax.tick_params(axis='x', labelbottom=False)
+                    
+                    if col_idx == 0: # Y 軸標籤只顯示在最左邊的子圖
+                        ax.set_ylabel(y_axis_label, fontsize=12)
+                    # 如果 share_y_axis=True，matplotlib 會自動處理右邊子圖的 Y 軸刻度標籤是否顯示
+                    # 如果 share_y_axis=False，且 col_idx > 0，則matplotlib也會自動顯示Y軸標籤
+                else:
+                    ax.text(0.5, 0.5, "No data for selected channels", ha="center", va="center", transform=ax.transAxes, color="grey")
+                    ax.set_xlim(-40, 100)
+                    if row_idx == num_rows - 1: ax.set_xlabel(x_axis_label, fontsize=12)
+                    else: ax.tick_params(axis='x', labelbottom=False)
+                    if col_idx == 0: ax.set_ylabel(y_axis_label, fontsize=12)
+
+
+        fig.suptitle(main_title, fontsize=18, fontweight='bold', y=0.99 if num_rows ==1 else 1.00)
+        plt.tight_layout(rect=[0.02, 0.02, 0.98, 0.95 if num_rows >1 else 0.92]) # Adjust rect based on rows
+        plt.show()
+
+    # --- 保留您可能需要的舊方法 ---
+    # def plot_time_comparison(...): ...
+    # def plot_cloud_comparison_per_emg_channel(...): ... 
+    # (這些方法也應該檢查並確保其X軸設定與您的需求一致，如果它們還被使用的話)
+
+# --- 示例數據和用法 ---
+if __name__ == '__main__':
+    # ... (此處應有 plot_multiple_emg_data_over_time 和 plot_standardized_signals_cloud_compare 的完整定義，
+    # 或者您的 EMGPlotter 類別包含所有需要的方法。為簡潔起見，這裡省略這些函數的重複粘貼。)
+    # 確保您的環境中定義了 plot_standardized_signals_cloud_compare，因為 EMGPlotter 的其他方法可能依賴它。
+
+    processed_data_directional_example = {
+        "left": { 
+            "Group_L1": defaultdict(lambda: np.full(101, np.nan),{
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) * 0.8 + 0.4 + np.random.rand(101)*0.15,
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) * 0.9 + 0.5 + np.random.rand(101)*0.2,
+                "DorInter.IM EMG4": np.random.rand(101) * 0.5 + 0.2,
+                "AbdDigMin.IM EMG5": np.random.rand(101) * 0.4 + 0.1,
+            }),
+             "Group_L2": defaultdict(lambda: np.full(101, np.nan),{
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) -0.1) * 0.85 + 0.45 + np.random.rand(101)*0.22,
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101) -0.2) * 0.95 + 0.55 + np.random.rand(101)*0.28,
+                "DorInter.IM EMG4": np.random.rand(101) * 0.55 + 0.22,
+                "AbdDigMin.IM EMG5": np.random.rand(101) * 0.42 + 0.12,
+            })
+        },
+        "right": {
+            "Group_R1": defaultdict(lambda: np.full(101, np.nan), {
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) + 0.5 + np.random.rand(101)*0.2,
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) + 0.6 + np.random.rand(101)*0.3,
+                "DorInter.IM EMG4": np.random.rand(101) * 0.6 + 0.25,
+                "AbdDigMin.IM EMG5": np.random.rand(101) * 0.45 + 0.15,
+            }),
+            "Group_R2": defaultdict(lambda: np.full(101, np.nan),{
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) + 0.2) + 0.55 + np.random.rand(101)*0.25,
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101) + 0.1) + 0.65 + np.random.rand(101)*0.35,
+                "DorInter.IM EMG4": np.random.rand(101) * 0.62 + 0.28,
+                "AbdDigMin.IM EMG5": np.random.rand(101) * 0.48 + 0.18,
+            })
+        }
+    }
+
+    plotter_instance = EMGPlotter(processed_data_directional_example, target_length=101)
+    
+    # --- 調用新的多行雲圖繪製功能 ---
+    
+    # 示例 1: 只有一組肌肉 (一行，兩個子圖 Left/Right)
+    muscles_to_plot_fig1 = {
+        "Arm Muscles": ['Biceps.IM EMG8', 'Triceps.IM EMG9', 'NonExistentMuscle'] # 包含一個不存在的肌肉以測試過濾
+    }
+    print(f"\nPlotting cloud summary for: {muscles_to_plot_fig1}")
+    plotter_instance.plot_emg_summary_by_direction_with_cloud(
+        muscle_groups_to_plot=muscles_to_plot_fig1,
+        main_title="EMG Activity: Arm Muscles (X: -40 to 100)",
+        share_y_axis=True
+    )
+
+    # 示例 2: 兩組肌肉 (兩行，每行兩個子圖 Left/Right)
+    muscles_to_plot_fig2 = {
+        "Upper Limb": ['Biceps.IM EMG8', 'Triceps.IM EMG9'],
+        "Hand Intrinsic": ['DorInter.IM EMG4', 'AbdDigMin.IM EMG5']
+    }
+    print(f"\nPlotting cloud summary for: {muscles_to_plot_fig2}")
+    plotter_instance.plot_emg_summary_by_direction_with_cloud(
+        muscle_groups_to_plot=muscles_to_plot_fig2,
+        main_title="EMG Activity: Upper Limb & Hand (X: -40 to 100)",
+        share_y_axis=True # 嘗試 share_y_axis=False 來看看效果
+    )
+
+    # 示例 3: 包含空肌肉列表的行 (應跳過該行)
+    muscles_to_plot_fig3 = {
+        "Valid Arm Muscles": ['Biceps.IM EMG8'],
+        "Empty Hand Group": [],
+        "Another Valid Group": ['Triceps.IM EMG9']
+    }
+    print(f"\nPlotting cloud summary for: {muscles_to_plot_fig3}")
+    plotter_instance.plot_emg_summary_by_direction_with_cloud(
+        muscle_groups_to_plot=muscles_to_plot_fig3,
+        main_title="EMG Activity: Testing Empty Group (X: -40 to 100)",
+        share_y_axis=True
+    )
+# %%
 # @app.route('/process_emg_signal', methods=['POST'])
 # def handle_emg_processing():
 #     if 'file' not in request.files:

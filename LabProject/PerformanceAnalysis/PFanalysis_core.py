@@ -93,13 +93,15 @@ def pro_main(data_path, motion_config, emg_config):
                                           yaw_range = 10,
                                           pitch_range = 10,
                                           show = True)
+    # 只取一槍命中的數值
+    oneshot_df = excldueCen_grouped_df[excldueCen_grouped_df['Shot Count']==1]
     
     # 做標準化處理
     if not excldueCen_grouped_df.empty:
         try:
             standardized_speeds = pre.standardize_group_signals(
                 df=df,
-                filtered_grouped_df=excldueCen_grouped_df,
+                filtered_grouped_df=oneshot_df,
                 signal_column_name='angle_speed_dps', # 指定要標準化的欄位
                 target_length=101,                   # 指定目標長度
                 start_col='NEW Frame Start',             # 指定起始幀欄位
