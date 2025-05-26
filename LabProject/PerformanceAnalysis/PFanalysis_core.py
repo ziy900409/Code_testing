@@ -19,9 +19,6 @@ import pre_processing as pre
 import calculate_func as cal
 import emg_function as emg
 
-#%%
-
-
 # %%   
 def pro_main(data_path, motion_config, emg_config):
     

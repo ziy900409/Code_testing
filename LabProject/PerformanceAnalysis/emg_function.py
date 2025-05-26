@@ -1460,9 +1460,6 @@ def plot_multiple_emg_data_over_time(
     plt.show()
 # %%
 
-
-
-
 def process_emg_data_with_direction(pre_excldueCen_df,
                                      emg_results,
                                      dataset_labels=None, # 未使用
@@ -1643,8 +1640,6 @@ def process_emg_data_with_direction(pre_excldueCen_df,
      
 # %%
 
-
-
 # -----------------------------------------------------------------------------
 # SECTION 1: CORE PLOTTING FUNCTION (plot_standardized_signals_cloud_compare)
 # -----------------------------------------------------------------------------
@@ -1721,203 +1716,6 @@ def plot_standardized_signals_cloud_compare(
     else:
         print("Plotting Error: No data could be plotted for any dataset.")
         plt.close(fig)
-
-# -----------------------------------------------------------------------------
-# SECTION 2: EMG PLOTTER CLASS 
-# (Assume __init__, _extract_unique_emg_channels, _calculate_signal_stats are defined as before)
-# Only showing the modified plot_emg_summary_by_direction_with_cloud method
-# and the parts of the class needed for context.
-# -----------------------------------------------------------------------------
-
-# class EMGPlotter:
-#     def __init__(self, processed_data_directional: Dict[str, Dict[str, Dict[str, np.ndarray]]], target_length: int = 101):
-#         if not isinstance(processed_data_directional, dict):
-#             raise ValueError("processed_data_directional must be a dictionary.")
-#         self.data_directional = processed_data_directional
-#         self.target_length = target_length
-#         self._unique_emg_channels = self._extract_unique_emg_channels()
-#         if not self._unique_emg_channels:
-#             print("EMGPlotter Warning: No unique EMG channels found in the provided data.")
-#         else:
-#             print(f"EMGPlotter initialized. Found unique EMG channels: {self._unique_emg_channels}")
-
-#     def _extract_unique_emg_channels(self) -> List[str]:
-#         emg_channels_set: Set[str] = set()
-#         for direction_key, groups_data in self.data_directional.items():
-#             if isinstance(groups_data, dict):
-#                 for group_id, emg_signals_dict in groups_data.items():
-#                     if isinstance(emg_signals_dict, dict):
-#                         for emg_channel_name in emg_signals_dict.keys():
-#                             emg_channels_set.add(emg_channel_name)
-#         return sorted(list(emg_channels_set))
-        
-#     def _calculate_signal_stats(self, signals_dict: Dict[str, np.ndarray]) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, int]]:
-#         if not signals_dict or not isinstance(signals_dict, dict):
-#             return None
-        
-#         valid_signals = [
-#             s for s in signals_dict.values() 
-#             if isinstance(s, np.ndarray) and s.ndim == 1 and s.size == self.target_length and not np.all(np.isnan(s))
-#         ]
-
-#         if not valid_signals:
-#             return None
-
-#         try:
-#             stacked_signals = np.stack(valid_signals, axis=0)
-#             num_valid_signals = stacked_signals.shape[0]
-#             with np.errstate(all='ignore'):
-#                 mean_signal = np.nanmean(stacked_signals, axis=0)
-#                 std_signal = np.nanstd(stacked_signals, axis=0)
-            
-#             if np.all(np.isnan(mean_signal)):
-#                 return None
-#             std_signal = np.nan_to_num(std_signal)
-#             lower_bound = mean_signal - std_signal
-#             upper_bound = mean_signal + std_signal
-#             return mean_signal, lower_bound, upper_bound, num_valid_signals
-#         except Exception as e:
-#             print(f"Plotter Error (_calculate_signal_stats): Could not stack/calculate stats: {e}")
-#             return None
-
-#     def plot_emg_summary_by_direction_with_cloud(
-#         self,
-#         selected_emg_channels: List[str],
-#         main_title: str = "EMG Activity Summary (Mean ± Std Dev)",
-#         y_axis_label: str = "EMG Amplitude (AU)",
-#         x_axis_label: str = "Time (-40 to 100 units)", # MODIFIED XLABEL
-#         share_y_axis: bool = True
-#     ) -> None:
-#         """
-#         繪製兩張子圖 (Right/Left)，每張子圖上以雲圖形式顯示多條選定肌肉的平均 EMG 活動 ± 標準差。
-#         X 軸範圍為 -40 到 100。
-#         """
-#         if not selected_emg_channels:
-#             print("Plotter Info: No EMG channels selected for cloud summary plot.")
-#             return
-        
-#         valid_selected_channels = [ch for ch in selected_emg_channels if ch in self._unique_emg_channels]
-#         if not valid_selected_channels:
-#             print(f"Plotter Info: None of the selected EMG channels {selected_emg_channels} are valid or found.")
-#             return
-        
-#         print(f"Plotter Info: Plotting cloud summary for muscles: {valid_selected_channels}")
-
-#         fig, axs = plt.subplots(1, 2, figsize=(20, 7), sharey=share_y_axis) # Wider figure for new x-axis
-        
-#         # MODIFICATION: Change time_axis generation
-#         time_axis = np.linspace(-40, 100, self.target_length) # X-axis from -40 to 100
-        
-#         palette = plt.get_cmap('tab10')
-
-#         for i, direction in enumerate(["left", "right"]): # Changed order to Left then Right, as per typical subplot indexing
-#             ax = axs[i]
-#             ax.set_title(f"{direction.capitalize()} Group Activity", fontsize=16)
-#             plotted_anything_on_ax = False
-            
-#             current_direction_data = self.data_directional.get(direction, {})
-
-#             for color_idx, emg_channel in enumerate(valid_selected_channels):
-#                 trials_for_this_emg_and_direction: Dict[str, np.ndarray] = {}
-#                 if isinstance(current_direction_data, dict):
-#                     for group_id, group_emg_data in current_direction_data.items():
-#                         if isinstance(group_emg_data, dict) and emg_channel in group_emg_data:
-#                             signal = group_emg_data[emg_channel]
-#                             if isinstance(signal, np.ndarray) and signal.size == self.target_length and not np.all(np.isnan(signal)):
-#                                 trials_for_this_emg_and_direction[group_id] = signal
-                
-#                 if trials_for_this_emg_and_direction:
-#                     stats_result = self._calculate_signal_stats(trials_for_this_emg_and_direction)
-                    
-#                     if stats_result:
-#                         mean_signal, lower_bound, upper_bound, num_trials = stats_result
-#                         color = palette(color_idx % palette.N)
-                        
-#                         ax.plot(time_axis, mean_signal, color=color, label=f'{emg_channel} (n={num_trials})', linewidth=2)
-#                         ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.2)
-#                         plotted_anything_on_ax = True
-
-#             if plotted_anything_on_ax:
-#                 ax.legend(fontsize=9, loc='best')
-#                 ax.set_xlabel(x_axis_label, fontsize=12)
-#                 ax.grid(True, linestyle=':', alpha=0.6)
-                
-#                 # MODIFICATION: Change x-axis limits
-#                 ax.set_xlim(-40, 100)
-                
-#                 ax.tick_params(axis='x', labelsize=10)
-#                 ax.tick_params(axis='y', labelsize=10)
-#                 if i == 0: 
-#                     ax.set_ylabel(y_axis_label, fontsize=12)
-#                 elif share_y_axis: 
-#                     ax.tick_params(axis='y', labelleft=False)
-#             else:
-#                 ax.text(0.5, 0.5, "No data for selected channels", ha="center", va="center", transform=ax.transAxes, color="grey")
-#                 ax.set_xlim(-40, 100) # Also set xlim if no data, for consistency
-#                 if i == 0: ax.set_ylabel(y_axis_label, fontsize=12)
-
-#         fig.suptitle(main_title, fontsize=18, fontweight='bold', y=0.98)
-#         plt.tight_layout(rect=[0.03, 0.03, 0.97, 0.93])
-#         plt.show()
-
-
-
-# # --- 示例數據和用法 ---
-# if __name__ == '__main__':
-#     # (此處應有 plot_multiple_emg_data_over_time 和舊的 plot_standardized_signals_cloud_compare 的完整定義，
-#     #  或者您的 EMGPlotter 類別包含所有需要的方法，如 plot_time_comparison 和
-#     #  plot_cloud_comparison_per_emg_channel（也應更新其 X 軸）。為簡潔起見，這裡省略這些函數的重複粘貼。)
-
-#     processed_data_directional_example = {
-#         "left": { # Changed order for axs[0] to be "left" in the loop
-#             "Group_L1": defaultdict(lambda: np.full(101, np.nan),{
-#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) * 0.8 + 0.4 + np.random.rand(101)*0.15,
-#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) * 0.9 + 0.5 + np.random.rand(101)*0.2,
-#             }),
-#              "Group_L2": defaultdict(lambda: np.full(101, np.nan),{
-#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) -0.1) * 0.85 + 0.45 + np.random.rand(101)*0.22,
-#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101) -0.2) * 0.95 + 0.55 + np.random.rand(101)*0.28,
-#             })
-#         },
-#         "right": {
-#             "Group_R1": defaultdict(lambda: np.full(101, np.nan), {
-#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) + 0.5 + np.random.rand(101)*0.2,
-#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) + 0.6 + np.random.rand(101)*0.3,
-#             }),
-#             "Group_R2": defaultdict(lambda: np.full(101, np.nan),{
-#                 "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) + 0.2) + 0.55 + np.random.rand(101)*0.25,
-#                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101) + 0.1) + 0.65 + np.random.rand(101)*0.35,
-#             })
-#         }
-#     }
-#     # processed_data_directional_example = interpolated_data
-#     plotter_instance = EMGPlotter(processed_data_directional_example, target_length=141)
-#     available_channels = plotter_instance._unique_emg_channels
-#     print(f"Available EMG channels: {available_channels}")
-
-#     muscles_to_plot_cloud = []
-#     if "Biceps.IM EMG8" in available_channels: muscles_to_plot_cloud.append("Biceps.IM EMG8")
-#     if "Triceps.IM EMG9" in available_channels: muscles_to_plot_cloud.append("Triceps.IM EMG9")
-    
-#     if not muscles_to_plot_cloud and available_channels:
-#         muscles_to_plot_cloud = available_channels[:1] # Plot first available if selection is empty
-
-#     if muscles_to_plot_cloud:
-#         print(f"\nPlotting new cloud summary for selected muscles: {muscles_to_plot_cloud}")
-#         plotter_instance.plot_emg_summary_by_direction_with_cloud(
-#             selected_emg_channels=muscles_to_plot_cloud,
-#             main_title="EMG Activity Clouds (X-axis: -40 to 100)",
-#             x_axis_label="Time (-40 to 100 units)", # Explicitly set new label
-#             share_y_axis=True
-#         )
-#     else:
-#         print("\nNo suitable EMG channels found in example data.")
-
-    # 重要提示: 如果您也希望 EMGPlotter 類別中的 `plot_cloud_comparison_per_emg_channel`
-    # (為每個肌肉生成單獨圖表，比較 Right vs Left) 方法使用相同的 X 軸範圍 (-40 到 100)，
-    # 您也需要對該方法進行類似的修改 (即更新其內部的 x_axis 和 ax.set_xlim)。
-    # 同樣，如果您在 EMGPlotter 外部直接使用 `plot_standardized_signals_cloud_compare`，
-    # 它現在已經更新。
     
 import numpy as np
 import matplotlib.pyplot as plt
@@ -2266,3 +2064,268 @@ if __name__ == '__main__':
 #     # 啟動 Flask 應用 (僅用於本地測試)
 #     # 在生產環境中，應使用 WSGI 伺服器如 Gunicorn 或 uWSGI
 #     app.run(debug=True, host='0.0.0.0', port=5000)
+
+# %%import numpy as np
+import matplotlib.pyplot as plt
+# from scipy.stats import linregress # 不再需要，因為雲圖主要展示均值和標準差區域
+import math
+from typing import List, Dict, Optional, Any, Set, Tuple
+from collections import defaultdict
+
+# --- 輔助函數 (獨立於任何類別) ---
+def _standalone_get_unique_emg_channels(
+    direction_data: Dict[str, Dict[str, np.ndarray]]
+) -> List[str]:
+    """從單個方向的數據中提取所有唯一的 EMG 頻道名稱。"""
+    emg_channels_set: Set[str] = set()
+    if isinstance(direction_data, dict):
+        for group_id, emg_signals_dict in direction_data.items():
+            if isinstance(emg_signals_dict, dict):
+                for emg_channel_name in emg_signals_dict.keys():
+                    emg_channels_set.add(emg_channel_name)
+    return sorted(list(emg_channels_set))
+
+def _standalone_calculate_emg_stats_for_direction(
+    direction_data: Dict[str, Dict[str, np.ndarray]], # 例如 one_dataset["left"]
+    emg_channels_to_process: List[str],
+    target_length: int
+) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, int]]: # EMGName -> (avg, low_bound, upp_bound, N_trials)
+    """
+    為指定方向數據中的每個 EMG 頻道計算統計數據 (平均值, 標準差上下限, 試驗次數)。
+    """
+    output_stats: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, int]] = {}
+
+    for emg_channel_name in emg_channels_to_process:
+        trials_for_this_emg: Dict[str, np.ndarray] = {} # Key: group_id, Value: signal_array
+        if isinstance(direction_data, dict):
+            for group_id, group_emg_data in direction_data.items():
+                if isinstance(group_emg_data, dict) and emg_channel_name in group_emg_data:
+                    signal = group_emg_data[emg_channel_name]
+                    if isinstance(signal, np.ndarray) and signal.size == target_length and not np.all(np.isnan(signal)):
+                        trials_for_this_emg[group_id] = signal
+        
+        if not trials_for_this_emg:
+            # print(f"Stats Helper: No valid trials for {emg_channel_name} in given direction_data.")
+            continue
+
+        # 計算統計數據
+        valid_signals_list = list(trials_for_this_emg.values())
+        try:
+            stacked = np.stack(valid_signals_list, axis=0) 
+            avg = np.nanmean(stacked, axis=0)
+            std = np.nanstd(stacked, axis=0)
+            num_trials = len(valid_signals_list)
+
+            if np.all(np.isnan(avg)):
+                # print(f"Stats Helper Warning: Mean for {emg_channel_name} is all NaN despite valid trials.")
+                continue # 跳過此 EMG 頻道如果平均值全是 NaN
+            
+            std = np.nan_to_num(std) # 處理 std 可能為 NaN 的情況 (例如只有一個試驗)
+            lower_bound = avg - std
+            upper_bound = avg + std
+            output_stats[emg_channel_name] = (avg, lower_bound, upper_bound, num_trials)
+        except Exception as e:
+            print(f"Stats Helper Error: Calculating stats for {emg_channel_name}: {e}")
+            continue # 出錯則跳過此 EMG 頻道
+            
+    return output_stats
+
+
+# --- 修改後的獨立繪圖函數 (現在繪製雲圖) ---
+def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪製雲圖的功能
+    raw_datasets_list: List[Dict[str, Dict[str, Dict[str, np.ndarray]]]],
+    raw_dataset_labels: List[str],
+    directions_to_process: List[str], # 例如 ["left", "right"]
+    figure_title: str,
+    target_length: int,
+    selected_emg_channels: Optional[List[str]] = None,
+    max_subplot_cols: int = 2,
+    y_axis_label: str = "EMG Amplitude (AU)",
+    x_axis_label: str = "Time (-40 to 100 units)"
+    # show_trendline 參數已移除，因為雲圖的均值線已是主要趨勢
+) -> None:
+    """
+    比較多個 'processed_data_directional' 格式的數據集，以雲圖形式展示。
+    對於每個指定的 EMG 頻道，會在一個子圖上繪製所有數據集（按指定方向聚合後）的對應雲圖。
+    X 軸範圍固定為 -40 到 100。
+    """
+    if not raw_datasets_list or not isinstance(raw_datasets_list, list):
+        print("Plotting Error: 'raw_datasets_list' must be a non-empty list.")
+        return
+    if len(raw_datasets_list) != len(raw_dataset_labels):
+        print("Plotting Error: Length of 'raw_datasets_list' and 'raw_dataset_labels' must match.")
+        return
+    if not directions_to_process:
+        print("Plotting Error: 'directions_to_process' list cannot be empty.")
+        return
+
+    # 1. 準備 "datasets" 以存儲統計數據
+    # 結構: List[{"StatsData": {emg_channel: (avg, low, upp, N)}}]
+    datasets_with_stats: List[Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, int]]]] = []
+    labels_for_stats_datasets: List[str] = []
+    
+    for i, raw_data_dict in enumerate(raw_datasets_list):
+        raw_label_prefix = raw_dataset_labels[i]
+        for direction in directions_to_process:
+            data_for_one_direction = raw_data_dict.get(direction)
+            if not data_for_one_direction:
+                print(f"Plotting Info: Direction '{direction}' not found in dataset '{raw_label_prefix}'. Skipping.")
+                continue
+
+            emg_channels_in_this_part = _standalone_get_unique_emg_channels(data_for_one_direction)
+            if not emg_channels_in_this_part:
+                continue
+
+            stats_for_all_emgs = _standalone_calculate_emg_stats_for_direction(
+                data_for_one_direction,
+                emg_channels_in_this_part,
+                target_length
+            )
+
+            if stats_for_all_emgs:
+                datasets_with_stats.append({"StatsData": stats_for_all_emgs})
+                labels_for_stats_datasets.append(f"{raw_label_prefix} - {direction.capitalize()}")
+
+    if not datasets_with_stats:
+        print("Plotting Error: No data available for plotting after statistical aggregation.")
+        return
+
+    # 2. 確定要為哪些 EMG 頻道創建子圖
+    all_present_emg_in_stats: Set[str] = set()
+    for ds_with_stats in datasets_with_stats:
+        all_present_emg_in_stats.update(ds_with_stats.get("StatsData", {}).keys())
+    
+    if not all_present_emg_in_stats:
+        print("Plotting Error: No EMG channels found in any aggregated statistical datasets.")
+        return
+
+    channels_for_subplots: List[str]
+    if selected_emg_channels:
+        channels_for_subplots = [ch for ch in selected_emg_channels if ch in all_present_emg_in_stats]
+        if not channels_for_subplots:
+            print(f"Plotting Warning: None of selected channels {selected_emg_channels} have stats data. Plotting all.")
+            channels_for_subplots = sorted(list(all_present_emg_in_stats))
+    else:
+        channels_for_subplots = sorted(list(all_present_emg_in_stats))
+
+    if not channels_for_subplots:
+        print("Plotting Error: No EMG channels to create subplots for.")
+        return
+
+    # 3. 繪圖佈局和繪製
+    num_subplots = len(channels_for_subplots)
+    cols = min(max_subplot_cols, num_subplots)
+    rows = math.ceil(num_subplots / cols)
+    
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 8, rows * 6.5), squeeze=False, sharex=True) # 增加高度
+    time_axis = np.linspace(-40, 100, target_length)
+    palette = plt.get_cmap('tab10')
+
+    for i_subplot, emg_channel_name in enumerate(channels_for_subplots):
+        ax = axs[i_subplot // cols, i_subplot % cols]
+        ax.set_title(emg_channel_name, fontsize=14)
+        plotted_anything_on_ax = False
+
+        for dataset_idx, dataset_dict_with_stats in enumerate(datasets_with_stats):
+            stats_map = dataset_dict_with_stats.get("StatsData", {})
+            if emg_channel_name in stats_map:
+                mean_signal, lower_bound, upper_bound, num_trials = stats_map[emg_channel_name]
+                
+                # 確保所有統計數據都是有效的 NumPy 陣列且長度正確
+                if not (isinstance(mean_signal, np.ndarray) and mean_signal.size == target_length and
+                        isinstance(lower_bound, np.ndarray) and lower_bound.size == target_length and
+                        isinstance(upper_bound, np.ndarray) and upper_bound.size == target_length):
+                    print(f"Plotting Warning: Invalid stats data for {emg_channel_name} in dataset {labels_for_stats_datasets[dataset_idx]}. Skipping.")
+                    continue
+
+                plotted_anything_on_ax = True
+                color = palette(dataset_idx % palette.N)
+                current_label = labels_for_stats_datasets[dataset_idx]
+                
+                ax.plot(time_axis, mean_signal, color=color, label=f'{current_label} (n={num_trials})', linewidth=2)
+                ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.2)
+            
+        if plotted_anything_on_ax:
+            ax.legend(fontsize=9, loc='best')
+            ax.grid(True, linestyle=':', alpha=0.7)
+            ax.set_xlim(-40, 100)
+            ax.tick_params(axis='y', labelsize=10)
+
+            is_bottom_row = (i_subplot // cols) == rows - 1
+            is_left_col = (i_subplot % cols) == 0
+
+            if is_bottom_row:
+                ax.set_xlabel(x_axis_label, fontsize=12)
+                ax.tick_params(axis='x', labelsize=10)
+            
+            if is_left_col:
+                 ax.set_ylabel(y_axis_label, fontsize=12)
+        else:
+            ax.text(0.5, 0.5, "No data for this channel", ha="center", va="center", transform=ax.transAxes, color="grey")
+            ax.set_xlim(-40, 100)
+            if (i_subplot // cols) == rows - 1: ax.set_xlabel(x_axis_label, fontsize=12)
+            if (i_subplot % cols) == 0: ax.set_ylabel(y_axis_label, fontsize=12)
+
+    for i_ax in range(num_subplots, rows * cols):
+        fig.delaxes(axs[i_ax // cols, i_ax % cols])
+
+    fig.suptitle(figure_title, fontsize=18, fontweight='bold', y=0.99 if rows == 1 else 1.00)
+    plt.tight_layout(rect=[0.03, 0.03, 0.97, 0.95 if rows > 1 else 0.92])
+    plt.show()
+
+# --- 示例用法 ---
+if __name__ == '__main__':
+    # 假設 processed_data_directional_example_v1 和 v2 已定義
+    processed_data_directional_example_v1 = {
+        "left": { 
+            "Group_L1_v1": defaultdict(lambda: np.full(101, np.nan),{
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) * 0.8 + 1.0 + np.random.normal(0, 0.2, 101),
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) * 0.9 + 1.2 + np.random.normal(0, 0.2, 101),
+            }),
+            "Group_L2_v1": defaultdict(lambda: np.full(101, np.nan),{
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) -0.1) * 0.82 + 1.05 + np.random.normal(0, 0.2, 101),
+                 "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)-0.1) * 0.92 + 1.25 + np.random.normal(0, 0.2, 101),
+            })
+        },
+        "right": { 
+             "Group_R1_v1": defaultdict(lambda: np.full(101, np.nan), {
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) + 1.1 + np.random.normal(0, 0.2, 101),
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) + 1.3 + np.random.normal(0, 0.2, 101),
+            })
+        }
+    }
+    processed_data_directional_example_v2 = {
+        "left": { 
+            "Group_L1_v2": defaultdict(lambda: np.full(101, np.nan),{
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101)) * 0.7 + 0.9 + np.random.normal(0, 0.25, 101),
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101)) * 0.8 + 1.1 + np.random.normal(0, 0.25, 101),
+            })
+        },
+        "right": { 
+             "Group_R1_v2": defaultdict(lambda: np.full(101, np.nan), {
+                "Biceps.IM EMG8": np.sin(np.linspace(0, np.pi*2, 101) + 0.1) + 1.0 + np.random.normal(0, 0.25, 101),
+                "Triceps.IM EMG9": np.cos(np.linspace(0, np.pi*2, 101) - 0.1) + 1.2 + np.random.normal(0, 0.25, 101),
+                 "ExtInd.IM EMG6": np.random.rand(101) + 0.5 + np.random.normal(0,0.1,101) # v2 特有的頻道
+            })
+        }
+    }
+    target_signal_length = 101
+    
+    print(f"\n--- Plotting Cloud Comparison of Two Raw Datasets (Left and Right Stats) ---")
+    plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
+        raw_datasets_list=[processed_data_directional_example_v1, processed_data_directional_example_v2],
+        raw_dataset_labels=["Condition Alpha", "Condition Beta"],
+        directions_to_process=["left", "right"],
+        figure_title="Cloud Comparison: Alpha vs Beta (Left/Right Stats)",
+        target_length=target_signal_length,
+        selected_emg_channels=['Biceps.IM EMG8', 'Triceps.IM EMG9', 'ExtInd.IM EMG6'],
+    )
+
+    print(f"\n--- Plotting Cloud Comparison (Only Right Stats) ---")
+    plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
+        raw_datasets_list=[processed_data_directional_example_v1, processed_data_directional_example_v2],
+        raw_dataset_labels=["Set A", "Set B"],
+        directions_to_process=["right"], # 只看 Right 的統計數據比較
+        figure_title="Cloud Comparison: Set A vs Set B (Right Stats Only)",
+        target_length=target_signal_length,
+    )

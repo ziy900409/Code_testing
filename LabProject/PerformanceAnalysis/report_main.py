@@ -248,7 +248,6 @@ def generate_report(data):
         else:
             description_text += f"\n- 反應時間變化不大。"
 
-
         textbox = slide.shapes.add_textbox(Inches(0.5), Inches(4.5), Inches(9), Inches(2.5)) # Adjusted position and size
         tf = textbox.text_frame
         tf.word_wrap = True

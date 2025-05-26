@@ -7,8 +7,8 @@ Created on Mon May  5 13:38:36 2025
 
 import sys
 # 路徑改成你放自己code的資料夾
-# sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
-sys.path.append(r"D:\git\Code_testing\LabProject\PerformanceAnalysis")
+sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
+# sys.path.append(r"D:\git\Code_testing\LabProject\PerformanceAnalysis")
 import pandas as pd
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -118,9 +118,9 @@ c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
                      'Biceps': 'Biceps Brachii',
                      }
 
-c3d_analog_cha = [#"ExtRad", "FleRad",
+c3d_analog_cha = ["ExtRad", "FleRad",
                   "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
-                  #"Biceps", "Triceps"
+                  "Biceps", "Triceps"
                   ]
 
 muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
@@ -187,12 +187,12 @@ mouse D
 # fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
 # after_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
 
-pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
-fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
-pos_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
-# data_path = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_EC2_3.c3d"
-# data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_1.c3d"
-# data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_07 non-symmetry\1.Motion\Vicon\S03\S03_LargeFlick_ECN1_2.c3d"
+# pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
+# fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
+# pos_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
+pre_path = r"E:\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
+fatigue_path = r"E:\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
+pos_path = r"E:\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
 
 pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path, MOTION_CONFIG, EMG_CONFIG)
 fati_results_c3d, fati_emg_results = core.fatigue_main(fatigue_path, MOTION_CONFIG, EMG_CONFIG)
@@ -217,6 +217,8 @@ all_configs = [EMG_CONFIG, EMG_CONFIG]
 labels = ['55g', '60g'] # 可選的自定義標籤
 
 oneshot_df = pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]
+
+pos_oneshot_df = pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]
 
 
 
@@ -261,6 +263,14 @@ interpolated_data = emg.process_emg_data_with_direction(oneshot_df,
                                                         pre_emg_results,
                                                         dataset_labels=None,
                                                         selected_keys = None)
+
+
+interpolated_data_1 = emg.process_emg_data_with_direction(pos_oneshot_df,
+                                                        pos_emg_results,
+                                                        dataset_labels=None,
+                                                        selected_keys = None)
+
+
 # %% 繪製肌肉活化程度曲線
     
 plotter_instance = emg.EMGPlotter(interpolated_data,
@@ -320,11 +330,23 @@ group1 = pre_emg_results["Amplitudes_Slope"]
 group2 = pos_emg_results["Amplitudes_Slope"]
 ta.plot_median_freq_slope_comparison(group1, group2,
                                      selected_keys=[
-                                         "ExtRad.IM EMG1", "Triceps.IM EMG9", "Biceps.IM EMG8"
+                                         "ExtRad.IM EMG1", "Triceps.IM EMG9",
+                                         "Biceps.IM EMG8", 'ExtRad.IM EMG1'
                                          ],
                                      title="Muscle Activation Slope Comparison",
                                      label_list=["pre", "pos"],
                                      show_values=False)
+
+
+emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
+        raw_datasets_list=[interpolated_data, interpolated_data_1],
+        raw_dataset_labels=["Pre", "Pos"],
+        directions_to_process=["left"],
+        figure_title="Cloud Comparison: Alpha vs Beta (Left/Right Stats)",
+        target_length=141,
+        selected_emg_channels=["ExtRad.IM EMG1", "Triceps.IM EMG9",
+        "Biceps.IM EMG8", 'ExtRad.IM EMG1'],
+    )
 # %%
 
 """
