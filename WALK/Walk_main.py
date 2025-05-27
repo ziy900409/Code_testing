@@ -24,26 +24,35 @@ import Walk_func as func
 # --- 請修改以下設定 ---
 INPUT_DIRECTORY = r'D:\Hsin\NTSU_lab\WALK\範例檔-20250519T142424Z-1-001\範例檔\S1皮爾森相關分析範例\\'  # 例如: 'C:/Users/YourUser/Documents/ExcelData'
 OUTPUT_DIRECTORY = r'D:\Hsin\NTSU_lab\WALK\範例檔-20250519T142424Z-1-001\範例檔\S1_ProcessedData\\'      # 例如: 'C:/Users/YourUser/Documents/ProcessedData'
-FILENAME_KEYWORD = ['ST_WALK', "ST_RUN"]                     # 例如: 檔名中包含 'report' 的才處理
+FILENAME_KEYWORD_1 = ['ST_WALK', "ST_RUN"]                     # 例如: 檔名中包含 'report' 的才處理
 FILENAME_KEYWORD = ['R_WALK, L_WALK', 'R_CHANGE', "L_CHANGE", "L_JUMP", "H_JUMP"]                     # 例如: 檔名中包含 'report' 的才處理
-FILENAME_KEYWORD = ['GOLF']
+FILENAME_KEYWORD_3 = ['GOLF']
 
 # excel_path = r"C:\Users\User\Downloads\範例檔-20250519T142424Z-1-001\範例檔\S1皮爾森相關分析範例\S1_GOLF_1 FP&SI extra v2.xlsx"
 
 # 假設這是您定義的公式字典
-CAL_FORMULAS = {
+CAL_FORMULAS_1 = {
+    "right 前後": "=-(C2-C$2)+J$2",
+    "right 左右": "=-(D2-D$2)+I$2",
+    "left 前後": "=-(E2-E$2)+H$2", # 假設 D$2 已被正確解析並放入環境
+    
+    "left 左右": "=(F2-F$2)+G$2"
+}
+
+CAL_FORMULAS_2 = {
+    "right 前後": "=-(F2-F$2)+J2",
+    "right 左右": "=(E2-E$2)+I$2",
+    "left 前後": "=-(D2-D$2)+H$2", # 假設 D$2 已被正確解析並放入環境
+    "left 左右": "=-(C2-C$2)+G$2"
+}
+
+CAL_FORMULAS_3 = {
     "right 前後": "=(D2-D$2)+J$2",
     "right 左右": "=-(C2-C$2)+I2",
     "left 前後": "=(F2-F$2)+H$2", # 假設 D$2 已被正確解析並放入環境
     "left 左右": "=(E2-E$2)+G$2"
 }
 
-CAL_FORMULAS = {
-    "right 前後": "=(D2-D$2)+J$2",
-    "right 左右": "=-(C2-C$2)+I2",
-    "left 前後": "=(F2-F$2)+H$2", # 假設 D$2 已被正確解析並放入環境
-    "left 左右": "=(E2-E$2)+G$2"
-}
 
 # 各EXCEL欄位對應名稱
 col_name_map = { 
