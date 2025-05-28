@@ -109,8 +109,8 @@ c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
                       'FleRad': 'Flexor Carpi Radialis',
                      'Triceps': 'Triceps Brachii',
                       'Triceps': 'Triceps Brachii',
-                     'ExtUlnar': 'Extensor Carpi Ulnaris',
-                     'ExtUlnar': 'Extensor Carpi Ulnaris',
+                      'ExtUlnar': 'Extensor Carpi Ulnaris',
+                      'ExtUlnar': 'Extensor Carpi Ulnaris',
                      'DorInter': '1st Dorsal Interosseous', 
                      'AbdDigMin': 'Abductor Digiti Quinti',
                      #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
@@ -190,9 +190,15 @@ mouse D
 # pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
 # fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
 # pos_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
-pre_path = r"E:\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
-fatigue_path = r"E:\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
-pos_path = r"E:\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
+# pre_path = r"E:\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
+# fatigue_path = r"E:\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
+# pos_path = r"E:\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
+
+
+pre_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pos_01_AddEMG.c3d"
+fatigue_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_fatigue_01_AddEMG.c3d"
+pos_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pre_01_AddEMG.c3d"
+
 
 pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path, MOTION_CONFIG, EMG_CONFIG)
 fati_results_c3d, fati_emg_results = core.fatigue_main(fatigue_path, MOTION_CONFIG, EMG_CONFIG)
