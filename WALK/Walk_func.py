@@ -103,12 +103,14 @@ def find_if_components(expression_if_body):
     return cond_str, true_str, false_str
 
 # %%
-def apply_excel_formulas_v4(df_input, formulas_dict, col_name_map): # <--- 新增 col_name_map
+ 
+
+def apply_excel_formulas_v4(df_input, formulas_dict, COL_NAME_MAP): # <--- 新增 COL_NAME_MAP
     df = df_input.copy()
     # 建立 eval 函式的局部變數環境
     # *** 修改初始化 eval_locals 的方式 ***
     eval_locals = {}
-    for formula_key, actual_col_name in col_name_map.items():
+    for formula_key, actual_col_name in COL_NAME_MAP.items():
         if actual_col_name in df.columns:
             eval_locals[formula_key] = df[actual_col_name] # 例如 eval_locals['D'] = df['plate 1 COPY analog']
         else:
@@ -135,11 +137,11 @@ def apply_excel_formulas_v4(df_input, formulas_dict, col_name_map): # <--- 新�
                 if_body = expression[len("IF("):-1]
                 cond_expr_str, true_expr_str, false_expr_str = find_if_components(if_body)
                 
-                # 遞迴解析每個部分，col_name_map 會被傳遞下去
+                # 遞迴解析每個部分，COL_NAME_MAP 會被傳遞下去
                 # current_eval_locals 將在 parse_excel_expression_recursively 中被更新 (加入 __fixed_... 值)
-                parsed_cond = parse_excel_expression_recursively(cond_expr_str, df, current_eval_locals, col_name_map)
-                parsed_true = parse_excel_expression_recursively(true_expr_str, df, current_eval_locals, col_name_map)
-                parsed_false = parse_excel_expression_recursively(false_expr_str, df, current_eval_locals, col_name_map)
+                parsed_cond = parse_excel_expression_recursively(cond_expr_str, df, current_eval_locals, COL_NAME_MAP)
+                parsed_true = parse_excel_expression_recursively(true_expr_str, df, current_eval_locals, COL_NAME_MAP)
+                parsed_false = parse_excel_expression_recursively(false_expr_str, df, current_eval_locals, COL_NAME_MAP)
                 
                 print(f"      轉換後條件: {parsed_cond}")
                 print(f"      轉換後真值: {parsed_true}")
@@ -154,7 +156,7 @@ def apply_excel_formulas_v4(df_input, formulas_dict, col_name_map): # <--- 新�
 
             else: # 基本算術運算
                 # current_eval_locals 已包含 Series，將在 parse_excel_expression_recursively 中加入固定值
-                processed_expression = parse_excel_expression_recursively(expression, df, current_eval_locals, col_name_map)
+                processed_expression = parse_excel_expression_recursively(expression, df, current_eval_locals, COL_NAME_MAP)
                 print(f"    轉換後表達式 for '{new_calc_col_name}': {processed_expression}")
                 df[new_calc_col_name] = eval(processed_expression, eval_globals, current_eval_locals)
                 print(f"    '{new_calc_col_name}' 計算完成。")
@@ -168,16 +170,18 @@ def apply_excel_formulas_v4(df_input, formulas_dict, col_name_map): # <--- 新�
     print("自動化公式運算 (v4) 完成。")
     return df
 # %%
-def calculate_custom_correlations(df, person_corr_config, col_name_mapping):
+
+
+def calculate_custom_correlations(df, PERSON_CORR, COL_NAME_MAP, START=None):
     """
     根據提供的設定計算 DataFrame 中特定欄位組合之間的相關係數。
 
     Args:
         df (pd.DataFrame): 包含數據的 DataFrame。
-        person_corr_config (dict): 定義相關係數計算組合的字典。
+        PERSON_CORR (dict): 定義相關係數計算組合的字典。
                                    鍵為相關係數結果的名稱 (例如 "right 前後_cor")，
                                    值為一個包含代號的列表 (例如 ["O", "J"])。
-        col_name_mapping (dict): 將 person_corr_config 中的代號映射到 df 中實際欄位名稱的字典。
+        COL_NAME_MAP (dict): 將 PERSON_CORR 中的代號映射到 df 中實際欄位名稱的字典。
                                  鍵為代號 (例如 "O")，
                                  值為實際欄位名 (例如 "right 前後")。
 
@@ -187,29 +191,33 @@ def calculate_custom_correlations(df, person_corr_config, col_name_mapping):
               如果一組多於兩個欄位，則鍵會加上 "_matrix" 後綴，值為相關係數矩陣 (DataFrame)。
               如果某組無法計算，則不會包含在回傳結果中。
     """
+    if START:
+        df = df.iloc[START[0]:START[1], :]
     print("\n執行自訂相關係數計算...")
     all_correlation_results = {}
 
     if not isinstance(df, pd.DataFrame):
         print("  錯誤: 輸入的 'df' 不是一個有效的 Pandas DataFrame。")
         return all_correlation_results
-    if not isinstance(person_corr_config, dict):
-        print("  錯誤: 'person_corr_config' 不是一個有效的字典。")
+    if not isinstance(PERSON_CORR, dict):
+        print("  錯誤: 'PERSON_CORR' 不是一個有效的字典。")
         return all_correlation_results
-    if not isinstance(col_name_mapping, dict):
-        print("  錯誤: 'col_name_mapping' 不是一個有效的字典。")
+    if not isinstance(COL_NAME_MAP, dict):
+        print("  錯誤: 'COL_NAME_MAP' 不是一個有效的字典。")
         return all_correlation_results
 
-    for result_name, key_list in person_corr_config.items():
+    for result_name, key_list in PERSON_CORR.items():
         actual_cols_for_this_corr = []
         valid_keys_for_current_set = True # 標記目前這組的代號是否都有效
 
-        if not isinstance(key_list, list):
+        if not len(key_list):
             print(f"  警告 (相關係數 for '{result_name}'): 提供的代號列表不是一個列表，已跳過。")
             continue
 
         for key in key_list:
-            actual_col_name = col_name_mapping.get(key)
+            print(key)
+            # actual_col_name = COL_NAME_MAP.get(key)
+            actual_col_name = key
             if actual_col_name:
                 if actual_col_name in df.columns:
                     if pd.api.types.is_numeric_dtype(df[actual_col_name]):
@@ -223,7 +231,7 @@ def calculate_custom_correlations(df, person_corr_config, col_name_mapping):
                     valid_keys_for_current_set = False
                     break # 一個欄位找不到，這組就無法計算
             else:
-                print(f"  錯誤 (相關係數 for '{result_name}'): 代號 '{key}' 在 col_name_mapping 中找不到對應的實際欄位名。")
+                print(f"  錯誤 (相關係數 for '{result_name}'): 代號 '{key}' 在 COL_NAME_MAP 中找不到對應的實際欄位名。")
                 valid_keys_for_current_set = False
                 break # 一個代號無效，這組就無法計算
         
@@ -249,17 +257,18 @@ def calculate_custom_correlations(df, person_corr_config, col_name_mapping):
     print("自訂相關係數計算完成。")
     return all_correlation_results
 # %%
-def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, filename):
+
+def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename):
     """
     根據提供的設定，為 DataFrame 中的資料建立包含多個子圖的圖表，
     每個子圖可以繪製兩條線。
 
     Args:
         df (pd.DataFrame): 包含數據的 DataFrame。
-        plots_config (dict): 繪圖設定字典。鍵為子圖的標識，
+        PLOTS_CONFIG (dict): 繪圖設定字典。鍵為子圖的標識，
                              值為包含 "x_col_key", "y1_col_key", "y2_col_key" 及可選 "title",
                              "xlabel", "ylabel" 的字典。
-        col_name_mapping (dict): 將 plots_config 中的 *_col_key 映射到 df 中實際欄位名稱的字典。
+        COL_NAME_MAP (dict): 將 PLOTS_CONFIG 中的 *_col_key 映射到 df 中實際欄位名稱的字典。
         output_dir (str): 儲存輸出圖片的資料夾路徑。
         filename (str): 原始檔案的基本名稱 (不含副檔名)，用於命名輸出的圖片。
 
@@ -271,14 +280,14 @@ def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, filen
     if not isinstance(df, pd.DataFrame):
         print("  錯誤: 輸入的 'df' 不是一個有效的 Pandas DataFrame。")
         return None
-    if not isinstance(plots_config, dict) or not plots_config:
-        print("  錯誤: 'plots_config' 不是一個有效的字典或為空。無需繪圖。")
+    if not isinstance(PLOTS_CONFIG, dict) or not PLOTS_CONFIG:
+        print("  錯誤: 'PLOTS_CONFIG' 不是一個有效的字典或為空。無需繪圖。")
         return None
-    if not isinstance(col_name_mapping, dict):
-        print("  錯誤: 'col_name_mapping' 不是一個有效的字典。")
+    if not isinstance(COL_NAME_MAP, dict):
+        print("  錯誤: 'COL_NAME_MAP' 不是一個有效的字典。")
         return None
 
-    num_plots = len(plots_config)
+    num_plots = len(PLOTS_CONFIG)
     
     # 設定子圖布局，盡量讓圖片美觀
     if num_plots == 0:
@@ -303,8 +312,8 @@ def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, filen
     plot_idx = 0
     successful_plots = 0
 
-    for plot_group_name, config in plots_config.items():
-        if plot_idx >= len(axes_flat): # 以防萬一 plots_config 比 axes 多
+    for plot_group_name, config in PLOTS_CONFIG.items():
+        if plot_idx >= len(axes_flat): # 以防萬一 PLOTS_CONFIG 比 axes 多
             print(f"  警告: 子圖數量超出預期佈局，'{plot_group_name}' 將不會被繪製。")
             break
 
@@ -321,9 +330,9 @@ def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, filen
             plot_idx +=1 # 確保即使跳過也增加索引，以便下一個圖使用正確的ax
             continue
 
-        # actual_x_col = col_name_mapping.get(x_key)
-        # actual_y1_col = col_name_mapping.get(y1_key)
-        # actual_y2_col = col_name_mapping.get(y2_key)
+        # actual_x_col = COL_NAME_MAP.get(x_key)
+        # actual_y1_col = COL_NAME_MAP.get(y1_key)
+        # actual_y2_col = COL_NAME_MAP.get(y2_key)
         
         actual_x_col = config.get("x_col_key")
         actual_y1_col = config.get("y1_col_key")
@@ -341,7 +350,7 @@ def create_custom_subplots(df, plots_config, col_name_mapping, output_dir, filen
 
         for key, actual_col in cols_to_check.items():
             if not actual_col:
-                print(f"  警告 (子圖 '{plot_group_name}'): 代號 '{key}' 在 col_name_mapping 中找不到對應的實際欄位名。跳過此子圖。")
+                print(f"  警告 (子圖 '{plot_group_name}'): 代號 '{key}' 在 COL_NAME_MAP 中找不到對應的實際欄位名。跳過此子圖。")
                 valid_cols_for_plot = False
                 break
             if actual_col not in df.columns:
@@ -467,16 +476,16 @@ def Read_File(file_path, file_type, subfolder=None):
 # %%
 
 
-def apply_butterworth_filter(df, columns_to_filter_keys, col_name_mapping,
+def apply_butterworth_filter(df, FILTER_COL, COL_NAME_MAP,
                              cutoff_freq, sampling_freq, order=4, filter_type='low'):
     """
     對 DataFrame 中的指定欄位應用 Butterworth 濾波器。
 
     Args:
         df (pd.DataFrame): 輸入的 DataFrame。
-        columns_to_filter_keys (set or list): 包含要濾波的欄位「代號」的集合或列表。
-                                             這些代號將透過 col_name_mapping 轉換。
-        col_name_mapping (dict): 將代號映射到 DataFrame 中實際欄位名稱的字典。
+        FILTER_COL (set or list): 包含要濾波的欄位「代號」的集合或列表。
+                                             這些代號將透過 COL_NAME_MAP 轉換。
+        COL_NAME_MAP (dict): 將代號映射到 DataFrame 中實際欄位名稱的字典。
         cutoff_freq (float): 濾波器的截止頻率 (Hz)。
         sampling_freq (float): 訊號的取樣頻率 (Hz)。
         order (int, optional): 濾波器的階數。預設為 4。
@@ -495,18 +504,18 @@ def apply_butterworth_filter(df, columns_to_filter_keys, col_name_mapping,
     # df_filtered = df_1.copy()
     nyquist_freq = 0.5 * sampling_freq
 
-    if not isinstance(columns_to_filter_keys, (set, list)):
-        print("  錯誤: 'columns_to_filter_keys' 必須是集合或列表。")
+    if not isinstance(FILTER_COL, (set, list)):
+        print("  錯誤: 'FILTER_COL' 必須是集合或列表。")
         return df # 回傳原始 df
-    if not isinstance(col_name_mapping, dict):
-        print("  錯誤: 'col_name_mapping' 必須是字典。")
+    if not isinstance(COL_NAME_MAP, dict):
+        print("  錯誤: 'COL_NAME_MAP' 必須是字典。")
         return df
 
-    for key in columns_to_filter_keys:
+    for key in FILTER_COL:
         actual_col_name = key
 
         if not actual_col_name:
-            print(f"  警告: 代號 '{key}' 在 col_name_mapping 中找不到對應的實際欄位名，跳過濾波。")
+            print(f"  警告: 代號 '{key}' 在 COL_NAME_MAP 中找不到對應的實際欄位名，跳過濾波。")
             continue
 
         if actual_col_name not in df_filtered.columns:
@@ -585,13 +594,15 @@ def apply_butterworth_filter(df, columns_to_filter_keys, col_name_mapping,
 
 # %%
 
-def process_file(data_path, CAL_FORMULAS, col_name_map,
-                 person_corr, PLOTS_CONFIG, filter_col,
+
+def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
+                 PERSON_CORR, PLOTS_CONFIG, FILTER_COL,
                  OUTPUT_DIRECTORY,
                  NeedFilter=True):
     """
     處理單個 Excel 檔案：欄位運算、計算相關係數、輸出結果、繪圖。
     """
+    data_path = r'D:\\Hsin\\NTSU_lab\\WALK\\範例檔-20250519T142424Z-1-001\\範例檔\\S1皮爾森相關分析範例\\\\\\S1_ST_WALK_1 FP&SI extra v2.xlsx'
     # print(f"--- 正在處理檔案: {original_filename} ---")
     try:
         df = pd.read_excel(data_path)
@@ -604,8 +615,8 @@ def process_file(data_path, CAL_FORMULAS, col_name_map,
     
     if df is not None and CAL_FORMULAS: # 確保 df 已載入且有公式要處理
         try:
-            # df = df.iloc[:, :10]
-            df_1 = apply_excel_formulas_v4(df, CAL_FORMULAS, col_name_map)
+            df = df.iloc[:, :10]
+            df_1 = apply_excel_formulas_v4(df, CAL_FORMULAS, COL_NAME_MAP)
         except Exception as e:
             print(f"  處理自動化公式時發生嚴重錯誤: {e}")
     # 取得含副檔名的檔名
@@ -616,8 +627,8 @@ def process_file(data_path, CAL_FORMULAS, col_name_map,
     # 2. 將資料濾波
     if NeedFilter:
         df_1 = apply_butterworth_filter(df_1,
-                                        filter_col,
-                                        col_name_map,
+                                        FILTER_COL,
+                                        COL_NAME_MAP,
                                         cutoff_freq = 25,
                                         sampling_freq = 100,
                                         order=4,
@@ -626,19 +637,19 @@ def process_file(data_path, CAL_FORMULAS, col_name_map,
     else:
         processed_output_filename = f"{os.path.splitext(file_name)[0]}_NoFiltered.xlsx"
     # 3. 計算其中數個欄位間的相關係數
-    all_correlation_results = calculate_custom_correlations(df_1, person_corr, col_name_map)
+    all_correlation_results = calculate_custom_correlations(df_1, PERSON_CORR, COL_NAME_MAP)
 
     # 4. 輸出欄位運算後的資料
     print("\n輸出運算後的資料...")
     
     processed_output_path = os.path.join(OUTPUT_DIRECTORY, processed_output_filename)
     try:
-        df.to_excel(processed_output_path, index=False)
+        df_1.to_excel(processed_output_path, index=False)
         print(f"  運算後的資料已儲存至: {processed_output_path}")
     except Exception as e:
         print(f"  儲存運算後的資料時發生錯誤: {e}")
     
     # 資料繪圖 
-    create_custom_subplots(df_1, PLOTS_CONFIG, col_name_map, OUTPUT_DIRECTORY, filename=processed_output_filename)
+    create_custom_subplots(df_1, PLOTS_CONFIG, COL_NAME_MAP, OUTPUT_DIRECTORY, filename=processed_output_filename)
     
     return all_correlation_results
