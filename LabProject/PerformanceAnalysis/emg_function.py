@@ -462,6 +462,7 @@ def calculate_fft_for_emg(
     回傳:
     - dict: 包含 FFT 結果的字典。
     """
+    
     if not os.path.exists(data_file_path):
         logging.error(f"檔案路徑不存在: {data_file_path}")
         raise FileNotFoundError(f"檔案路徑不存在: {data_file_path}")
