@@ -6,6 +6,7 @@ __pycache__
 config.json
 **.csv
 **.7z
+**.zip
 # 忽略所有 .DS_Store 文件（macOS 系統產生）
 .DS_Store
 
