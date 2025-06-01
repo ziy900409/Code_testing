@@ -258,23 +258,245 @@ def calculate_custom_correlations(df, PERSON_CORR, COL_NAME_MAP, START=None):
     return all_correlation_results
 # %%
 
-def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename):
+def calculate_custom_correlations_with_start(df, PERSON_CORR, COL_NAME_MAP, START=None):
     """
-    根據提供的設定，為 DataFrame 中的資料建立包含多個子圖的圖表，
-    每個子圖可以繪製兩條線。
+    計算相關係數並依照欄位名稱是否包含 'left' 或 'right' 使用不同的切片範圍。
 
     Args:
-        df (pd.DataFrame): 包含數據的 DataFrame。
-        PLOTS_CONFIG (dict): 繪圖設定字典。鍵為子圖的標識，
-                             值為包含 "x_col_key", "y1_col_key", "y2_col_key" 及可選 "title",
-                             "xlabel", "ylabel" 的字典。
-        COL_NAME_MAP (dict): 將 PLOTS_CONFIG 中的 *_col_key 映射到 df 中實際欄位名稱的字典。
-        output_dir (str): 儲存輸出圖片的資料夾路徑。
-        filename (str): 原始檔案的基本名稱 (不含副檔名)，用於命名輸出的圖片。
+        df (pd.DataFrame): 資料來源。
+        PERSON_CORR (dict): 要計算的相關係數欄位組合。
+        COL_NAME_MAP (dict): 對應代號到實際欄位名稱。
+        START (dict, optional): 包含 'LEFT' 和 'RIGHT' 的切片範圍。
 
     Returns:
-        str or None: 成功儲存圖片則回傳圖片檔案路徑，否則回傳 None。
+        dict: 各組相關係數或相關係數矩陣。
     """
+
+    print("\n執行自訂相關係數計算 (含 START 切片)...")
+    all_correlation_results = {}
+
+    if not isinstance(df, pd.DataFrame):
+        print("  錯誤: 輸入的 'df' 不是有效的 DataFrame。")
+        return all_correlation_results
+
+    for result_name, key_list in PERSON_CORR.items():
+        actual_cols = [COL_NAME_MAP.get(k, k) for k in key_list]  # 支援直接用欄位名稱
+        valid_cols = []
+        sliced_cols = {}
+
+        for col in actual_cols:
+            if col not in df.columns:
+                print(f"  錯誤: 欄位 '{col}' 不存在於 DataFrame 中。")
+                continue
+            if not pd.api.types.is_numeric_dtype(df[col]):
+                print(f"  警告: 欄位 '{col}' 非數值型，略過。")
+                continue
+
+            # 根據欄位名稱切片
+            sliced_df = df.copy()
+            if START and isinstance(START, dict):
+                col_lower = col.lower()
+                if 'left' in col_lower and 'LEFT' in START:
+                    sliced_df = df.iloc[START['LEFT']['START']:START['LEFT']['END'] + 1, :]
+                elif 'right' in col_lower and 'RIGHT' in START:
+                    sliced_df = df.iloc[START['RIGHT']['START']:START['RIGHT']['END'] + 1, :]
+            sliced_cols[col] = sliced_df[col]
+            valid_cols.append(col)
+
+        if len(valid_cols) >= 2:
+            try:
+                sub_df = pd.concat([sliced_cols[c] for c in valid_cols], axis=1)
+                corr_matrix = sub_df.corr()
+                if len(valid_cols) == 2:
+                    corr_value = corr_matrix.iloc[0, 1]
+                    print(f"  計算完成: '{result_name}' ({valid_cols[0]} vs {valid_cols[1]}): {corr_value:.4f}")
+                    all_correlation_results[result_name] = corr_value
+                else:
+                    print(f"  計算完成: '{result_name}' (欄位: {', '.join(valid_cols)})\n{corr_matrix}")
+                    all_correlation_results[result_name + '_matrix'] = corr_matrix
+            except Exception as e:
+                print(f"  錯誤: 計算 '{result_name}' 的相關係數時發生錯誤: {e}")
+        else:
+            print(f"  警告: '{result_name}' 至少需要兩個有效欄位，目前僅有 {len(valid_cols)} 個。")
+
+    print("相關係數計算完成。")
+    return all_correlation_results
+# %%
+
+# def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename, START=None):
+#     """
+#     根據提供的設定，為 DataFrame 中的資料建立包含多個子圖的圖表，
+#     每個子圖可以繪製兩條線。
+
+#     Args:
+#         df (pd.DataFrame): 包含數據的 DataFrame。
+#         PLOTS_CONFIG (dict): 繪圖設定字典。鍵為子圖的標識，
+#                              值為包含 "x_col_key", "y1_col_key", "y2_col_key" 及可選 "title",
+#                              "xlabel", "ylabel" 的字典。
+#         COL_NAME_MAP (dict): 將 PLOTS_CONFIG 中的 *_col_key 映射到 df 中實際欄位名稱的字典。
+#         output_dir (str): 儲存輸出圖片的資料夾路徑。
+#         filename (str): 原始檔案的基本名稱 (不含副檔名)，用於命名輸出的圖片。
+
+#     Returns:
+#         str or None: 成功儲存圖片則回傳圖片檔案路徑，否則回傳 None。
+#     """
+#     print("\n執行自訂子圖繪製...")
+
+#     if not isinstance(df, pd.DataFrame):
+#         print("  錯誤: 輸入的 'df' 不是一個有效的 Pandas DataFrame。")
+#         return None
+#     if not isinstance(PLOTS_CONFIG, dict) or not PLOTS_CONFIG:
+#         print("  錯誤: 'PLOTS_CONFIG' 不是一個有效的字典或為空。無需繪圖。")
+#         return None
+#     if not isinstance(COL_NAME_MAP, dict):
+#         print("  錯誤: 'COL_NAME_MAP' 不是一個有效的字典。")
+#         return None
+
+#     num_plots = len(PLOTS_CONFIG)
+    
+#     # 設定子圖布局，盡量讓圖片美觀
+#     if num_plots == 0:
+#         print("  沒有定義任何子圖，無需繪製。")
+#         return None
+    
+#     ncols = 1 # 每行顯示1個子圖，可以調整為2或更多以獲得不同佈局
+#     # ncols = min(2, num_plots) # 例如，每行最多2個子圖
+#     nrows = (num_plots + ncols - 1) // ncols # 計算需要的行數
+
+#     # 設定每個子圖的建議尺寸 (寬, 高)，單位為英吋
+#     subplot_width = 10
+#     subplot_height = 5
+#     fig_width = subplot_width * ncols
+#     fig_height = subplot_height * nrows
+
+#     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(fig_width, fig_height), squeeze=False)
+#     # squeeze=False 確保 axes 總是一個二維陣列，方便迭代
+    
+#     axes_flat = axes.flatten() # 將 axes 攤平成一維陣列，方便迭代
+
+#     plot_idx = 0
+#     successful_plots = 0
+
+#     for plot_group_name, config in PLOTS_CONFIG.items():
+#         if plot_idx >= len(axes_flat): # 以防萬一 PLOTS_CONFIG 比 axes 多
+#             print(f"  警告: 子圖數量超出預期佈局，'{plot_group_name}' 將不會被繪製。")
+#             break
+
+#         ax = axes_flat[plot_idx]
+
+#         x_key = config.get("x_col_key")
+#         y1_key = config.get("y1_col_key")
+#         y2_key = config.get("y2_col_key")
+
+#         if not all([x_key, y1_key, y2_key]):
+#             print(f"  警告 (子圖 '{plot_group_name}'): x_col_key, y1_col_key, 或 y2_col_key 未完整定義。跳過此子圖。")
+#             # 仍然可以隱藏這個未使用的 ax
+#             ax.axis('off')
+#             plot_idx +=1 # 確保即使跳過也增加索引，以便下一個圖使用正確的ax
+#             continue
+
+#         # actual_x_col = COL_NAME_MAP.get(x_key)
+#         # actual_y1_col = COL_NAME_MAP.get(y1_key)
+#         # actual_y2_col = COL_NAME_MAP.get(y2_key)
+        
+#         actual_x_col = config.get("x_col_key")
+#         actual_y1_col = config.get("y1_col_key")
+#         actual_y2_col = config.get("y2_col_key")
+
+#         # 檢查欄位是否存在及是否為數值型
+#         valid_cols_for_plot = True
+#         cols_to_check = {
+#             x_key: actual_x_col,
+#             y1_key: actual_y1_col,
+#             y2_key: actual_y2_col
+#         }
+        
+#         numeric_series = {} # 儲存有效的數值型 Series
+
+#         for key, actual_col in cols_to_check.items():
+#             if not actual_col:
+#                 print(f"  警告 (子圖 '{plot_group_name}'): 代號 '{key}' 在 COL_NAME_MAP 中找不到對應的實際欄位名。跳過此子圖。")
+#                 valid_cols_for_plot = False
+#                 break
+#             if actual_col not in df.columns:
+#                 print(f"  警告 (子圖 '{plot_group_name}'): 實際欄位 '{actual_col}' (代號 '{key}') 在 DataFrame 中找不到。跳過此子圖。")
+#                 valid_cols_for_plot = False
+#                 break
+#             if not pd.api.types.is_numeric_dtype(df[actual_col]):
+#                 print(f"  警告 (子圖 '{plot_group_name}'): 實際欄位 '{actual_col}' (代號 '{key}') 非數值型。跳過此子圖。")
+#                 valid_cols_for_plot = False
+#                 break
+#             numeric_series[key] = df[actual_col] # 儲存 Series 供後續使用
+
+#         if not valid_cols_for_plot:
+#             ax.axis('off') # 隱藏無效的子圖座標軸
+#             plot_idx += 1
+#             continue
+
+#         # 繪製兩條線
+#         try:
+#             # 使用代號 (key) 或實際欄位名 (actual_col) 作為圖例標籤
+#             line1_label = f"{y1_key} ({actual_y1_col})" if y1_key != actual_y1_col else actual_y1_col
+#             line2_label = f"{y2_key} ({actual_y2_col})" if y2_key != actual_y2_col else actual_y2_col
+
+#             ax.plot(numeric_series[x_key], numeric_series[y1_key], label=line1_label)
+#             ax.plot(numeric_series[x_key], numeric_series[y2_key], label=line2_label)
+
+#             # 設定標題和軸標籤
+#             plot_title = config.get("title", plot_group_name)
+#             ax.set_title(plot_title)
+            
+#             xlabel_text = config.get("xlabel", actual_x_col) # 如果未提供，使用實際X欄位名
+#             ax.set_xlabel(xlabel_text)
+
+#             ylabel_text = config.get("ylabel", "數值") # 如果未提供，使用通用標籤 "數值"
+#             ax.set_ylabel(ylabel_text)
+            
+#             ax.legend() # 顯示圖例
+#             ax.grid(True) # 加入網格線
+#             successful_plots += 1
+#         except Exception as e:
+#             print(f"  錯誤 (子圖 '{plot_group_name}'): 繪圖時發生錯誤: {e}")
+#             ax.axis('off') # 隱藏出錯的子圖座標軸
+        
+#         plot_idx += 1
+
+#     # 隱藏剩餘未使用的子圖 (如果 num_plots 不是 nrows * ncols 的整數倍)
+#     for i in range(plot_idx, nrows * ncols):
+#         axes_flat[i].axis('off')
+
+#     if successful_plots == 0:
+#         print("  沒有任何子圖成功繪製，不儲存圖片。")
+#         plt.close(fig) # 關閉圖形以釋放記憶體
+#         return None
+
+#     # 自動調整子圖佈局以避免重疊
+#     try:
+#         fig.tight_layout(rect=[0, 0, 1, 0.96]) # rect=[0, 0, 1, 0.96] 為了給主標題留空間
+#         fig.suptitle(f"{filename} - 圖表分析", fontsize=16)
+#     except Exception as e:
+#         print(f"  警告: tight_layout 失敗: {e}")
+
+
+#     # 儲存整個圖表
+#     plot_output_filename = f"{filename}_custom_plots.png"
+#     plot_output_path = os.path.join(output_dir, plot_output_filename)
+#     try:
+#         plt.savefig(plot_output_path)
+#         plt.show()
+#         print(f"  多子圖圖表已儲存至: {plot_output_path}")
+#         plt.close(fig) # 關閉圖形以釋放記憶體
+#         return plot_output_path
+#     except Exception as e:
+#         print(f"  儲存圖表時發生錯誤: {e}")
+#         plt.close(fig) # 關閉圖形以釋放記憶體
+#         return None
+# %%
+def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename, START=None):
+    # import matplotlib.pyplot as plt
+    # import os
+    # import pandas as pd
+
     print("\n執行自訂子圖繪製...")
 
     if not isinstance(df, pd.DataFrame):
@@ -288,32 +510,27 @@ def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename)
         return None
 
     num_plots = len(PLOTS_CONFIG)
-    
-    # 設定子圖布局，盡量讓圖片美觀
+
     if num_plots == 0:
         print("  沒有定義任何子圖，無需繪製。")
         return None
-    
-    ncols = 1 # 每行顯示1個子圖，可以調整為2或更多以獲得不同佈局
-    # ncols = min(2, num_plots) # 例如，每行最多2個子圖
-    nrows = (num_plots + ncols - 1) // ncols # 計算需要的行數
 
-    # 設定每個子圖的建議尺寸 (寬, 高)，單位為英吋
+    ncols = 1
+    nrows = (num_plots + ncols - 1) // ncols
+
     subplot_width = 10
     subplot_height = 5
     fig_width = subplot_width * ncols
     fig_height = subplot_height * nrows
 
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(fig_width, fig_height), squeeze=False)
-    # squeeze=False 確保 axes 總是一個二維陣列，方便迭代
-    
-    axes_flat = axes.flatten() # 將 axes 攤平成一維陣列，方便迭代
+    axes_flat = axes.flatten()
 
     plot_idx = 0
     successful_plots = 0
 
     for plot_group_name, config in PLOTS_CONFIG.items():
-        if plot_idx >= len(axes_flat): # 以防萬一 PLOTS_CONFIG 比 axes 多
+        if plot_idx >= len(axes_flat):
             print(f"  警告: 子圖數量超出預期佈局，'{plot_group_name}' 將不會被繪製。")
             break
 
@@ -325,28 +542,22 @@ def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename)
 
         if not all([x_key, y1_key, y2_key]):
             print(f"  警告 (子圖 '{plot_group_name}'): x_col_key, y1_col_key, 或 y2_col_key 未完整定義。跳過此子圖。")
-            # 仍然可以隱藏這個未使用的 ax
             ax.axis('off')
-            plot_idx +=1 # 確保即使跳過也增加索引，以便下一個圖使用正確的ax
+            plot_idx +=1
             continue
 
-        # actual_x_col = COL_NAME_MAP.get(x_key)
-        # actual_y1_col = COL_NAME_MAP.get(y1_key)
-        # actual_y2_col = COL_NAME_MAP.get(y2_key)
-        
         actual_x_col = config.get("x_col_key")
         actual_y1_col = config.get("y1_col_key")
         actual_y2_col = config.get("y2_col_key")
 
-        # 檢查欄位是否存在及是否為數值型
         valid_cols_for_plot = True
         cols_to_check = {
             x_key: actual_x_col,
             y1_key: actual_y1_col,
             y2_key: actual_y2_col
         }
-        
-        numeric_series = {} # 儲存有效的數值型 Series
+
+        numeric_series = {}
 
         for key, actual_col in cols_to_check.items():
             if not actual_col:
@@ -361,71 +572,76 @@ def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename)
                 print(f"  警告 (子圖 '{plot_group_name}'): 實際欄位 '{actual_col}' (代號 '{key}') 非數值型。跳過此子圖。")
                 valid_cols_for_plot = False
                 break
-            numeric_series[key] = df[actual_col] # 儲存 Series 供後續使用
+            numeric_series[key] = df[actual_col]
 
         if not valid_cols_for_plot:
-            ax.axis('off') # 隱藏無效的子圖座標軸
+            ax.axis('off')
             plot_idx += 1
             continue
 
-        # 繪製兩條線
         try:
-            # 使用代號 (key) 或實際欄位名 (actual_col) 作為圖例標籤
             line1_label = f"{y1_key} ({actual_y1_col})" if y1_key != actual_y1_col else actual_y1_col
             line2_label = f"{y2_key} ({actual_y2_col})" if y2_key != actual_y2_col else actual_y2_col
 
             ax.plot(numeric_series[x_key], numeric_series[y1_key], label=line1_label)
             ax.plot(numeric_series[x_key], numeric_series[y2_key], label=line2_label)
 
-            # 設定標題和軸標籤
             plot_title = config.get("title", plot_group_name)
             ax.set_title(plot_title)
-            
-            xlabel_text = config.get("xlabel", actual_x_col) # 如果未提供，使用實際X欄位名
+
+            xlabel_text = config.get("xlabel", actual_x_col)
             ax.set_xlabel(xlabel_text)
 
-            ylabel_text = config.get("ylabel", "數值") # 如果未提供，使用通用標籤 "數值"
+            ylabel_text = config.get("ylabel", "數值")
             ax.set_ylabel(ylabel_text)
-            
-            ax.legend() # 顯示圖例
-            ax.grid(True) # 加入網格線
+
+            ax.legend()
+            ax.grid(True)
+
+            # === 新增 START 垂直線功能 ===
+            if START and isinstance(START, dict):
+                if "left" in plot_title and "LEFT" in START:
+                    ax.axvline(x=START["LEFT"].get("START", 0)/100, color='r', linestyle='--', label='LEFT START')
+                    ax.axvline(x=START["LEFT"].get("END", 0)/100, color='g', linestyle='--', label='LEFT END')
+                elif "right" in plot_title and "RIGHT" in START:
+                    ax.axvline(x=START["RIGHT"].get("START", 0)/100, color='r', linestyle='--', label='RIGHT START')
+                    ax.axvline(x=START["RIGHT"].get("END", 0)/100, color='g', linestyle='--', label='RIGHT END')
+
             successful_plots += 1
         except Exception as e:
             print(f"  錯誤 (子圖 '{plot_group_name}'): 繪圖時發生錯誤: {e}")
-            ax.axis('off') # 隱藏出錯的子圖座標軸
-        
+            ax.axis('off')
+
         plot_idx += 1
 
-    # 隱藏剩餘未使用的子圖 (如果 num_plots 不是 nrows * ncols 的整數倍)
     for i in range(plot_idx, nrows * ncols):
         axes_flat[i].axis('off')
 
     if successful_plots == 0:
         print("  沒有任何子圖成功繪製，不儲存圖片。")
-        plt.close(fig) # 關閉圖形以釋放記憶體
+        plt.close(fig)
         return None
 
-    # 自動調整子圖佈局以避免重疊
     try:
-        fig.tight_layout(rect=[0, 0, 1, 0.96]) # rect=[0, 0, 1, 0.96] 為了給主標題留空間
+        fig.tight_layout(rect=[0, 0, 1, 0.96])
         fig.suptitle(f"{filename} - 圖表分析", fontsize=16)
     except Exception as e:
         print(f"  警告: tight_layout 失敗: {e}")
 
-
-    # 儲存整個圖表
     plot_output_filename = f"{filename}_custom_plots.png"
     plot_output_path = os.path.join(output_dir, plot_output_filename)
     try:
         plt.savefig(plot_output_path)
         plt.show()
         print(f"  多子圖圖表已儲存至: {plot_output_path}")
-        plt.close(fig) # 關閉圖形以釋放記憶體
+        plt.close(fig)
         return plot_output_path
     except Exception as e:
         print(f"  儲存圖表時發生錯誤: {e}")
-        plt.close(fig) # 關閉圖形以釋放記憶體
+        plt.close(fig)
         return None
+
+
 # %%
 
 def Read_File(file_path, file_type, subfolder=None):
@@ -598,11 +814,13 @@ def apply_butterworth_filter(df, FILTER_COL, COL_NAME_MAP,
 def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
                  PERSON_CORR, PLOTS_CONFIG, FILTER_COL,
                  OUTPUT_DIRECTORY,
-                 NeedFilter=True):
+                 NeedFilter=True,
+                 START=None):
     """
     處理單個 Excel 檔案：欄位運算、計算相關係數、輸出結果、繪圖。
     """
-    data_path = r'D:\\Hsin\\NTSU_lab\\WALK\\範例檔-20250519T142424Z-1-001\\範例檔\\S1皮爾森相關分析範例\\\\\\S1_ST_WALK_1 FP&SI extra v2.xlsx'
+    # data_path = r'D:\\Hsin\\NTSU_lab\\WALK\\範例檔-20250519T142424Z-1-001\\範例檔\\S1皮爾森相關分析範例\\\\\\S1_ST_WALK_1 FP&SI extra v2.xlsx'
+    data_path = r'D:\\BenQ_Project\\python\\WALK\\第一階段（100hz）\\merge xlsx\\S7_ST_WALK_5 FP&SI.xlsx'
     # print(f"--- 正在處理檔案: {original_filename} ---")
     try:
         df = pd.read_excel(data_path)
@@ -615,7 +833,7 @@ def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
     
     if df is not None and CAL_FORMULAS: # 確保 df 已載入且有公式要處理
         try:
-            df = df.iloc[:, :10]
+            # df = df.iloc[:, :10]
             df_1 = apply_excel_formulas_v4(df, CAL_FORMULAS, COL_NAME_MAP)
         except Exception as e:
             print(f"  處理自動化公式時發生嚴重錯誤: {e}")
@@ -636,9 +854,20 @@ def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
         processed_output_filename = f"{os.path.splitext(file_name)[0]}_Filtered.xlsx"
     else:
         processed_output_filename = f"{os.path.splitext(file_name)[0]}_NoFiltered.xlsx"
+       
     # 3. 計算其中數個欄位間的相關係數
-    all_correlation_results = calculate_custom_correlations(df_1, PERSON_CORR, COL_NAME_MAP)
-
+    # all_correlation_results = calculate_custom_correlations(df_1, PERSON_CORR, COL_NAME_MAP)
+    for idx in PERSON_CORR:
+        print(idx)
+        if 'left' in PERSON_CORR[idx] and 'LEFT' in START:
+            col_name = list(PERSON_CORR[idx])
+            start = df_1[df_1['FP frame number'] == START['LEFT']['START']].index
+            end = df_1[df_1['FP frame number'] == START['LEFT']['END']].index + 1
+            sliced_df = df_1.loc[start:end , col_name]
+        elif 'right' in PERSON_CORR[idx] and 'RIGHT' in START:
+            start = df_1[df_1['FP frame number'] == START['RIGHT']['START']].index
+            end = df_1[df_1['FP frame number'] == START['RIGHT']['END']].index + 1
+            sliced_df = df_1.loc[start:end , col_name].corr()
     # 4. 輸出欄位運算後的資料
     print("\n輸出運算後的資料...")
     
@@ -649,7 +878,15 @@ def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
     except Exception as e:
         print(f"  儲存運算後的資料時發生錯誤: {e}")
     
-    # 資料繪圖 
-    create_custom_subplots(df_1, PLOTS_CONFIG, COL_NAME_MAP, OUTPUT_DIRECTORY, filename=processed_output_filename)
+    # 資料繪圖
+    if START:
+        create_custom_subplots(df_1, PLOTS_CONFIG,
+                               COL_NAME_MAP, OUTPUT_DIRECTORY,
+                               filename=processed_output_filename,
+                               START=START)
+        all_correlation_results = calculate_custom_correlations_with_start(df_1, PERSON_CORR, COL_NAME_MAP, START=START)
+    else:
+        
+        create_custom_subplots(df_1, PLOTS_CONFIG, COL_NAME_MAP, OUTPUT_DIRECTORY, filename=processed_output_filename)
     
     return all_correlation_results
