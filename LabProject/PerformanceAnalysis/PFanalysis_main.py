@@ -183,9 +183,9 @@ mouse D
 
 # %%
 
-# before_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
-# fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
-# after_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
+pre_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
+fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
+pos_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
 
 # pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
 # fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
@@ -195,9 +195,9 @@ mouse D
 # pos_path = r"E:\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA2_1.c3d"
 
 
-pre_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pos_01_AddEMG.c3d"
-fatigue_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_fatigue_01_AddEMG.c3d"
-pos_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pre_01_AddEMG.c3d"
+# pre_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pos_01_AddEMG.c3d"
+# fatigue_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_fatigue_01_AddEMG.c3d"
+# pos_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pre_01_AddEMG.c3d"
 
 
 pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path, MOTION_CONFIG, EMG_CONFIG)
@@ -272,9 +272,9 @@ interpolated_data = emg.process_emg_data_with_direction(oneshot_df,
 
 
 interpolated_data_1 = emg.process_emg_data_with_direction(pos_oneshot_df,
-                                                        pos_emg_results,
-                                                        dataset_labels=None,
-                                                        selected_keys = None)
+                                                          pos_emg_results,
+                                                            dataset_labels=None,
+                                                            selected_keys = None)
 
 
 # %% 繪製肌肉活化程度曲線
@@ -326,7 +326,8 @@ group2 = pos_fft_results["MedianFreq_Slope"]
 
 ta.plot_median_freq_slope_comparison(group1, group2,
                                      selected_keys=[
-                                         "ExtRad.IM EMG1", "Triceps.IM EMG9", "Biceps.IM EMG8"
+                                         "ExtRad.IM EMG1", "Triceps.IM EMG9",
+                                         "Biceps.IM EMG8", 'ExtRad.IM EMG1'
                                          ],
                                      title="Median Frequency Slope Comparison",
                                      label_list=["pre", "pos"],
@@ -340,6 +341,7 @@ ta.plot_median_freq_slope_comparison(group1, group2,
                                          "Biceps.IM EMG8", 'ExtRad.IM EMG1'
                                          ],
                                      title="Muscle Activation Slope Comparison",
+                                     ylabel="Muscle Activation Level",
                                      label_list=["pre", "pos"],
                                      show_values=False)
 

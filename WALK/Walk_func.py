@@ -601,11 +601,11 @@ def create_custom_subplots(df, PLOTS_CONFIG, COL_NAME_MAP, output_dir, filename,
             # === 新增 START 垂直線功能 ===
             if START and isinstance(START, dict):
                 if "left" in plot_title and "LEFT" in START:
-                    ax.axvline(x=START["LEFT"].get("START", 0)/100, color='r', linestyle='--', label='LEFT START')
-                    ax.axvline(x=START["LEFT"].get("END", 0)/100, color='g', linestyle='--', label='LEFT END')
+                    ax.axvline(x=START["LEFT"].get("START", 0), color='r', linestyle='--', label='LEFT START')
+                    ax.axvline(x=START["LEFT"].get("END", 0), color='g', linestyle='--', label='LEFT END')
                 elif "right" in plot_title and "RIGHT" in START:
-                    ax.axvline(x=START["RIGHT"].get("START", 0)/100, color='r', linestyle='--', label='RIGHT START')
-                    ax.axvline(x=START["RIGHT"].get("END", 0)/100, color='g', linestyle='--', label='RIGHT END')
+                    ax.axvline(x=START["RIGHT"].get("START", 0), color='r', linestyle='--', label='RIGHT START')
+                    ax.axvline(x=START["RIGHT"].get("END", 0), color='g', linestyle='--', label='RIGHT END')
 
             successful_plots += 1
         except Exception as e:
@@ -820,8 +820,8 @@ def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
     處理單個 Excel 檔案：欄位運算、計算相關係數、輸出結果、繪圖。
     """
     # data_path = r'D:\\Hsin\\NTSU_lab\\WALK\\範例檔-20250519T142424Z-1-001\\範例檔\\S1皮爾森相關分析範例\\\\\\S1_ST_WALK_1 FP&SI extra v2.xlsx'
-    # data_path = r'D:\\BenQ_Project\\python\\WALK\\第一階段（100hz）\\merge xlsx\\S7_ST_WALK_5 FP&SI.xlsx'
-    # print(f"--- 正在處理檔案: {original_filename} ---")
+    # data_path = r"D:\BenQ_Project\python\WALK\第一階段（100hz）\merge xlsx\S7_ST_WALK_5 FP&SI.xlsx"
+                                                                        # print(f"--- 正在處理檔案: {original_filename} ---")
     try:
         df = pd.read_excel(data_path)
     except FileNotFoundError:
@@ -857,17 +857,22 @@ def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
        
     # 3. 計算其中數個欄位間的相關係數
     # all_correlation_results = calculate_custom_correlations(df_1, PERSON_CORR, COL_NAME_MAP)
+    all_correlation_results = {}
     for idx in PERSON_CORR:
-        print(idx)
-        if 'left' in PERSON_CORR[idx] and 'LEFT' in START:
-            col_name = list(PERSON_CORR[idx])
-            start = df_1[df_1['FP frame number'] == START['LEFT']['START']].index
-            end = df_1[df_1['FP frame number'] == START['LEFT']['END']].index + 1
-            sliced_df = df_1.loc[start:end , col_name]
-        elif 'right' in PERSON_CORR[idx] and 'RIGHT' in START:
-            start = df_1[df_1['FP frame number'] == START['RIGHT']['START']].index
-            end = df_1[df_1['FP frame number'] == START['RIGHT']['END']].index + 1
-            sliced_df = df_1.loc[start:end , col_name].corr()
+        col_name = list(PERSON_CORR[idx])
+        # print(idx)
+        if any('left' in col for col in PERSON_CORR[idx]) and 'LEFT' in START:
+            
+            start = (df_1['SI time'] - START['LEFT']['START']).abs().idxmin()
+            end = (df_1['SI time'] - START['LEFT']['END']).abs().idxmin() + 1
+            # correlation_matrix = df_1.loc[start:end , col_name].corr()
+        elif  any('right' in col for col in PERSON_CORR[idx]) and 'RIGHT' in START:
+            start = (df_1['SI time'] - START['RIGHT']['START']).abs().idxmin()
+            end = (df_1['SI time'] - START['RIGHT']['END']).abs().idxmin() + 1
+        correlation_matrix = df_1.loc[start:end , col_name].corr()
+        correlation_value = correlation_matrix.iloc[0, 1]
+        all_correlation_results[idx] = correlation_value
+       
     # 4. 輸出欄位運算後的資料
     print("\n輸出運算後的資料...")
     
@@ -883,11 +888,11 @@ def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
         create_custom_subplots(df_1, PLOTS_CONFIG,
                                COL_NAME_MAP, OUTPUT_DIRECTORY,
                                filename=processed_output_filename,
-                               # START=START
+                               START=START
                                )
-        all_correlation_results = calculate_custom_correlations_with_start(df_1, PERSON_CORR, COL_NAME_MAP, START=START)
+        # all_correlation_results = calculate_custom_correlations_with_start(df_1, PERSON_CORR, COL_NAME_MAP, START=START)
     else:
         
         create_custom_subplots(df_1, PLOTS_CONFIG, COL_NAME_MAP, OUTPUT_DIRECTORY, filename=processed_output_filename)
-    # all_correlation_results
-    # return 
+    
+    return all_correlation_results

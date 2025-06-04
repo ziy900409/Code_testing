@@ -351,6 +351,7 @@ def process_emg_core(
         
         # --- 降採樣 ---
         # `downsample_len_global` 是目標長度
+        
         if len(notched_signal) > 0 :
             resampled_notch = signal.resample(notched_signal, downsample_len_global)
             notch_filtered_data_df.iloc[:, i] = resampled_notch[:downsample_len_global]
@@ -362,11 +363,12 @@ def process_emg_core(
             bandpass_filtered_data_df.iloc[:, i] = resampled_bandpass[:downsample_len_global]
         else:
             bandpass_filtered_data_df.iloc[:, i] = np.zeros(downsample_len_global)
-
+        # 新增標準化動作
         if len(lowpassed_signal) > 0:
             resampled_lowpass = signal.resample(lowpassed_signal, downsample_len_global)
             lowpass_filtered_data_df.iloc[:, i] = resampled_lowpass[:downsample_len_global]
-            emg_results["Smoothing"][emg_col_name] = resampled_lowpass[:downsample_len_global]
+            std_data = resampled_lowpass[:downsample_len_global] / max(resampled_lowpass[:downsample_len_global]) * 100
+            emg_results["Smoothing"][emg_col_name] = std_data
         else:
             lowpass_filtered_data_df.iloc[:, i] = np.zeros(downsample_len_global)
         
@@ -402,8 +404,10 @@ def process_emg_core(
 
 
             # 填充到 DataFrame，確保長度一致
+            # 新增標準化的方法
             if len(averaged_values_for_channel) == num_averaged_points_global:
                 averaged_data_df.iloc[:, i] = averaged_values_for_channel
+                averaged_values_for_channel = averaged_values_for_channel / max(averaged_values_for_channel) * 100
                 emg_results["AverageData"][emg_col_name] = averaged_values_for_channel
                 time_axis = np.arange(len(averaged_values_for_channel))
                 # 計算趨勢線的斜率
@@ -412,6 +416,7 @@ def process_emg_core(
                 temp_array = np.full(num_averaged_points_global, np.nan)
                 temp_array[:len(averaged_values_for_channel)] = averaged_values_for_channel
                 averaged_data_df.iloc[:, i] = temp_array
+                temp_array = temp_array / max(temp_array) * 100
                 emg_results["AverageData"][emg_col_name] = temp_array
                 time_axis = np.arange(len(temp_array))
                 # 計算趨勢線的斜率
@@ -1462,9 +1467,9 @@ def plot_multiple_emg_data_over_time(
 # %%
 
 def process_emg_data_with_direction(pre_excldueCen_df,
-                                     emg_results,
-                                     dataset_labels=None, # 未使用
-                                     selected_keys: list = None):
+                                    emg_results,
+                                    dataset_labels=None, # 未使用
+                                    selected_keys: list = None):
 
     # --- 2. 收集所有唯一的、包含有效 MDF 數據的頻道名稱 ---
     # 先收集所有數據集中所有可能的頻道

@@ -11,7 +11,9 @@ import numpy as np
 
 
 def plot_median_freq_slope_comparison(group1: dict, group2: dict,
-                                      title="Median Frequency Slope Comparison",
+                                      title: str = "Median Frequency Slope Comparison",
+                                      ylabel: str = "Fatigue Index",
+                                      turn: bool = True,
                                       selected_keys: list = None,
                                       label_list: list = None,
                                       show_values: bool = True):
@@ -34,10 +36,12 @@ def plot_median_freq_slope_comparison(group1: dict, group2: dict,
     if not keys:
         print("❌ 找不到有效的 key 可比較，請確認 key 是否存在於兩組資料中")
         return
-
-    values1 = [abs(group1[k]) for k in keys]
-    values2 = [abs(group2[k]) for k in keys]
-
+    if turn:
+        values1 = [-(group1[k]) for k in keys]
+        values2 = [-(group2[k]) for k in keys]
+    else:
+        values1 = [(group1[k]) for k in keys]
+        values2 = [(group2[k]) for k in keys]
     x = np.arange(len(keys))
     width = 0.35
 
@@ -45,7 +49,7 @@ def plot_median_freq_slope_comparison(group1: dict, group2: dict,
     bars1 = ax.bar(x - width/2, values1, width, label=label_list[0], color='dodgerblue')
     bars2 = ax.bar(x + width/2, values2, width, label=label_list[1], color='orange')
 
-    ax.set_ylabel('Fatigue Index')
+    ax.set_ylabel(ylabel)
     ax.set_title(title, fontsize=16)
     ax.set_xticks(x)
     ax.set_xticklabels(keys, rotation=45, ha='right')
