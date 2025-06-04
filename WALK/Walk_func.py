@@ -814,13 +814,13 @@ def apply_butterworth_filter(df, FILTER_COL, COL_NAME_MAP,
 def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
                  PERSON_CORR, PLOTS_CONFIG, FILTER_COL,
                  OUTPUT_DIRECTORY,
-                 NeedFilter=True,
+                 NeedFilter=False,
                  START=None):
     """
     處理單個 Excel 檔案：欄位運算、計算相關係數、輸出結果、繪圖。
     """
     # data_path = r'D:\\Hsin\\NTSU_lab\\WALK\\範例檔-20250519T142424Z-1-001\\範例檔\\S1皮爾森相關分析範例\\\\\\S1_ST_WALK_1 FP&SI extra v2.xlsx'
-    data_path = r'D:\\BenQ_Project\\python\\WALK\\第一階段（100hz）\\merge xlsx\\S7_ST_WALK_5 FP&SI.xlsx'
+    # data_path = r'D:\\BenQ_Project\\python\\WALK\\第一階段（100hz）\\merge xlsx\\S7_ST_WALK_5 FP&SI.xlsx'
     # print(f"--- 正在處理檔案: {original_filename} ---")
     try:
         df = pd.read_excel(data_path)
@@ -883,10 +883,11 @@ def process_file(data_path, CAL_FORMULAS, COL_NAME_MAP,
         create_custom_subplots(df_1, PLOTS_CONFIG,
                                COL_NAME_MAP, OUTPUT_DIRECTORY,
                                filename=processed_output_filename,
-                               START=START)
+                               # START=START
+                               )
         all_correlation_results = calculate_custom_correlations_with_start(df_1, PERSON_CORR, COL_NAME_MAP, START=START)
     else:
         
         create_custom_subplots(df_1, PLOTS_CONFIG, COL_NAME_MAP, OUTPUT_DIRECTORY, filename=processed_output_filename)
-    
-    return all_correlation_results
+    # all_correlation_results
+    # return 
