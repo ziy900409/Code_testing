@@ -10,14 +10,27 @@ import time
 import os
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"E:\Hsin\git\gitgit\Code_testing\LabProject\function")
-# sys.path.append(r"D:\BenQ_Project\git\Code_testing\LabProject\function")
+# sys.path.append(r"E:\Hsin\git\gitgit\Code_testing\LabProject\function")
+sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\function")
 import gen_function as func
 import Kinematic_function as kincal
 import plotFig_function as FigPlot
 import EMG_function as emg
 
 import gc
+
+# %%
+
+x = func.Read_File(r"D:\BenQ_Project\01_UR_lab\2025_04 U2 FK2 weight test\1.Motion\2.Cortex\S15",
+                   ".c3d")
+b = []
+
+for i in range(len(x)):
+    # print(x[i])
+    filepath, tempfilename = os.path.split(x[i])
+    filename, extension = os.path.splitext(tempfilename)
+    b.append(filename)
+    
 # %%
 folder_path = r"D:\BenQ_Project\01_UR_lab\2025_02 Asymmetry\\"
 RawData_folder = "1.Motion\\1.Vicon\\"

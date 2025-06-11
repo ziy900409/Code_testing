@@ -43,18 +43,46 @@ def plot_median_freq_slope_comparison(group1: dict, group2: dict,
         values1 = [(group1[k]) for k in keys]
         values2 = [(group2[k]) for k in keys]
     x = np.arange(len(keys))
-    width = 0.35
+    # width = 0.35
+    
+    # x = np.arange(len(keys)) * 1.5  # 放大 x 軸間距
+    # width = 0.3  # 稍微窄一點避免重疊
 
     fig, ax = plt.subplots(figsize=(max(8, len(keys) * 1.2), 6))
-    bars1 = ax.bar(x - width/2, values1, width, label=label_list[0], color='dodgerblue')
-    bars2 = ax.bar(x + width/2, values2, width, label=label_list[1], color='orange')
+    # bars1 = ax.bar(x - width/2, values1, width, label=label_list[0], color="#3B3B3B")
+    # bars2 = ax.bar(x + width/2, values2, width, label=label_list[1], color="#CC0040")
+    
+    width = 0.25       # 原本 0.35 → 改小一點
+    offset = 0.14      # 控制兩組柱子之間的間距
+    
+    # bars1 = ax.bar(x - offset, values1, width, label=label_list[0], color="#CC0040")
+    # bars1 = ax.bar(x - offset, values1, width, label=label_list[0],
+    #               edgecolor="#CC0040",edgecolor='none', facecolor='none', hatch='\\\\', linewidth=2)
+    
+    bars1 = ax.bar(x - offset, values1, width, label=label_list[0],
+                   edgecolor="#CC0040",   # 用斜線顏色
+                   facecolor='none',
+                   hatch='\\\\',
+                   linewidth=0.1          # ✅ 非常細的外框線
+                   )
+    bars2 = ax.bar(x + offset, values2, width, label=label_list[1], color="#CC0040")
+    
+    # ax.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='gray', alpha=0.8)
+    # ax.set_ylabel(ylabel)
+    # ax.set_title(title, fontsize=16)
+    ax.text(0.5, -0.15, title, fontsize=16, ha='center', va='top', transform=ax.transAxes)
 
-    ax.set_ylabel(ylabel)
-    ax.set_title(title, fontsize=16)
+    ax.tick_params(axis='y', left=False, labelleft=False)
+    ax.spines['left'].set_visible(False)   # 左框線
+    ax.spines['right'].set_visible(False)  # 右框線
+    ax.spines['top'].set_visible(False)    # 上框線
+    ax.spines['bottom'].set_visible(False) # 下框線（依需要）
+    
+    ax.axhline(y=0, color='#3B3B3B', linewidth=2)
     ax.set_xticks(x)
-    ax.set_xticklabels(keys, rotation=45, ha='right')
+    ax.set_xticklabels(keys, ha='center')
     ax.legend()
-    ax.axhline(0, color='gray', linewidth=0.8, linestyle='--')
+    ax.grid(True, axis='y', linestyle=(0, (10, 5)), alpha=0.7)
 
     # ✅ 在柱子上加上絕對值數字
     if show_values:

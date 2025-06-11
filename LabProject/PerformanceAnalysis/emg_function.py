@@ -21,11 +21,13 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 
 from adjustText import adjust_text
-plt.rcParams['font.sans-serif'] =  ['Noto Sans TC']  # 微軟正黑體
+plt.rcParams['font.sans-serif'] =  ['Roboto']  
 plt.rcParams['axes.unicode_minus'] = False  # 正常顯示負號
+plt.rcParams['figure.dpi'] = 150
 from scipy.stats import linregress
 from matplotlib.ticker import MaxNLocator
 from scipy.interpolate import interp1d # 需要導入
+from matplotlib.patches import FancyBboxPatch
 
 
 # %%
@@ -2146,8 +2148,9 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
     target_length: int,
     selected_emg_channels: Optional[List[str]] = None,
     max_subplot_cols: int = 2,
-    y_axis_label: str = "EMG Amplitude (AU)",
-    x_axis_label: str = "Time (-40 to 100 units)"
+    y_axis_label: str = "muscle activation level",
+    x_axis_label: str = "Time (%)",
+    color_hex_codes: Optional[List[str]] = None
     # show_trendline 參數已移除，因為雲圖的均值線已是主要趨勢
 ) -> None:
     """
@@ -2190,8 +2193,8 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
 
             if stats_for_all_emgs:
                 datasets_with_stats.append({"StatsData": stats_for_all_emgs})
-                labels_for_stats_datasets.append(f"{raw_label_prefix} - {direction.capitalize()}")
-
+                # labels_for_stats_datasets.append(f"{raw_label_prefix} - {direction.capitalize()}")
+                labels_for_stats_datasets.append(f"{raw_label_prefix}")
     if not datasets_with_stats:
         print("Plotting Error: No data available for plotting after statistical aggregation.")
         return
@@ -2223,7 +2226,16 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
     cols = min(max_subplot_cols, num_subplots)
     rows = math.ceil(num_subplots / cols)
     
-    fig, axs = plt.subplots(rows, cols, figsize=(cols * 8, rows * 6.5), squeeze=False, sharex=True) # 增加高度
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 6.4, rows * 3.6), dpi=150,
+                            squeeze=False, sharex=True) # 增加高度
+    # 🔳 在 figure 上加一個淡灰色外框
+    rect = FancyBboxPatch(
+        (0.01, 0.01), 0.98, 0.98,  # (x, y, width, height) in figure coordinates
+        boxstyle="round,pad=0.01",  # 可改成 "square" 若不想要圓角
+        edgecolor="#e5e5e5", facecolor="none", linewidth=2,
+        transform=fig.transFigure, clip_on=False
+    )
+    fig.patches.append(rect)
     time_axis = np.linspace(-40, 100, target_length)
     palette = plt.get_cmap('tab10')
 
@@ -2245,27 +2257,61 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
                     continue
 
                 plotted_anything_on_ax = True
-                color = palette(dataset_idx % palette.N)
+              
+                if color_hex_codes and dataset_idx < len(color_hex_codes):
+                   color = color_hex_codes[dataset_idx]
+                else:
+                   color = palette(dataset_idx % palette.N)
+                   
                 current_label = labels_for_stats_datasets[dataset_idx]
                 
-                ax.plot(time_axis, mean_signal, color=color, label=f'{current_label} (n={num_trials})', linewidth=2)
-                ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.2)
+                # ax.plot(time_axis, mean_signal, color=color, label=f'{current_label} (n={num_trials})', linewidth=1.5)
+                ax.plot(time_axis, mean_signal, color=color, linewidth=1.5)
+                ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.15)
             
         if plotted_anything_on_ax:
-            ax.legend(fontsize=9, loc='best')
-            ax.grid(True, linestyle=':', alpha=0.7)
+            # ax.legend(fontsize=9, loc='best')
+            # ax.grid(True, linestyle='-', alpha=0.5)
+            ax.grid(True, linestyle=(0, (10, 5)), alpha=0.5, linewidth=0.5)
             ax.set_xlim(-40, 100)
+            ax.axvline(x=0, color='black', linestyle='--', linewidth=0.5)
             ax.tick_params(axis='y', labelsize=10)
 
             is_bottom_row = (i_subplot // cols) == rows - 1
             is_left_col = (i_subplot % cols) == 0
+            ax.yaxis.tick_right()                  # 把刻度值也放右邊
+            # ax.set_ylim(0, 110)              # 設定 Y 軸範圍
+            ax.set_ylim(0, 105)  # 可視範圍
+            ax.set_yticks(np.arange(20, 101, 20))  # 顯示 20~100，但不含 0、110
+            # ax.set_yticks(np.arange(0, 101, 20))  # 設定 Y 軸刻度間距
+            # 自訂 Y 軸刻度，去掉 0
+            # ticks = [tick for tick in ax.get_yticks() if tick != 0]
+            
+            ticks = ax.get_yticks()
+            labels = ["" if t == 0 else str(int(t)) for t in ticks]
+            ax.set_yticks(ticks)
+            ax.set_yticklabels(labels)
+            # ax.set_yticks(ticks)
+            # 移除上框線與右框線
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_linewidth(2)         # 下方邊框加粗
+            ax.spines['left'].set_linewidth(2)           # 左側邊框加粗
+            
+            ax.spines['bottom'].set_color('#959595')     # 下方邊框改為深灰色
+            ax.spines['left'].set_color('#959595')     # 下方邊框改為深灰色
 
             if is_bottom_row:
                 ax.set_xlabel(x_axis_label, fontsize=12)
-                ax.tick_params(axis='x', labelsize=10)
+                ax.tick_params(axis='x', labelsize=10, which='both', length=0)
+            else:
+                ax.tick_params(axis='x', which='both', length=0)
             
             if is_left_col:
-                 ax.set_ylabel(y_axis_label, fontsize=12)
+                 ax.set_ylabel(y_axis_label, fontsize=16, labelpad=30, rotation=270, color="#868686")
+                 ax.yaxis.set_label_coords(-0.12, 0.0)  # (x, y) → y=0.0 對齊 X 軸
+                 # ax.yaxis.set_label_position("right")   # 把標籤放右邊
+                 
         else:
             ax.text(0.5, 0.5, "No data for this channel", ha="center", va="center", transform=ax.transAxes, color="grey")
             ax.set_xlim(-40, 100)
@@ -2275,7 +2321,7 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
     for i_ax in range(num_subplots, rows * cols):
         fig.delaxes(axs[i_ax // cols, i_ax % cols])
 
-    fig.suptitle(figure_title, fontsize=18, fontweight='bold', y=0.99 if rows == 1 else 1.00)
+    # fig.suptitle(figure_title, fontsize=18, fontweight='bold', y=0.99 if rows == 1 else 1.00)
     plt.tight_layout(rect=[0.03, 0.03, 0.97, 0.95 if rows > 1 else 0.92])
     plt.show()
 

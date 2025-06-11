@@ -127,6 +127,12 @@ muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brac
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
                'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
 
+color_codes = ["#CC0040", "#3B3B3B",
+             # "#F1A012", "#7A4EDF"
+             ]
+select_muscle = ["DorInter.IM EMG4", "AbdDigMin.IM EMG5",
+                 "FleRad.IM EMG2", 'ExtUlnar.IM EMG3']
+
 # %%
 
 EMG_CONFIG = {
@@ -227,7 +233,6 @@ oneshot_df = pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]
 pos_oneshot_df = pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]
 
 
-
 # 繪製瞄準速度取線
 pre.plot_standardized_signals_cloud_compare(
     datasets=[pre_standardized_speeds, pos_standardized_speeds],
@@ -273,8 +278,8 @@ interpolated_data = emg.process_emg_data_with_direction(oneshot_df,
 
 interpolated_data_1 = emg.process_emg_data_with_direction(pos_oneshot_df,
                                                           pos_emg_results,
-                                                            dataset_labels=None,
-                                                            selected_keys = None)
+                                                          dataset_labels=None,
+                                                          selected_keys = None)
 
 
 # %% 繪製肌肉活化程度曲線
@@ -305,7 +310,7 @@ plotter_instance.plot_emg_summary_by_direction_with_cloud(
     muscle_groups_to_plot=muscles_to_plot_fig2,
     main_title="EMG Activity: Upper Limb & Hand (X: -40 to 100)",
     share_y_axis=False # 嘗試 share_y_axis=False 來看看效果
-)
+    )
 
 # 示例 3: 包含空肌肉列表的行 (應跳過該行)
 # muscles_to_plot_fig3 = {
@@ -325,35 +330,40 @@ group1 = pre_fft_results["MedianFreq_Slope"]
 group2 = pos_fft_results["MedianFreq_Slope"]
 
 ta.plot_median_freq_slope_comparison(group1, group2,
-                                     selected_keys=[
-                                         "ExtRad.IM EMG1", "Triceps.IM EMG9",
-                                         "Biceps.IM EMG8", 'ExtRad.IM EMG1'
-                                         ],
-                                     title="Median Frequency Slope Comparison",
+                                     selected_keys=select_muscle,
+                                     title="Fatigue Index Slope",
                                      label_list=["pre", "pos"],
                                      show_values=False)
 
 group1 = pre_emg_results["Amplitudes_Slope"]
 group2 = pos_emg_results["Amplitudes_Slope"]
 ta.plot_median_freq_slope_comparison(group1, group2,
-                                     selected_keys=[
-                                         "ExtRad.IM EMG1", "Triceps.IM EMG9",
-                                         "Biceps.IM EMG8", 'ExtRad.IM EMG1'
-                                         ],
-                                     title="Muscle Activation Slope Comparison",
+                                     selected_keys=select_muscle,
+                                     title="Muscle Activation Level Slope",
                                      ylabel="Muscle Activation Level",
                                      label_list=["pre", "pos"],
-                                     show_values=False)
+                                     show_values=False,
+                                     turn=False)
 
 
 emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
         raw_datasets_list=[interpolated_data, interpolated_data_1],
         raw_dataset_labels=["Pre", "Pos"],
         directions_to_process=["left"],
-        figure_title="Cloud Comparison: Alpha vs Beta (Left/Right Stats)",
+        figure_title="Cloud Comparison: Alpha vs Beta (Left Stats)",
         target_length=141,
-        selected_emg_channels=["ExtRad.IM EMG1", "Triceps.IM EMG9",
-        "Biceps.IM EMG8", 'ExtRad.IM EMG1'],
+        selected_emg_channels=select_muscle,
+        color_hex_codes=color_codes
+    )
+
+emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
+        raw_datasets_list=[interpolated_data, interpolated_data_1],
+        raw_dataset_labels=["Pre", "Pos"],
+        directions_to_process=["right"],
+        figure_title="Cloud Comparison: Alpha vs Beta (Right Stats)",
+        target_length=141,
+        selected_emg_channels=select_muscle,
+        color_hex_codes=color_codes
     )
 # %%
 
