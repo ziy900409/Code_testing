@@ -237,11 +237,12 @@ pos_oneshot_df = pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]
 pre.plot_standardized_signals_cloud_compare(
     datasets=[pre_standardized_speeds, pos_standardized_speeds],
     target_length=101,
-    title="Comparison of Mean ± Std Dev Clouds",
+    title="Speed Profile",
     xlabel="Normalized Time (%)",
-    ylabel="Signal Value (°/s or other units)",
+    ylabel="Aim Speed (°/s)",
     # title="Sine Group Mean ± Std Dev",
     labels=['55g', "60g"],
+    color_hex_codes=color_codes,
     # labels=None,                
     # color_indices=[0, 2, 4]          
       )
@@ -267,7 +268,7 @@ emg.plot_multiple_emg_data_over_time(
     show_trendline=True, # New parameter to control trendline plotting
     selected_keys = [
         'Biceps.IM EMG8', 'Triceps.IM EMG9', 'DorInter_1st.IM EMG4', 'AbdDigMin.IM EMG5'
-        ]
+        ],
 )
 
 interpolated_data = emg.process_emg_data_with_direction(oneshot_df,

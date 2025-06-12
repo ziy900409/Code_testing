@@ -1687,7 +1687,8 @@ def plot_standardized_signals_cloud_compare(
         ylabel="Signal Value (°/s or other units)",
         # Optional: Provide lists for labels and colors, otherwise defaults are used
         labels=None,                # List of labels corresponding to datasets
-        color_indices=None          # List of color indices corresponding to datasets
+        # color_indices=None,          # List of color indices corresponding to datasets
+        color_hex_codes: Optional[List[str]] = None
     ):
     """
     Plots the mean and standard deviation range for one or more (up to N) datasets of
@@ -1767,48 +1768,57 @@ def plot_standardized_signals_cloud_compare(
         print(f"Warning: Number of labels ({len(labels)}) does not match number of datasets ({num_datasets}). Using default labels.")
         labels = [f'Dataset {i+1}' for i in range(num_datasets)]
 
-    if color_indices is None:
-        color_indices = list(range(num_datasets))
-    elif len(color_indices) != num_datasets:
-        print(f"Warning: Number of color_indices ({len(color_indices)}) does not match number of datasets ({num_datasets}). Using default indices.")
-        color_indices = list(range(num_datasets))
+    # if color_indices is None:
+    #     color_indices = list(range(num_datasets))
+    # elif len(color_indices) != num_datasets:
+    #     print(f"Warning: Number of color_indices ({len(color_indices)}) does not match number of datasets ({num_datasets}). Using default indices.")
+    #     color_indices = list(range(num_datasets))
 
     # --- Create figure and x-axis ---
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     iters = np.linspace(0, 100, target_length) # x-axis: 0% to 100%
-    try:
-        # Use a colormap with more distinct colors if plotting many lines
-        if num_datasets > plt.get_cmap('Set1').N:
-             palette = plt.get_cmap('tab10') # Or 'tab20', 'viridis', etc.
-             print(f"Warning: More datasets ({num_datasets}) than distinct colors in 'Set1'. Switched to '{palette.name}' colormap.")
-        else:
-             palette = plt.get_cmap('Set1')
-    except ValueError:
-        print("Warning: Colormap 'Set1' not found. Using default 'viridis'.")
-        palette = plt.get_cmap('viridis')
+    # try:
+    #     # Use a colormap with more distinct colors if plotting many lines
+    #     if color_hex_codes and num_datasets > plt.get_cmap('Set1').N:
+    #         color = color_hex_codes[num_datasets]
+    #         # palette = plt.get_cmap('tab10') # Or 'tab20', 'viridis', etc.
+    #         # print(f"Warning: More datasets ({num_datasets}) than distinct colors in 'Set1'. Switched to '{palette.name}' colormap.")
+    #     else:
+    #         palette = plt.get_cmap('Set1')
+    # except ValueError:
+    #     print("Warning: Colormap 'Set1' not found. Using default 'viridis'.")
+    #     palette = plt.get_cmap('viridis')
 
     plot_success_count = 0
 
     # --- Loop through datasets, process and plot ---
-    plotted_colors = set() # Keep track of used colors to avoid reuse if indices clash
+    # plotted_colors = set() # Keep track of used colors to avoid reuse if indices clash
     for i in range(num_datasets):
+        if color_hex_codes:
+        # and num_datasets > plt.get_cmap('Set1').N:
+            color = color_hex_codes[i]
+            # palette = plt.get_cmap('tab10') # Or 'tab20', 'viridis', etc.
+            # print(f"Warning: More datasets ({num_datasets}) than distinct colors in 'Set1'. Switched to '{palette.name}' colormap.")
+        else:
+            palette = plt.get_cmap('Set1')
+            color = palette(i % palette.N)
         signals_dict = datasets[i]
         label = labels[i]
-        color_idx = color_indices[i]
+        # color_idx = color_indices[i]
 
         print(f"\nProcessing {label}...")
         avg, lower, upper, count = _process_and_calculate_stats(signals_dict, target_length)
 
         if avg is not None:
             # Assign color, ensuring uniqueness if indices clash
-            current_color_idx = color_idx
-            while current_color_idx in plotted_colors:
-                 print(f"Warning: Color index {current_color_idx} for '{label}' already used. Trying next index.")
-                 current_color_idx += 1
-            color = palette(current_color_idx % palette.N) # Use modulo for safety
-            plotted_colors.add(current_color_idx)
+            # current_color_idx = color_idx
+            # while current_color_idx in plotted_colors:
+            #      print(f"Warning: Color index {current_color_idx} for '{label}' already used. Trying next index.")
+            #      current_color_idx += 1
+            # color = palette(current_color_idx % palette.N) # Use modulo for safety
+            # plotted_colors.add(current_color_idx)
 
-            ax.plot(iters, avg, color=color, label=f'{label} (n={count})', linewidth=2)
+            ax.plot(iters, avg, color=color, linewidth=2)
             ax.fill_between(iters, lower, upper, color=color, alpha=0.2)
             plot_success_count += 1
         else:
@@ -1816,12 +1826,31 @@ def plot_standardized_signals_cloud_compare(
 
     # --- Plot Formatting ---
     if plot_success_count > 0:
-        ax.set_title(title, fontsize=14)
-        ax.legend(loc="best")
-        ax.grid(True, linestyle='-.')
-        ax.set_xlabel(xlabel, fontsize=12)
-        ax.set_ylabel(ylabel, fontsize=12)
+        # 設置 title
+        ax.text(x=0.0, y=1.1, s=title, fontsize=32, fontweight='bold',
+                transform=ax.transAxes,
+                ha='left', va='bottom')
+        # ax.set_title(title, fontsize=20, loc='left')
+        # ax.legend(loc="best")
+        # 設置背景格式
+        ax.grid(True, linestyle=(0, (10, 5)), alpha=0.5, linewidth=0.5)
+        # 設定邊框格式
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_linewidth(2)         # 下方邊框加粗
+        ax.spines['left'].set_linewidth(2)           # 左側邊框加粗
+        ax.spines['bottom'].set_color('#959595')     # 下方邊框改為深灰色
+        ax.spines['left'].set_color('#959595')     # 下方邊框改為深灰色
+        
+        # 設置 X 軸格式
         ax.set_xlim(left=0, right=100)
+        ax.set_xlabel(xlabel, fontsize=12, color="#868686")
+        ax.tick_params(axis='x', labelsize=10, which='both', length=0, labelcolor="#868686")
+        # 設置 Y 軸格式
+        ax.set_ylabel(ylabel, fontsize=16, labelpad=30, rotation=270, color="#868686")
+        ax.yaxis.tick_right()                  # 把刻度值也放右邊
+        ax.tick_params(axis='y', labelsize=10, which='both', length=0, labelcolor="#868686")
+        ax.yaxis.set_label_coords(-0.05, 0.42)  # (x, y) → y=0.0 對齊 X 軸
         plt.tight_layout()
         plt.show()
     else:

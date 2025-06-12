@@ -28,6 +28,7 @@ from scipy.stats import linregress
 from matplotlib.ticker import MaxNLocator
 from scipy.interpolate import interp1d # 需要導入
 from matplotlib.patches import FancyBboxPatch
+from matplotlib.lines import Line2D
 
 
 # %%
@@ -2226,7 +2227,7 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
     cols = min(max_subplot_cols, num_subplots)
     rows = math.ceil(num_subplots / cols)
     
-    fig, axs = plt.subplots(rows, cols, figsize=(cols * 6.4, rows * 3.6), dpi=150,
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 6, rows * 4.1), dpi=150,
                             squeeze=False, sharex=True) # 增加高度
     # 🔳 在 figure 上加一個淡灰色外框
     rect = FancyBboxPatch(
@@ -2272,6 +2273,19 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
         if plotted_anything_on_ax:
             # ax.legend(fontsize=9, loc='best')
             # ax.grid(True, linestyle='-', alpha=0.5)
+            # 橫線（畫在上下子圖之間）
+            # 畫十字線分隔四張子圖
+            # 橫線：Y = 中間，X 從邊界 0.01 開始到 0.99
+            hline = Line2D([0.0, 1], [0.5, 0.5], transform=fig.transFigure,
+                           color='#e5e5e5', linewidth=2, linestyle='-')
+            
+            # 直線：X = 中間，Y 從邊界 0.01 到 0.99
+            vline = Line2D([0.5, 0.5], [0.00, 1], transform=fig.transFigure,
+                           color='#e5e5e5', linewidth=2, linestyle='-')
+            
+            fig.add_artist(hline)
+            fig.add_artist(vline)
+            
             ax.grid(True, linestyle=(0, (10, 5)), alpha=0.5, linewidth=0.5)
             ax.set_xlim(-40, 100)
             ax.axvline(x=0, color='black', linestyle='--', linewidth=0.5)
@@ -2307,9 +2321,10 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
             else:
                 ax.tick_params(axis='x', which='both', length=0)
             
-            if is_left_col:
-                 ax.set_ylabel(y_axis_label, fontsize=16, labelpad=30, rotation=270, color="#868686")
-                 ax.yaxis.set_label_coords(-0.12, 0.0)  # (x, y) → y=0.0 對齊 X 軸
+            # if is_left_col:
+            ax.set_ylabel(y_axis_label, fontsize=16, labelpad=30, rotation=270, color="#868686")
+            ax.yaxis.set_label_coords(-0.1, 0.43)  # (x, y) → y=0.0 對齊 X 軸
+            ax.tick_params(axis='y', labelsize=10, labelcolor='#e5e5e5', which='both', length=0)
                  # ax.yaxis.set_label_position("right")   # 把標籤放右邊
                  
         else:
@@ -2323,6 +2338,8 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
 
     # fig.suptitle(figure_title, fontsize=18, fontweight='bold', y=0.99 if rows == 1 else 1.00)
     plt.tight_layout(rect=[0.03, 0.03, 0.97, 0.95 if rows > 1 else 0.92])
+    plt.subplots_adjust(hspace=0.4, wspace=0.3)  # hspace 控制上下距離，wspace 控制左右距離
+
     plt.show()
 
 # --- 示例用法 ---
