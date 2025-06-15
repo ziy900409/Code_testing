@@ -29,6 +29,7 @@ from matplotlib.ticker import MaxNLocator
 from scipy.interpolate import interp1d # 需要導入
 from matplotlib.patches import FancyBboxPatch
 from matplotlib.lines import Line2D
+from matplotlib.ticker import FuncFormatter
 
 
 # %%
@@ -2229,7 +2230,7 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
     
     fig, axs = plt.subplots(rows, cols, figsize=(cols * 6, rows * 4.1), dpi=150,
                             squeeze=False, sharex=True) # 增加高度
-    # 🔳 在 figure 上加一個淡灰色外框
+    # 在 figure 上加一個淡灰色外框
     rect = FancyBboxPatch(
         (0.01, 0.01), 0.98, 0.98,  # (x, y, width, height) in figure coordinates
         boxstyle="round,pad=0.01",  # 可改成 "square" 若不想要圓角
@@ -2242,7 +2243,12 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
 
     for i_subplot, emg_channel_name in enumerate(channels_for_subplots):
         ax = axs[i_subplot // cols, i_subplot % cols]
-        ax.set_title(emg_channel_name, fontsize=14)
+        # ax.set_title(emg_channel_name, fontsize=14)
+        # 1. 在左上角添加帶圓圈的編號 (更新位置和對齊方式)
+        ax.text(-0.08, 0.92, str(i_subplot + 1), transform=ax.transAxes,
+                fontsize=20, color='white',
+                horizontalalignment='center', verticalalignment='center', # 將對齊方式改為置中
+                bbox=dict(boxstyle='circle,pad=0.4', facecolor='black', edgecolor='none'))
         plotted_anything_on_ax = False
 
         for dataset_idx, dataset_dict_with_stats in enumerate(datasets_with_stats):
@@ -2260,9 +2266,9 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
                 plotted_anything_on_ax = True
               
                 if color_hex_codes and dataset_idx < len(color_hex_codes):
-                   color = color_hex_codes[dataset_idx]
+                    color = color_hex_codes[dataset_idx]
                 else:
-                   color = palette(dataset_idx % palette.N)
+                    color = palette(dataset_idx % palette.N)
                    
                 current_label = labels_for_stats_datasets[dataset_idx]
                 
@@ -2277,11 +2283,11 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
             # 畫十字線分隔四張子圖
             # 橫線：Y = 中間，X 從邊界 0.01 開始到 0.99
             hline = Line2D([0.0, 1], [0.5, 0.5], transform=fig.transFigure,
-                           color='#e5e5e5', linewidth=2, linestyle='-')
+                            color='#e5e5e5', linewidth=2, linestyle='-')
             
             # 直線：X = 中間，Y 從邊界 0.01 到 0.99
             vline = Line2D([0.5, 0.5], [0.00, 1], transform=fig.transFigure,
-                           color='#e5e5e5', linewidth=2, linestyle='-')
+                            color='#e5e5e5', linewidth=2, linestyle='-')
             
             fig.add_artist(hline)
             fig.add_artist(vline)
@@ -2294,10 +2300,9 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
             is_bottom_row = (i_subplot // cols) == rows - 1
             is_left_col = (i_subplot % cols) == 0
             ax.yaxis.tick_right()                  # 把刻度值也放右邊
-            # ax.set_ylim(0, 110)              # 設定 Y 軸範圍
-            ax.set_ylim(0, 105)  # 可視範圍
+           
+            ax.set_ylim(0, 105)  # 設定 Y 軸範圍可視範圍
             ax.set_yticks(np.arange(20, 101, 20))  # 顯示 20~100，但不含 0、110
-            # ax.set_yticks(np.arange(0, 101, 20))  # 設定 Y 軸刻度間距
             # 自訂 Y 軸刻度，去掉 0
             # ticks = [tick for tick in ax.get_yticks() if tick != 0]
             
@@ -2305,7 +2310,7 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
             labels = ["" if t == 0 else str(int(t)) for t in ticks]
             ax.set_yticks(ticks)
             ax.set_yticklabels(labels)
-            # ax.set_yticks(ticks)
+            ax.set_yticks(ticks)
             # 移除上框線與右框線
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
@@ -2316,16 +2321,16 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
             ax.spines['left'].set_color('#959595')     # 下方邊框改為深灰色
 
             if is_bottom_row:
-                ax.set_xlabel(x_axis_label, fontsize=12)
-                ax.tick_params(axis='x', labelsize=10, which='both', length=0)
+                ax.set_xlabel(x_axis_label, color='#868686', fontsize=16)
+                ax.tick_params(axis='x',labelcolor='#868686', labelsize=14, which='both', length=0)
             else:
                 ax.tick_params(axis='x', which='both', length=0)
             
             # if is_left_col:
             ax.set_ylabel(y_axis_label, fontsize=16, labelpad=30, rotation=270, color="#868686")
-            ax.yaxis.set_label_coords(-0.1, 0.43)  # (x, y) → y=0.0 對齊 X 軸
-            ax.tick_params(axis='y', labelsize=10, labelcolor='#e5e5e5', which='both', length=0)
-                 # ax.yaxis.set_label_position("right")   # 把標籤放右邊
+            ax.yaxis.set_label_coords(-0.06, 0.38)  # (x, y) → y=0.0 對齊 X 軸 
+            ax.tick_params(axis='y', labelsize=14, labelcolor='#868686', which='both', length=0)
+            ax.yaxis.set_label_position("right")   # 把標籤放右邊
                  
         else:
             ax.text(0.5, 0.5, "No data for this channel", ha="center", va="center", transform=ax.transAxes, color="grey")
@@ -2337,11 +2342,194 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
         fig.delaxes(axs[i_ax // cols, i_ax % cols])
 
     # fig.suptitle(figure_title, fontsize=18, fontweight='bold', y=0.99 if rows == 1 else 1.00)
-    plt.tight_layout(rect=[0.03, 0.03, 0.97, 0.95 if rows > 1 else 0.92])
+    plt.tight_layout(rect=[0.01, 0, 0.99, 1 if rows > 1 else 0.92])
     plt.subplots_adjust(hspace=0.4, wspace=0.3)  # hspace 控制上下距離，wspace 控制左右距離
 
     plt.show()
+# %%
 
+# def plot_multi_raw_datasets_cloud_comparison(
+#     raw_datasets_list: List[Dict[str, Dict[str, Dict[str, np.ndarray]]]],
+#     raw_dataset_labels: List[str],
+#     directions_to_process: List[str],
+#     figure_title: str,
+#     target_length: int,
+#     selected_emg_channels: Optional[List[str]] = None,
+#     max_subplot_cols: int = 2,
+#     y_axis_label: str = "muscle activation level",
+#     x_axis_label: str = "Time (%)",
+#     color_hex_codes: Optional[List[str]] = None
+# ) -> None:
+#     """
+#     比較多個 'processed_data_directional' 格式的數據集，以雲圖形式展示。
+#     對於每個指定的 EMG 頻道，會在一個子圖上繪製所有數據集（按指定方向聚合後）的對應雲圖。
+#     X 軸範圍固定為 -40 到 100。
+#     增加了左上角的編號圓圈，並調整了樣式以匹配目標圖片。
+#     """
+#     if not raw_datasets_list or not isinstance(raw_datasets_list, list):
+#         print("Plotting Error: 'raw_datasets_list' must be a non-empty list.")
+#         return
+#     if len(raw_datasets_list) != len(raw_dataset_labels):
+#         print("Plotting Error: Length of 'raw_datasets_list' and 'raw_dataset_labels' must match.")
+#         return
+#     if not directions_to_process:
+#         print("Plotting Error: 'directions_to_process' list cannot be empty.")
+#         return
+
+#     # 1. 準備 "datasets" 以存儲統計數據
+#     datasets_with_stats: List[Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, int]]]] = []
+#     labels_for_stats_datasets: List[str] = []
+    
+#     for i, raw_data_dict in enumerate(raw_datasets_list):
+#         raw_label_prefix = raw_dataset_labels[i]
+#         for direction in directions_to_process:
+#             data_for_one_direction = raw_data_dict.get(direction)
+#             if not data_for_one_direction:
+#                 print(f"Plotting Info: Direction '{direction}' not found in dataset '{raw_label_prefix}'. Skipping.")
+#                 continue
+
+#             emg_channels_in_this_part = _standalone_get_unique_emg_channels(data_for_one_direction)
+#             if not emg_channels_in_this_part:
+#                 continue
+
+#             stats_for_all_emgs = _standalone_calculate_emg_stats_for_direction(
+#                 data_for_one_direction,
+#                 emg_channels_in_this_part,
+#                 target_length
+#             )
+
+#             if stats_for_all_emgs:
+#                 datasets_with_stats.append({"StatsData": stats_for_all_emgs})
+#                 labels_for_stats_datasets.append(f"{raw_label_prefix}")
+#     if not datasets_with_stats:
+#         print("Plotting Error: No data available for plotting after statistical aggregation.")
+#         return
+
+#     # 2. 確定要為哪些 EMG 頻道創建子圖
+#     all_present_emg_in_stats: Set[str] = set()
+#     for ds_with_stats in datasets_with_stats:
+#         all_present_emg_in_stats.update(ds_with_stats.get("StatsData", {}).keys())
+    
+#     if not all_present_emg_in_stats:
+#         print("Plotting Error: No EMG channels found in any aggregated statistical datasets.")
+#         return
+
+#     channels_for_subplots: List[str]
+#     if selected_emg_channels:
+#         channels_for_subplots = [ch for ch in selected_emg_channels if ch in all_present_emg_in_stats]
+#         if not channels_for_subplots:
+#             print(f"Plotting Warning: None of selected channels {selected_emg_channels} have stats data. Plotting all.")
+#             channels_for_subplots = sorted(list(all_present_emg_in_stats))
+#     else:
+#         channels_for_subplots = sorted(list(all_present_emg_in_stats))
+
+#     if not channels_for_subplots:
+#         print("Plotting Error: No EMG channels to create subplots for.")
+#         return
+
+#     # 3. 繪圖佈局和繪製
+#     num_subplots = len(channels_for_subplots)
+#     cols = min(max_subplot_cols, num_subplots)
+#     rows = math.ceil(num_subplots / cols)
+    
+#     fig, axs = plt.subplots(rows, cols, figsize=(cols * 6, rows * 4.1), dpi=150,
+#                             squeeze=False, sharex=True, sharey=True)
+    
+#     # 🔳 在 figure 上加一個淡灰色外框
+#     rect = FancyBboxPatch(
+#         (0.01, 0.01), 0.98, 0.98,
+#         boxstyle="round,pad=0.01",
+#         edgecolor="#e5e5e5", facecolor="none", linewidth=2,
+#         transform=fig.transFigure, clip_on=False
+#     )
+#     fig.patches.append(rect)
+#     time_axis = np.linspace(-40, 100, target_length)
+#     palette = plt.get_cmap('tab10')
+
+#     for i_subplot, emg_channel_name in enumerate(channels_for_subplots):
+#         ax = axs[i_subplot // cols, i_subplot % cols]
+        
+#         # --- START: 修改部分 ---
+#         # 1. 在左上角添加帶圓圈的編號 (更新位置和對齊方式)
+#         ax.text(0.05, 0.95, str(i_subplot + 1), transform=ax.transAxes,
+#                 fontsize=16, fontweight='bold', color='white',
+#                 horizontalalignment='left', verticalalignment='top', # 精準定位左上角
+#                 bbox=dict(boxstyle='circle,pad=0.4', facecolor='black', edgecolor='none'))
+#         # --- END: 修改部分 ---
+
+#         plotted_anything_on_ax = False
+
+#         for dataset_idx, dataset_dict_with_stats in enumerate(datasets_with_stats):
+#             stats_map = dataset_dict_with_stats.get("StatsData", {})
+#             if emg_channel_name in stats_map:
+#                 mean_signal, lower_bound, upper_bound, num_trials = stats_map[emg_channel_name]
+                
+#                 if not (isinstance(mean_signal, np.ndarray) and mean_signal.size == target_length and
+#                         isinstance(lower_bound, np.ndarray) and lower_bound.size == target_length and
+#                         isinstance(upper_bound, np.ndarray) and upper_bound.size == target_length):
+#                     print(f"Plotting Warning: Invalid stats data for {emg_channel_name} in dataset {labels_for_stats_datasets[dataset_idx]}. Skipping.")
+#                     continue
+
+#                 plotted_anything_on_ax = True
+                
+#                 if color_hex_codes and dataset_idx < len(color_hex_codes):
+#                     color = color_hex_codes[dataset_idx]
+#                 else:
+#                     color = palette(dataset_idx % palette.N)
+                    
+#                 current_label = labels_for_stats_datasets[dataset_idx]
+                
+#                 ax.plot(time_axis, mean_signal, color=color, linewidth=1.5)
+#                 ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.15)
+            
+#         if plotted_anything_on_ax:
+#             ax.grid(True, linestyle=(0, (10, 5)), alpha=0.5, linewidth=0.5)
+#             ax.set_xlim(-40, 100)
+#             ax.axvline(x=0, color='black', linestyle='--', linewidth=0.5)
+
+#             # Y軸樣式調整
+#             ax.yaxis.tick_right()
+#             ax.yaxis.set_label_position("right")
+#             ax.set_ylim(0, 105) 
+#             ax.set_yticks(np.arange(20, 101, 20))
+#             ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f'{int(y)}%'))
+#             ax.set_ylabel("") 
+#             ax.tick_params(axis='y', labelsize=10, labelcolor='black', which='both', length=0)
+            
+#             # X軸樣式調整
+#             is_bottom_row = (i_subplot // cols) == rows - 1
+#             if is_bottom_row:
+#                  ax.set_xlabel("", fontsize=12)
+#                  ax.tick_params(axis='x', labelsize=10, which='both', length=0)
+#             else:
+#                  ax.tick_params(axis='x', labelbottom=False, which='both', length=0)
+            
+#             ax.spines['top'].set_visible(False)
+#             ax.spines['left'].set_visible(False)
+#             ax.spines['bottom'].set_linewidth(2)
+#             ax.spines['right'].set_linewidth(2) 
+            
+#             ax.spines['bottom'].set_color('#959595')
+#             ax.spines['right'].set_color('#959595')
+
+#         else:
+#             ax.text(0.5, 0.5, "No data for this channel", ha="center", va="center", transform=ax.transAxes, color="grey")
+#             ax.set_xlim(-40, 100)
+
+#     for i_ax in range(num_subplots, rows * cols):
+#         fig.delaxes(axs[i_ax // cols, i_ax % cols])
+
+#     # --- START: 修改部分 ---
+#     # 2. 移除整個 Figure 的 Y 軸標籤，讓風格更簡潔
+#     # fig.text(...) # 已被移除
+#     # --- END: 修改部分 ---
+
+#     # 調整佈局
+#     plt.tight_layout(rect=[0.01, 0.01, 1, 0.95])
+#     plt.subplots_adjust(hspace=0.1, wspace=0.1) 
+
+#     plt.show()
+# %%
 # --- 示例用法 ---
 if __name__ == '__main__':
     # 假設 processed_data_directional_example_v1 和 v2 已定義

@@ -228,7 +228,7 @@ all_fft_data = [pre_fft_results, pos_fft_results]
 all_configs = [EMG_CONFIG, EMG_CONFIG]
 labels = ['55g', '60g'] # 可選的自定義標籤
 
-oneshot_df = pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]
+pre_oneshot_df = pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]
 
 pos_oneshot_df = pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]
 
@@ -271,7 +271,7 @@ emg.plot_multiple_emg_data_over_time(
         ],
 )
 
-interpolated_data = emg.process_emg_data_with_direction(oneshot_df,
+interpolated_data = emg.process_emg_data_with_direction(pre_oneshot_df,
                                                         pre_emg_results,
                                                         dataset_labels=None,
                                                         selected_keys = None)
@@ -332,21 +332,25 @@ group2 = pos_fft_results["MedianFreq_Slope"]
 
 ta.plot_median_freq_slope_comparison(group1, group2,
                                      selected_keys=select_muscle,
-                                     title="Fatigue Index Slope",
+                                     title="Fatigue Index",
                                      label_list=["pre", "pos"],
-                                     show_values=False)
+                                     show_values=False,
+                                     custom_xticklabels=['Muscle 1', 'Muscel 2',
+                                                         'Muscle 3', 'Muscel 4'])
 
 group1 = pre_emg_results["Amplitudes_Slope"]
 group2 = pos_emg_results["Amplitudes_Slope"]
 ta.plot_median_freq_slope_comparison(group1, group2,
                                      selected_keys=select_muscle,
-                                     title="Muscle Activation Level Slope",
+                                     title="Muscle Activation Level",
                                      ylabel="Muscle Activation Level",
                                      label_list=["pre", "pos"],
                                      show_values=False,
-                                     turn=False)
+                                     turn=False,
+                                     custom_xticklabels=['Muscle 1', 'Muscel 2',
+                                                         'Muscle 3', 'Muscel 4'])
 
-
+# 向左移動，或是向右移動的差別
 emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
         raw_datasets_list=[interpolated_data, interpolated_data_1],
         raw_dataset_labels=["Pre", "Pos"],
@@ -389,28 +393,28 @@ emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
 # --- 繪製 mean std cloud ---
 # 假設 standardized_speeds1 和 standardized_speeds2 是兩個包含標準化速度信號的字典
 # 假設 target_length = 101
-standardized_speeds1 = standardized_speeds
-standardized_speeds2 = standardized_speeds_1
-standardized_speeds3 = standardized_speeds_2
+# standardized_speeds1 = standardized_speeds
+# standardized_speeds2 = standardized_speeds_1
+# standardized_speeds3 = standardized_speeds_2
 
-# 示例 2: 繪製兩個以上數據集進行比較
-if standardized_speeds1 and standardized_speeds2:
-      pre.plot_standardized_signals_cloud_compare(
-          datasets=[standardized_speeds1, standardized_speeds2, standardized_speeds3],
-          target_length=101,
-          title="Comparison of Mean ± Std Dev Clouds",
-          xlabel="Normalized Time (%)",
-          ylabel="Signal Value (°/s or other units)",
-          # title="Sine Group Mean ± Std Dev",
-          labels=['55g', '65g', "60g"],
-          # labels=None,                
-          # color_indices=[0, 2, 4]          
-      )    
+# # 示例 2: 繪製兩個以上數據集進行比較
+# if standardized_speeds1 and standardized_speeds2:
+#       pre.plot_standardized_signals_cloud_compare(
+#           datasets=[standardized_speeds1, standardized_speeds2, standardized_speeds3],
+#           target_length=101,
+#           title="Comparison of Mean ± Std Dev Clouds",
+#           xlabel="Normalized Time (%)",
+#           ylabel="Signal Value (°/s or other units)",
+#           # title="Sine Group Mean ± Std Dev",
+#           labels=['55g', '65g', "60g"],
+#           # labels=None,                
+#           # color_indices=[0, 2, 4]          
+#       )    
 
-else:
-      print("至少需要一個有效的標準化信號字典才能繪圖。")
+# else:
+#       print("至少需要一個有效的標準化信號字典才能繪圖。")
       
-      # 長條圖 花費時間
+#       # 長條圖 花費時間
       
 # %%
 """
@@ -431,7 +435,6 @@ else:
         k. Mouse Travel Efficiency: idea path/real path
     2.2.2. 不同方向的計算: 全部方向綜合, 分四個方向 (四象限)
 """
-
 # === b. Mouse Speed (°/s) ===
 # === x. 量化速度 ===
 # === k. Mouse Travel Efficiency
@@ -443,20 +446,85 @@ else:
 # 在cal_tra_efficiency一起計算
 
 # # === c. Initial Move Angle: ===
-excldueCen_grouped_df['Initial Move Angle (°)']
+# excldueCen_grouped_df['Initial Move Angle (°)']
 
 # mean_initial_move_angle = np.mean(excldueCen_grouped_df['Initial Move Angle (°)'])
 
 # # === d. Full Path Time (單位 Second)===
-path_time = np.mean(excldueCen_grouped_df["Frame Span"])\
-    /metadata['motion_info']['frame_rate']
+# path_time = np.mean(excldueCen_grouped_df["Frame Span"])\
+#     /metadata['motion_info']['frame_rate']
 
 # === e. Reaction Time ===
 # 只計算從中心出發，並且 initial move angle 小於 45 度
 
 # 呼叫函數計算效率
-grouped_df = cal.cal_tra_efficiency(df, # 原始資料
-                                    excldueCen_grouped_df)
+pre_excldueCen_df = cal.cal_tra_efficiency(pre_df, # 原始資料
+                                           pre_excldueCen_df)
+# 呼叫函數計算效率
+pos_excldueCen_df = cal.cal_tra_efficiency(pos_df, # 原始資料
+                                           pos_excldueCen_df)
+
+
+key_table = {
+    "TTK": {
+        "pre": pre_excldueCen_df["Frame Span"].mean(),
+        "pos": pos_excldueCen_df["Frame Span"].mean()
+        },
+    "OneShotTTK": {
+        "pre": pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]["Frame Span"].mean(),
+        "pos": pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]["Frame Span"].mean()
+        },
+    "Kill": {
+        "pre": len(pre_excldueCen_df["Frame Span"]),
+        "pos": len(pos_excldueCen_df["Frame Span"])
+        },
+    "OneShotKill": {
+        "pre": len(pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]),
+        "pos": len(pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1])
+        },
+    "Accuracy": {
+        "pre": len(pre_excldueCen_df["Shot Count"])/
+                   pre_excldueCen_df["Shot Count"].sum(),
+        "pos": len(pos_excldueCen_df["Shot Count"])/
+                   pos_excldueCen_df["Shot Count"].sum()
+        },
+    "Initial Move Angle (°)": {
+        "pre": pre_excldueCen_df["Initial Move Angle (°)"].mean(),
+        "pos": pos_excldueCen_df["Initial Move Angle (°)"].mean()
+        },
+    
+    "Efficiency Ratio": {
+        "pre": pre_excldueCen_df["Efficiency Ratio"].mean(),
+        "pos": pos_excldueCen_df["Efficiency Ratio"].mean()
+        }
+    }
+
+# %% 依照以上表格繪製bar 圖
+# 1. 定義您想要繪製的欄位名稱
+keys_to_plot = ['TTK', 'Accuracy', ""]
+
+# 2. 使用字典推導式，建立一個只包含這些欄位的新字典
+filtered_data = {key: key_table[key] for key in keys_to_plot if key in key_table}
+
+# 建立一個自訂標籤的對照表
+custom_label_texts = {
+        "TTK": ("TTK", "(ms)"),
+        "Accuracy": ("Accuracy", "(%)"),
+        # "Efficiency Ratio": ("效率指標", ""), # 如果沒有單位，可以留空
+        
+    }
+
+
+ta.plot_performance_comparison(
+        data=filtered_data,
+        title="Performance",
+        custom_texts=custom_label_texts
+    )
+
+
+# 呼叫函數計算效率
+# grouped_df = cal.cal_tra_efficiency(pre_df, # 原始資料
+#                                     pre_excldueCen_df)
 
 # %%
 """

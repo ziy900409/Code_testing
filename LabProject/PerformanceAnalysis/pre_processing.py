@@ -60,7 +60,7 @@ import ezc3d
 import emg_function as emg
 
 # import Spider_function as func
-plt.rcParams['font.sans-serif'] = ['Noto Sans TC']  # 改為你實際有的
+plt.rcParams['font.sans-serif'] = ['Roboto']  # 改為你實際有的
 plt.rcParams['axes.unicode_minus'] = False    # 避免座標軸負號亂碼
 
 # %% Reading all of data path
@@ -1827,7 +1827,7 @@ def plot_standardized_signals_cloud_compare(
     # --- Plot Formatting ---
     if plot_success_count > 0:
         # 設置 title
-        ax.text(x=0.0, y=1.1, s=title, fontsize=32, fontweight='bold',
+        ax.text(x=0.0, y=1.1, s=title, fontsize=32,
                 transform=ax.transAxes,
                 ha='left', va='bottom')
         # ax.set_title(title, fontsize=20, loc='left')
@@ -1844,13 +1844,15 @@ def plot_standardized_signals_cloud_compare(
         
         # 設置 X 軸格式
         ax.set_xlim(left=0, right=100)
-        ax.set_xlabel(xlabel, fontsize=12, color="#868686")
-        ax.tick_params(axis='x', labelsize=10, which='both', length=0, labelcolor="#868686")
+        ax.set_xlabel(xlabel, fontsize=20, color="#868686")
+        ax.tick_params(axis='x', labelsize=14, which='both', length=0, labelcolor="#868686")
         # 設置 Y 軸格式
-        ax.set_ylabel(ylabel, fontsize=16, labelpad=30, rotation=270, color="#868686")
+        ax.set_ylabel(ylabel, fontsize=20, labelpad=30, rotation=270, color="#868686")
+        ax.yaxis.set_label_coords(-0.07, 0.5)  # (x, y) → y=0.0 對齊 X 軸
+        
         ax.yaxis.tick_right()                  # 把刻度值也放右邊
-        ax.tick_params(axis='y', labelsize=10, which='both', length=0, labelcolor="#868686")
-        ax.yaxis.set_label_coords(-0.05, 0.42)  # (x, y) → y=0.0 對齊 X 軸
+        ax.tick_params(axis='y', labelsize=14, which='both', length=0, labelcolor="#868686")
+        
         plt.tight_layout()
         plt.show()
     else:

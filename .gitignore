@@ -1,7 +1,7 @@
 # 忽略 __pycache__/ 目錄及其下所有內容
 imgs
 __pycache__
-
+placeholders
 # 忽略特定配置文件
 config.json
 **.csv

@@ -1,190 +1,291 @@
+import pptx
+from pptx.util import Pt, Cm
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 
-down_freq = 1000
-c = 0.802
-# 帶通濾波頻率
-bandpass_cutoff = [20/0.802, 450/0.802]
-# 低通濾波頻率
-lowpass_freq = 10/c
-# 設定移動平均數與移動均方根之參數
-# 更改window length, 更改overlap length
-time_of_window = 0.1 # 窗格長度 (單位 second)
-overlap_len = 0.5 # 百分比 (%)
-# 設定 notch filter cutoff frequency
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import os
+import datetime
 
-notch_cutoff = [[59, 61],
-                [295.5, 296.5],
-                [369.5, 370.5],
-                [179, 181],
-                [299, 301],
-                [419, 421],
-                ]
+import io
+import cairosvg
 
-c3d_notch_cutoff = [[49, 51],
-                    [99.5, 100.5],
-                    [149.5, 150.5],
-                    [199.5, 200.5],
-                    [249.5, 250.5],
-                    [299.5, 300.5],
-                    [349.5, 350.5],
-                    [295, 297],
-                    [369, 371],
-                    [73, 75],
-                    [399, 401]
-                    ]
+def add_smart_picture(slide, spec):
+    """
+    Adds a picture to the slide, automatically handling SVG or PNG/JPG.
+    If the path is SVG, it converts it to a high-res PNG in memory.
+    Otherwise, it adds the image directly.
+    """
+    image_path = spec['path']
+    print(f"Adding image: {os.path.basename(image_path)}")
 
-csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
-                     'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
-                     'Mini sensor 3: EMG 3': 'Triceps Brachii',
-                     'Quattro sensor 4: EMG.A 4': 'Extensor Carpi Ulnaris', 
-                     'Quattro sensor 4: EMG.B 4': '1st Dorsal Interosseous', 
-                     'Quattro sensor 4: EMG.C 4': 'Abductor Digiti Quinti', 
-                     'Quattro sensor 4: EMG.D 4': 'Extensor Indicis',
-                     'Avanti sensor 5: EMG 5': 'Biceps Brachii'}
+    # Check if the file path ends with .svg (case-insensitive)
+    if image_path.lower().endswith('.svg'):
+        # It's an SVG: convert to PNG in memory
+        png_output = io.BytesIO()
+        
+        # CORRECTED: Call the function from the cairosvg library
+        cairosvg.svg2png(url=image_path, write_to=png_output, output_width=2048)
+        
+        png_output.seek(0) # Rewind the stream to the beginning
+        
+        # Add the picture from the in-memory PNG stream
+        slide.shapes.add_picture(
+            png_output,
+            spec['left'],
+            spec['top'],
+            width=spec['width']
+        )
+    else:
+        # It's a PNG, JPG, etc.: add it directly from the file path
+        slide.shapes.add_picture(
+            image_path,
+            spec['left'],
+            spec['top'],
+            width=spec['width']
+        )
 
-c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
-                     'FleRad': 'Flexor Carpi Radialis',
-                     'Triceps': 'Triceps Brachii',
-                     'Triceps': 'Triceps Brachii',
-                     'ExtUlnar': 'Extensor Carpi Ulnaris',
-                     'ExtUlnar': 'Extensor Carpi Ulnaris',
-                     'DorInter': '1st Dorsal Interosseous', 
-                     'AbdDigMin': 'Abductor Digiti Quinti',
-                     #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
-                     'ExtInd': 'Extensor Indicis',
-                     'Biceps': 'Biceps Brachii',
-                     }
+# --- 0. 自動建立佔位符圖片 (已修正) ---
+def create_placeholder_images():
+    """自動生成所有需要的示意圖，方便直接執行看到結果。"""
+    print("Creating placeholder images...")
+    if not os.path.exists('placeholders'):
+        os.makedirs('placeholders')
 
-c3d_analog_cha = ["ExtRad", "FleRad", "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
-                  "Biceps", "Triceps"]
+    placeholder_specs = {
+        "logo.png": (2, 0.5),
+        "hand_path.png": (2, 2),
+        "speed_profile.png": (2, 2),
+        "performance.png": (2, 2),
+        "forearm_muscles.png": (2, 3),
+        "muscle_charts_combined.png": (4, 3), # 修正：產生合併後的大圖
+        "fatigue_index.png": (4, 2),
+        "muscle_activation.png": (4, 2)
+    }
 
-muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brachii',
-               'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
-               'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
- #%%
+    for name, size in placeholder_specs.items():
+        path = os.path.join('placeholders', name)
+        if not os.path.exists(path): # 僅在檔案不存在時建立
+            fig, ax = plt.subplots(figsize=size)
+            ax.text(0.5, 0.5, name.replace('.png', ''), ha='center', va='center', fontsize=10, color='gray')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            plt.savefig(path, bbox_inches='tight', pad_inches=0.1)
+            plt.close(fig)
+    print("Placeholder images are ready in 'placeholders' folder.")
 
+# --- 1. 參數設定 (所有元件的尺寸、位置和內容) ---
 
+# -- 整體版面 --
+SLIDE_WIDTH = Cm(21.0)
+SLIDE_HEIGHT = Cm(29.7)
+MARGIN_LEFT = Cm(1.5)
+# Corrected calculation pattern applied here
+CONTENT_WIDTH = Cm(SLIDE_WIDTH.cm - MARGIN_LEFT.cm * 2)
 
-# (如果後端環境不確定是否有顯示，可以加上下面這行，但如果完全不繪圖則非必須)
-# import matplotlib
-# matplotlib.use('Agg')
-
-# --- 日誌設定 ---
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-# 假設日誌已在 Flask app 層級設定
-
-
-APP_CONFIG = {
-    "DEFAULT_DOWNSAMPLE_FREQ": 1000,
-    "DEFAULT_BANDPASS_CUTOFF": [20, 450],
-    "DEFAULT_LOWPASS_FREQ": 6,
-    "DEFAULT_CSV_NOTCH_CUTOFF_LIST": notch_cutoff, # 假設 50Hz 工頻
-    "DEFAULT_C3D_NOTCH_CUTOFF_LIST": c3d_notch_cutoff, # 假設 60Hz 工頻
-    "DEFAULT_CSV_RECOLUMNS_NAME": csv_recolumns_name, # 範例
-    "DEFAULT_C3D_RECOLUMNS_NAME": c3d_recolumns_name, # 範例
-    "EMG_CHANNEL_IDENTIFIER": muscle_name, # 用於辨識 EMG 頻道的關鍵字
-    "DURATION": 1,
+# -- Header --
+HEADER_Y = Cm(1.0)
+HEADER_SPECS = {
+    # MODIFIED: 'logo' is now an image with a 'path' instead of 'text'
+    'logo': {
+        'label': 'Company Logo',
+        'path': 'placeholders/logo.svg',
+        # 'path': r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis\placeholders\logo.svg",
+        'left': MARGIN_LEFT,
+        'top': HEADER_Y,
+        'width': Cm(5),
+        'height': Cm(1.5)
+    },
+    'date': {
+        'text': f'Measured on {datetime.date.today().strftime("%Y-%m-%d")}', 
+        'left': Cm(15), 'top': HEADER_Y, 'width': Cm(4.5), 'height': Cm(1)
+    },
+    'line_top': Cm(2.2)
+}
+# -- Body: Player Background --
+PLAYER_BG_Y = Cm(2.8)
+PLAYER_BG_HEIGHT = Cm(3.2)
+PLAYER_SPECS = {
+    'name': {'text': 'Robert Fox', 'left': Cm(MARGIN_LEFT.cm + 0.5), 'top': Cm(PLAYER_BG_Y.cm + 0.3), 'width': Cm(8), 'height': Cm(1)},
+    'details': {'text': 'Male • From Fnatic', 'left': Cm(MARGIN_LEFT.cm + 0.5), 'top': Cm(PLAYER_BG_Y.cm + 1.3), 'width': Cm(8), 'height': Cm(1)},
+    'mouse_title': {'text': 'Mouse Preferences', 'left': Cm(11), 'top': Cm(PLAYER_BG_Y.cm + 0.3), 'width': Cm(4), 'height': Cm(0.7)},
+    'mouse_details': {'text': 'Mouse brand:\tBenQ ZOWIE\nMouse model:\tWWWW\n\t\tEC (S)', 'left': Cm(11), 'top': Cm(PLAYER_BG_Y.cm + 1.0), 'width': Cm(8), 'height': Cm(2)},
+    'line_left': Cm(10.5), 
+    'line_top': Cm(PLAYER_BG_Y.cm + 0.3), 
+    'line_height': Cm(PLAYER_BG_HEIGHT.cm - 0.6)
 }
 
+# -- Body: Flick Shot --
+FLICK_SHOT_Y = Cm(6.8)
+FLICK_SHOT_SPECS = {
+    'title': {'text': 'Flick Shot (Pre & Post)', 'left': MARGIN_LEFT, 'top': FLICK_SHOT_Y, 'width': Cm(6), 'height': Cm(1)},
+    'hand_path': {'label': 'Hand Path', 'path': 'placeholders/hand_path.png', 'left': MARGIN_LEFT, 'top': Cm(FLICK_SHOT_Y.cm + 1.2), 'width': Cm(5.5)},
+    'speed_profile': {'label': 'Speed Profile', 'path': 'placeholders/speed_profile.png', 'left': Cm(MARGIN_LEFT.cm + 6.0), 'top': Cm(FLICK_SHOT_Y.cm + 1.2), 'width': Cm(5.5)},
+    'performance': {'label': 'Performance', 'path': 'placeholders/performance.png', 'left': Cm(MARGIN_LEFT.cm + 12.0), 'top': Cm(FLICK_SHOT_Y.cm + 1.2), 'width': Cm(6)},
+    'forearm_muscles': {'label': 'Forearm Muscles', 'path': 'placeholders/forearm_muscles.png', 'left': Cm(MARGIN_LEFT.cm + 0.5), 'top': Cm(FLICK_SHOT_Y.cm + 6.5), 'width': Cm(4.5)},
+    'muscle_charts_combined': {'label': 'Muscle Charts (Combined)', 'path': 'placeholders/muscle_charts_combined.png', 'left': Cm(MARGIN_LEFT.cm + 6.0), 'top': Cm(FLICK_SHOT_Y.cm + 6.0), 'width': Cm(11.5), 'height': Cm(6.0)}
+}
 
-# raw_data_object = r"D:\Hsin\BenQ\testfile\S02_LargeFlick_Rep_9.25.csv"
-# raw_data_object = r"D:\Hsin\BenQ\testfile\S06_SpiderShot_S1_3.c3d"
-# data_file_path = r"D:\Hsin\BenQ\testfile\S06_SpiderShot_S1_3.c3d"
+# -- Body: Fatigue Test --
+FATIGUE_Y = Cm(20.0)
+FATIGUE_SPECS = {
+    'title': {'text': 'Fatigue Test', 'left': MARGIN_LEFT, 'top': FATIGUE_Y, 'width': CONTENT_WIDTH, 'height': Cm(1)},
+    'fatigue_index': {'label': 'Fatigue Index', 'path': 'placeholders/fatigue_index.png', 'left': MARGIN_LEFT, 'top': Cm(FATIGUE_Y.cm + 1.5), 'width': Cm(8.5)},
+    'muscle_activation': {'label': 'Muscle Activation', 'path': 'placeholders/muscle_activation.png', 'left': Cm(MARGIN_LEFT.cm + 9.5), 'top': Cm(FATIGUE_Y.cm + 1.5), 'width': Cm(8.5)},
+}
 
-data_file_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
-data_path_2 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
-data_path_1 = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
-data_file_path = r"D:\test\S21_LargeFlick_Rep_4.150.csv"
-data_file_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
+# -- Footer --
+FOOTER_Y = Cm(28.5)
+FOOTER_SPECS = {
+    'page_num': {'text': '1', 'left': Cm(SLIDE_WIDTH.cm - MARGIN_LEFT.cm - 1), 'top': FOOTER_Y, 'width': Cm(1), 'height': Cm(1)}
+}
 
-config = APP_CONFIG
-# %%
+# --- 2. 預覽函式 (已修正) ---
+def preview_layout():
+    """使用 Matplotlib 繪製排版示意圖。"""
+    fig, ax = plt.subplots(figsize=(SLIDE_WIDTH.cm / 2.54, SLIDE_HEIGHT.cm / 2.54))
+    ax.set_xlim(0, SLIDE_WIDTH.cm)
+    ax.set_ylim(0, SLIDE_HEIGHT.cm)
+    ax.invert_yaxis()
+    ax.set_title('Layout Preview')
+    ax.set_xlabel('Width (cm)')
+    ax.set_ylabel('Top (cm)')
+
+    # 建立一個包含所有要繪製元件的列表
+    elements_to_draw = [
+        {'label': 'Logo', **HEADER_SPECS['logo']},
+        {'label': 'Date', **HEADER_SPECS['date']},
+        {'label': 'Player BG Box', 'left': MARGIN_LEFT, 'top': PLAYER_BG_Y, 'width': CONTENT_WIDTH, 'height': PLAYER_BG_HEIGHT},
+        {'label': 'Player Name', **PLAYER_SPECS['name']},
+        {'label': 'Flick Shot Title', **FLICK_SHOT_SPECS['title']},
+        {'label': 'Fatigue Title', **FATIGUE_SPECS['title']},
+        {'label': 'Page Num', **FOOTER_SPECS['page_num']},
+    ]
+    all_image_specs = {**FLICK_SHOT_SPECS, **FATIGUE_SPECS}
+    for spec in all_image_specs.values():
+        if 'path' in spec:
+            # 為圖片提供預設高度，以確保預覽圖能正確顯示
+            spec_with_height = {'height': spec.get('height', Cm(4.5)), **spec}
+            elements_to_draw.append(spec_with_height)
+
+    # 遍歷所有元件並繪製矩形色塊
+    for elem in elements_to_draw:
+        try:
+            left_cm = elem['left'].cm
+            top_cm = elem['top'].cm
+            width_cm = elem['width'].cm
+            height_cm = elem['height'].cm
+
+            rect = patches.Rectangle(
+                (left_cm, top_cm), width_cm, height_cm,
+                linewidth=1, edgecolor='r', facecolor='skyblue', alpha=0.6
+            )
+            ax.add_patch(rect)
+            ax.text(
+                left_cm + width_cm / 2, top_cm + height_cm / 2,
+                elem.get('label', ''), ha='center', va='center', color='black', fontsize=6
+            )
+        except AttributeError:
+            print(f"Error: Could not draw '{elem.get('label', 'Unnamed')}' due to an invalid dimension. Check its spec.")
+            continue # 跳過有問題的元件，繼續繪製其他部分
+
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.show()
 
 
-# 假設日誌已在應用程式層級設定
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# --- 3. PPT 生成主函式 (已完整修正結構與邏輯) ---
+def create_report(output_filename="science_report.pptx"):
+    """根據以上所有設定，生成最終的 PowerPoint 報告。"""
+    prs = pptx.Presentation()
+    prs.slide_width = SLIDE_WIDTH
+    prs.slide_height = SLIDE_HEIGHT
+    slide = prs.slides.add_slide(prs.slide_layouts[6]) # 空白版面
 
-
-
-# %%
-
-
-
-# %%
-
-
-# %%
-plot_fft_data_output(results_c3d)
-# %%
-import matplotlib.pyplot as plt
-import numpy as np
-import math
-
-# %%
-plot_mdf_over_time(results_c3d)
-fft_results_data = results_c3d
-# if __name__ == '__main__':
-#     # --- 產生一個模擬的 fft_results_data (包含 MDF) 以供測試 ---
-#     def generate_dummy_mdf_channel_data_for_plotter(channel_name, num_windows=20, base_mdf=60, fs=1000):
-#         # 模擬 MDF 隨時間有些波動或下降趨勢 (疲勞)
-#         mdf_trend = base_mdf - np.linspace(0, 15, num_windows) * (np.random.rand() * 0.5 + 0.5)
-#         mdf_noise = (np.random.rand(num_windows) - 0.5) * 8
-#         mdf_values = mdf_trend + mdf_noise
-#         mdf_values = np.clip(mdf_values, 20, 150) # 限制在合理範圍
-#         # 隨機插入一些 NaN
-#         if num_windows > 5:
-#             nan_indices = np.random.choice(num_windows, size=num_windows // 5, replace=False)
-#             mdf_values[nan_indices] = np.nan
-        
-#         # 同時生成一些假的 channels_fft_data 結構，以便獲取 fs_used
-#         dummy_main_fft_data = {
-#             "channel_name": channel_name,
-#             "sampling_frequency_used": fs,
-#             "frequencies": [1.0,2.0], # 簡化
-#             "amplitudes": [0.1,0.1], # 簡化
-#             "top_peaks": [],
-#             "error": None
-#         }
-#         return mdf_values.tolist(), dummy_main_fft_data
-
-#     mdf_data_for_plot = {}
-#     main_fft_data_for_plot = []
-
-#     ch1_mdf, ch1_main_fft = generate_dummy_mdf_channel_data_for_plotter("EMG_TA_R_MDF", num_windows=15, base_mdf=75, fs=2000)
-#     mdf_data_for_plot["EMG_TA_R_MDF"] = ch1_mdf
-#     main_fft_data_for_plot.append(ch1_main_fft)
-
-#     ch2_mdf, ch2_main_fft = generate_dummy_mdf_channel_data_for_plotter("EMG_GAS_R_MDF", num_windows=25, base_mdf=60, fs=1000)
-#     mdf_data_for_plot["EMG_GAS_R_MDF"] = ch2_mdf
-#     main_fft_data_for_plot.append(ch2_main_fft)
+    # 1. --- Header ---
+    print("Adding Header...")
+    add_smart_picture(slide, HEADER_SPECS['logo'])
     
-#     ch3_mdf, ch3_main_fft = generate_dummy_mdf_channel_data_for_plotter("EMG_VL_L_MDF_Short", num_windows=5, base_mdf=90, fs=1000)
-#     mdf_data_for_plot["EMG_VL_L_MDF_Short"] = ch3_mdf
-#     main_fft_data_for_plot.append(ch3_main_fft)
+    date_spec = HEADER_SPECS['date']
+    tb = slide.shapes.add_textbox(date_spec['left'], date_spec['top'], date_spec['width'], date_spec['height'])
+    tb.text_frame.paragraphs[0].text = date_spec['text']
+    tb.text_frame.paragraphs[0].font.size = Pt(11)
+    tb.text_frame.paragraphs[0].alignment = PP_ALIGN.RIGHT
+    
+    line = slide.shapes.add_shape(MSO_SHAPE.LINE_INVERSE, MARGIN_LEFT, HEADER_SPECS['line_top'], CONTENT_WIDTH, Pt(1))
+    line.line.fill.solid()
+    line.line.fill.fore_color.rgb = RGBColor(220, 220, 220)
 
-#     mdf_data_for_plot["EMG_NoValidMDF"] = [np.nan, np.nan, np.nan] # 測試全為 NaN 的情況
-#     main_fft_data_for_plot.append({ "channel_name": "EMG_NoValidMDF", "sampling_frequency_used": 1000, "error": None})
+    # 2. --- Player Background ---
+    print("Adding Player Info...")
+    bg_box_spec = {'left': MARGIN_LEFT, 'top': PLAYER_BG_Y, 'width': CONTENT_WIDTH, 'height': PLAYER_BG_HEIGHT}
+    bg_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, **bg_box_spec)
+    bg_box.fill.background()
+    bg_box.line.fill.solid()
+    bg_box.line.fill.fore_color.rgb = RGBColor(220, 220, 220)
+    bg_box.line.width = Pt(1.5)
+    bg_box.adjustments[0] = 0.15
 
+    for key in ['name', 'details', 'mouse_title', 'mouse_details']:
+        spec = PLAYER_SPECS[key]
+        tb = slide.shapes.add_textbox(spec['left'], spec['top'], spec['width'], spec['height'])
+        tb.text_frame.text = spec['text']
+        if key == 'name':
+            tb.text_frame.paragraphs[0].font.size = Pt(24)
+            tb.text_frame.paragraphs[0].font.bold = True
+        elif key == 'details':
+            tb.text_frame.paragraphs[0].font.size = Pt(11)
+        elif key == 'mouse_title':
+            tb.text_frame.paragraphs[0].font.bold = True
+        elif key == 'mouse_details':
+            tb.text_frame.paragraphs[0].font.size = Pt(10)
+    
+    line = slide.shapes.add_shape(MSO_SHAPE.LINE_INVERSE, PLAYER_SPECS['line_left'], PLAYER_SPECS['line_top'], Pt(1), PLAYER_SPECS['line_height'])
+    line.line.fill.solid()
+    line.line.fill.fore_color.rgb = RGBColor(220, 220, 220)
 
-#     dummy_results_with_mdf = {
-#         "filename": "Dummy_MDF_Plot_Test.c3d",
-#         "c3d_sampling_rate_from_header": 2000.0, # 假設
-#         "channels_fft_data": main_fft_data_for_plot, # 主頻譜數據
-#         "median_frequency_analysis": mdf_data_for_plot # MDF 時程數據
-#     }
+    # 3. --- Flick Shot Section ---
+    print("Adding Flick Shot Section...")
+    title_spec = FLICK_SHOT_SPECS['title']
+    tb = slide.shapes.add_textbox(title_spec['left'], title_spec['top'], title_spec['width'], title_spec['height'])
+    tb.text_frame.paragraphs[0].text = title_spec['text']
+    tb.text_frame.paragraphs[0].font.size = Pt(16)
 
-#     print("正在繪製模擬的 MDF 時程圖...")
-#     plot_mdf_over_time(dummy_results_with_mdf, max_subplot_cols=2)
+    for key in ['hand_path', 'speed_profile', 'performance', 'forearm_muscles', 'muscle_charts_combined']:
+        add_smart_picture(slide, FLICK_SHOT_SPECS[key])
 
-#     # 測試單一頻道MDF
-#     single_ch_mdf, single_ch_main_fft = generate_dummy_mdf_channel_data_for_plotter("EMG_Biceps_MDF", num_windows=10, base_mdf=70)
-#     dummy_single_mdf_results = {
-#          "filename": "Single_Channel_MDF.csv",
-#          "channels_fft_data": [single_ch_main_fft],
-#          "median_frequency_analysis": {
-#              "EMG_Biceps_MDF": single_ch_mdf
-#          }
-#     }
-#     print("正在繪製模擬的單一頻道 MDF 時程圖...")
-#     plot_mdf_over_time(dummy_single_mdf_results)
+    # 4. --- Fatigue Test Section ---
+    print("Adding Fatigue Test Section...")
+    title_spec = FATIGUE_SPECS['title']
+    geometry_spec = {k: v for k, v in title_spec.items() if k != 'text'}
+    title_shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, **geometry_spec)
+    title_shape.fill.solid()
+    title_shape.fill.fore_color.rgb = RGBColor(237, 28, 36)
+    title_shape.text_frame.text = title_spec['text']
+    p = title_shape.text_frame.paragraphs[0]
+    p.font.color.rgb = RGBColor(255, 255, 255)
+    p.font.bold = True
+    p.font.size = Pt(14)
+    
+    for key in ['fatigue_index', 'muscle_activation']:
+        add_smart_picture(slide, FATIGUE_SPECS[key])
 
+    # 5. --- Footer ---
+    print("Adding Footer...")
+    footer_spec = FOOTER_SPECS['page_num']
+    tb = slide.shapes.add_textbox(footer_spec['left'], footer_spec['top'], footer_spec['width'], footer_spec['height'])
+    p = tb.text_frame.paragraphs[0]
+    p.text = footer_spec['text']
+    p.font.size = Pt(10)
+    p.alignment = PP_ALIGN.RIGHT
 
+    # 6. --- Save Presentation ---
+    prs.save(output_filename)
+    print(f"Report successfully saved as '{output_filename}'")
+
+# --- Main Execution ---
+if __name__ == '__main__':
+    create_placeholder_images()
+    preview_layout()
+    create_report()
