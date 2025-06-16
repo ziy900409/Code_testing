@@ -2,7 +2,7 @@ import pptx
 from pptx.util import Pt, Cm
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -12,40 +12,7 @@ import datetime
 import io
 import cairosvg
 
-def add_smart_picture(slide, spec):
-    """
-    Adds a picture to the slide, automatically handling SVG or PNG/JPG.
-    If the path is SVG, it converts it to a high-res PNG in memory.
-    Otherwise, it adds the image directly.
-    """
-    image_path = spec['path']
-    print(f"Adding image: {os.path.basename(image_path)}")
 
-    # Check if the file path ends with .svg (case-insensitive)
-    if image_path.lower().endswith('.svg'):
-        # It's an SVG: convert to PNG in memory
-        png_output = io.BytesIO()
-        
-        # CORRECTED: Call the function from the cairosvg library
-        cairosvg.svg2png(url=image_path, write_to=png_output, output_width=2048)
-        
-        png_output.seek(0) # Rewind the stream to the beginning
-        
-        # Add the picture from the in-memory PNG stream
-        slide.shapes.add_picture(
-            png_output,
-            spec['left'],
-            spec['top'],
-            width=spec['width']
-        )
-    else:
-        # It's a PNG, JPG, etc.: add it directly from the file path
-        slide.shapes.add_picture(
-            image_path,
-            spec['left'],
-            spec['top'],
-            width=spec['width']
-        )
 
 # --- 0. 自動建立佔位符圖片 (已修正) ---
 def create_placeholder_images():
@@ -81,11 +48,11 @@ def create_placeholder_images():
 # -- Overall Layout --
 SLIDE_WIDTH = Cm(21.0)
 SLIDE_HEIGHT = Cm(29.7)
-MARGIN_LEFT = Cm(1.5)
+MARGIN_LEFT = Cm(0.6354)
 CONTENT_WIDTH = Cm(SLIDE_WIDTH.cm - MARGIN_LEFT.cm * 2)
-
+# 1 px ≈ 0.0353 cm
 # -- Section Y-Coordinates (for easy vertical adjustment) --
-HEADER_Y = Cm(1.0)
+HEADER_Y = Cm(0.6707)
 PLAYER_BG_Y = Cm(2.8)
 FLICK_SHOT_Y = Cm(7.0)
 FOREARM_MUSCLES_Y = Cm(13.2)
@@ -99,17 +66,25 @@ HEADER_SPECS = {
         'path': 'placeholders/logo.svg', # Change to your actual logo path
         'left': MARGIN_LEFT,
         'top': HEADER_Y,
-        'width': Cm(5.1),
-        'height': Cm(0.8)
+        'width': Cm(4.5184),
+        'height': Cm(0.5295)
     },
     'date': {
         'text': f'Measured on {datetime.date.today().strftime("%Y-%m-%d")}',
-        'left': Cm(15.0),
-        'top': HEADER_Y,
-        'width': Cm(4.5),
-        'height': Cm(1)
+        'left': Cm(17.1911),
+        'top': Cm(0.7766),
+        # 'height': Cm(0.3177),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,        # From font-weight: 400 means not bold
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
     },
-    'line_top': Cm(2.2)
+    # 'line_top': Cm(5.295)
 }
 
 # -- Body: Player Background --
@@ -117,57 +92,149 @@ PLAYER_BG_HEIGHT = Cm(3.8)
 PLAYER_SPECS = {
     'name': {
         'text': 'Robert Fox',
-        'left': Cm(MARGIN_LEFT.cm + 0.5),
-        'top': Cm(PLAYER_BG_Y.cm + 0.3),
-        'width': Cm(8),
-        'height': Cm(1)
+        'left': Cm(1.2355),
+        'top': Cm(2.2945),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(20),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     'details': {
         'text': 'Male • From Fnatic',
-        'left': Cm(MARGIN_LEFT.cm + 0.5),
-        'top': Cm(PLAYER_BG_Y.cm + 1.3),
-        'width': Cm(8),
-        'height': Cm(1)
+        'left': Cm(1.2355),
+        'top': Cm(3.4594),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     'mouse_pref_title': {
         'text': 'Mouse 1 Preferences',
-        'left': Cm(12.2),
-        'top': Cm(PLAYER_BG_Y.cm + 0.3),
-        'width': Cm(6.8),
-        'height': Cm(0.7)
+        'left': Cm(15.8144),
+        'top': Cm(2.3298),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
         },
-    'mouse_pref_line_top': Cm(PLAYER_BG_Y.cm + 1.2),
-    'mouse_pref_table': {
-        'data': [
-            ['Mouse brand:', 'BenQ ZOWIE\nWWWW'],
-            ['Mouse model:', 'EC (S)']
-            ],
-        'left': Cm(12.2),
-        'top': Cm(PLAYER_BG_Y.cm + 1.5),
-        'width': Cm(6.8),
-        'col_widths': [Cm(6.8 * 0.45), Cm(6.8 * 0.55)]
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    # 'mouse_pref_line_top': Cm(PLAYER_BG_Y.cm + 1.2),
+    'Mouse_brand': {
+        'text': 'Mouse brand\n\nMouse model',
+        'left': Cm(15.4614),
+        'top': Cm(3.177),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
     },
-    'line_left': Cm(11.5),
-    'line_top': Cm(PLAYER_BG_Y.cm + 0.3),
-    'line_height': Cm(PLAYER_BG_HEIGHT.cm - 0.6)
+    'Mouse_info': {
+        'text': 'BenQ ZOWIE\n\nEC (S)',
+        'left': Cm(18.0736),
+        'top': Cm(3.177),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+    },
+    'vertical_separator': {
+        'left': Cm(14.8613),
+        'top': Cm(2.2592),
+        'height': Cm(2.1886),
+        'style': {
+            'width_pt': Pt(1),          # Translates from '1px'
+            'color_hex': '#E5E5E5'      # Translates from your primary color
+        }
+    },
+    'horizontal_separator': {
+        'left': Cm(15.4614),
+        'top': Cm(2.9652),
+        'width': Cm(4.236),  # <-- 修改處：使用 'width' 來定義水平線的長度
+        # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
+        'style': {
+            'width_pt': Pt(1),
+            'color_hex': '#CC0040'
+            }
+        },
+    'background_box': {
+        'shape_type': MSO_SHAPE.ROUNDED_RECTANGLE,
+        'left': Cm(0.6707),
+        'top': Cm(1.9415),
+        'width': Cm(19.8033),
+        'height': Cm(2.8593),
+        'style': {
+            'fill_color_hex': '#F2F2F2',
+            'border_color_hex': '#E5E5E5',
+            'border_width_pt': Pt(1),
+            'corner_radius': 0.1
+            }
+        },
 }
 
 # -- Body: Flick Shot --
 FLICK_SHOT_SPECS = {
-    'title': {
+    'horizontal_separator': {
+        'left': Cm(0.6707),
+        'top': Cm(5.295),
+        'width': Cm(19.8033),  # <-- 修改處：使用 'width' 來定義水平線的長度
+        # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
+        'style': {
+            'width_pt': Pt(1),
+            'color_hex': '#CC0040'
+            }
+        },
+    'flick_title': {
         'text': 'Flick Shot (Pre & Post)',
-        'left': MARGIN_LEFT,
-        'top': FLICK_SHOT_Y,
-        'width': Cm(6),
-        'height': Cm(1)
+        'left': Cm(0.6707),
+        'top': Cm(5.7892),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#CC0040' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     # Row 1 of charts
     'hand_path_title': {
         'text': 'Hand Path',
-        'left': MARGIN_LEFT,
-        'top': Cm(FLICK_SHOT_Y.cm + 1.5),
-        'width': Cm(5.5),
-        'height': Cm(0.7)
+        'left': Cm(0.6707),
+        'top': Cm(6.9541),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     'hand_path_image': {
         'label': 'Hand Path Image',
@@ -180,102 +247,184 @@ FLICK_SHOT_SPECS = {
     
     'speed_profile_title': {
         'text': 'Speed Profile',
-        'left': Cm(7.7),
-        'top': Cm(FLICK_SHOT_Y.cm + 1.5),
-        'width': Cm(5.5),
-        'height': Cm(0.7)
+        'left': Cm(7.2718),
+        'top': Cm(6.9894),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     'speed_profile_image': {
         'label': 'Speed Profile Image',
-        'path': 'placeholders/speed_profile.png',
-        'left': Cm(7.7),
-        'top': Cm(FLICK_SHOT_Y.cm + 2.2),
-        'width': Cm(5.5),
-        'height': Cm(3.0)
+        'path': 'placeholders/speed_profile (2).png',
+        'left': Cm(7.2718),
+        'top': Cm(7.8366),
+        'width': Cm(6.3893),
+        'height': Cm(4.5537)
         },
     
     'performance_title': {
         'text': 'Performance',
-        'left': Cm(14.0),
-        'top': Cm(FLICK_SHOT_Y.cm + 1.5),
-        'width': Cm(5.5),
-        'height': Cm(0.7)
+        'left': Cm(14.1553),
+        'top': Cm(6.9894),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     'performance_image': {
         'label': 'Performance Image',
-        'path': 'placeholders/performance.png',
-        'left': Cm(14.0),
-        'top': Cm(FLICK_SHOT_Y.cm + 2.2),
-        'width': Cm(5.5),
-        'height': Cm(3.0)
+        'path': 'placeholders/performance (2).png',
+        'left': Cm(14.1553),
+        'top': Cm(7.8366),
+        'width': Cm(6.2128),
+        'height': Cm(4.5537)
         },
 
     # Row 2 of charts (Forearm Muscles)
     'forearm_muscles_title': {
         'text': 'Forearm Muscles',
-        'left': Cm(3.8),
-        'top': FOREARM_MUSCLES_Y,
-        'width': Cm(5.0),
-        'height': Cm(0.7)
+        'left': Cm(3.53),
+        'top': Cm(13.1316),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    'type_title': {
+        'text': 'type',
+        'left': Cm(1.2355),
+        'top': Cm(13.1316),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    'section_header': {
+        # The correct shape name from your library's list
+        'shape_type': MSO_SHAPE.ROUND_2_SAME_RECTANGLE,
+        'left': Cm(0.6707),
+        'top': Cm(12.8845),
+        'width': Cm(6.1775),
+        'height': Cm(0.9178),
+        'hide_bottom_border': True, # This flag is used by the add_custom_box, we can ignore it for add_styled_shape
+        'style': {
+            'fill_color_hex': '#F2F2F2',
+            'border_color_hex': '#E5E5E5',
+            'border_width_pt': Pt(1),
+            'corner_radius': 0.2
+            }
         },
     'forearm_muscles_image': {
         'label': 'Forearm Muscles Image',
         'path': 'placeholders/forearm_muscles.svg',
-        'left': MARGIN_LEFT,
-        'top': Cm(FOREARM_MUSCLES_Y.cm + 0.7),
-        'width': Cm(4.8),
-        'height': Cm(7.5)
+        'left': Cm(0.6707),
+        'top': Cm(13.8023),
+        'width': Cm(6.1775),
+        'height': Cm(8.0484)
         },
-    'muscle_charts_combined': {
+    'muscle_charts_image': {
         'label': 'Muscle Charts (Combined)',
-        'path': 'placeholders/muscle_charts_combined.png',
-        'left': Cm(7.7),
-        'top': Cm(FOREARM_MUSCLES_Y.cm + 0.2),
-        'width': Cm(11.8),
-        'height': Cm(8.0)
+        'path': 'placeholders/muscle_charts_combined (2).png',
+        'left': Cm(7.2718),
+        'top': Cm(12.7645),
+        'width': Cm(13.2022),
+        'height': Cm(9.18)
         }
     }
+    
 
 # -- Body: Fatigue Test --
 FATIGUE_SPECS = {
-    'title': {
+    'horizontal_separator': {
+        'left': Cm(0.6707),
+        'top': Cm(22.3449),
+        'width': Cm(19.8033),  # <-- 修改處：使用 'width' 來定義水平線的長度
+        # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
+        'style': {
+            'width_pt': Pt(1),
+            'color_hex': '#CC0040'
+            }
+        },
+    'fatigue_title': {
         'text': 'Fatigue Test',
-        'left': MARGIN_LEFT,
-        'top': FATIGUE_TEST_Y,
-        'width': CONTENT_WIDTH,
-        'height': Cm(1)
+        'left': Cm(0.6707),
+        'top': Cm(22.8391),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#CC0040' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     
     'fatigue_index_title': {
         'text': 'Fatigue Index',
-        'left': MARGIN_LEFT,
-        'top': Cm(FATIGUE_TEST_Y.cm + 1.5),
-        'width': Cm(8.8),
-        'height': Cm(0.7)
+        'left': Cm(4.1301),
+        'top': Cm(23.31565),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     'fatigue_index_image': {
         'label': 'Fatigue Index Image',
-        'path': 'placeholders/fatigue_index.png',
-        'left': MARGIN_LEFT,
-        'top': Cm(FATIGUE_TEST_Y.cm + 2.2),
-        'width': Cm(8.8),
-        'height': Cm(3.5)
+        'path': 'placeholders/fatigue_index (2).png',
+        'left': Cm(0.6707),
+        'top': Cm(24.00985),
+        'width': Cm(9.54865),
+        'height': Cm(3.883)
         },
     
     'muscle_activation_title': {
         'text': 'Muscle Activation Level',
-        'left': Cm(10.7),
-        'top': Cm(FATIGUE_TEST_Y.cm + 1.5),
-        'width': Cm(8.8),
-        'height': Cm(0.7)
+        'left': Cm(13.46695),
+        'top': Cm(23.31565),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
     'muscle_activation_image': {
         'label': 'Muscle Activation Image',
-        'path': 'placeholders/muscle_activation.png',
-        'left': Cm(10.7),
-        'top': Cm(FATIGUE_TEST_Y.cm + 2.2),
-        'width': Cm(8.8),
-        'height': Cm(3.5)
+        'path': 'placeholders/muscle_activation (2).png',
+        'left': Cm(10.81945),
+        'top': Cm(24.00985),
+        'width': Cm(9.54865),
+        'height': Cm(3.883)
         },
     
     'bottom_text': {
@@ -290,315 +439,360 @@ FATIGUE_SPECS = {
 # -- Footer --
 FOOTER_SPECS = {
     'page_num': {
-        'text': '1',
-        'left': Cm(SLIDE_WIDTH.cm - MARGIN_LEFT.cm - 1),
-        'top': FOOTER_Y,
-        'width': Cm(1),
-        'height': Cm(1)
+        'text': '1/3',
+        'left': Cm(10.2017),
+        'top': Cm(28.5224),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
         }
-}
-# --- 2. 預覽函式 (已修正) ---
-# def preview_layout():
-#     """使用 Matplotlib 繪製排版示意圖。"""
-#     fig, ax = plt.subplots(figsize=(SLIDE_WIDTH.cm / 2.54, SLIDE_HEIGHT.cm / 2.54))
-#     ax.set_xlim(0, SLIDE_WIDTH.cm)
-#     ax.set_ylim(0, SLIDE_HEIGHT.cm)
-#     ax.invert_yaxis()
-#     ax.set_title('Layout Preview')
-#     ax.set_xlabel('Width (cm)')
-#     ax.set_ylabel('Top (cm)')
+    }
 
-#     # 建立一個包含所有要繪製元件的列表
-#     elements_to_draw = [
-#         {'label': 'Logo', **HEADER_SPECS['logo']},
-#         {'label': 'Date', **HEADER_SPECS['date']},
-#         {'label': 'Player BG Box', 'left': MARGIN_LEFT, 'top': PLAYER_BG_Y, 'width': CONTENT_WIDTH, 'height': PLAYER_BG_HEIGHT},
-#         {'label': 'Player Name', **PLAYER_SPECS['name']},
-#         {'label': 'Flick Shot Title', **FLICK_SHOT_SPECS['title']},
-#         {'label': 'Fatigue Title', **FATIGUE_SPECS['title']},
-#         {'label': 'Page Num', **FOOTER_SPECS['page_num']},
-#     ]
-#     all_image_specs = {**FLICK_SHOT_SPECS, **FATIGUE_SPECS}
-#     for spec in all_image_specs.values():
-#         if 'path' in spec:
-#             # 為圖片提供預設高度，以確保預覽圖能正確顯示
-#             spec_with_height = {'height': spec.get('height', Cm(4.5)), **spec}
-#             elements_to_draw.append(spec_with_height)
+def add_line(slide, spec):
+    """
+    Adds a line to the slide based on a detailed specification.
+    Determines if the line is horizontal or vertical and applies styling.
+    """
+    style = spec.get('style', {})
+    thickness = style.get('width_pt', Pt(1))
 
-#     # 遍歷所有元件並繪製矩形色塊
-#     for elem in elements_to_draw:
-#         try:
-#             left_cm = elem['left'].cm
-#             top_cm = elem['top'].cm
-#             width_cm = elem['width'].cm
-#             height_cm = elem['height'].cm
+    # This logic determines if the line is horizontal or vertical
+    # and sets its thickness correctly.
+    if 'height' in spec and 'width' not in spec: # It's a vertical line
+        spec['width'] = thickness
+    elif 'width' in spec and 'height' not in spec: # It's a horizontal line
+        spec['height'] = thickness
+    
+    geom = calculate_geometry(spec, SLIDE_WIDTH.cm, SLIDE_HEIGHT.cm)
+    
+    final_geom_for_shape = {
+        'left': geom['left'],
+        'top': geom['top'],
+        'width': geom['width'],
+        'height': geom['height']
+    }
+    
+    # Add the line shape
+    shape = slide.shapes.add_shape(MSO_SHAPE.LINE_INVERSE, **final_geom_for_shape)
+    
+    # --- THE FIX ---
+    # Add this line to disable the default shadow effect
+    shape.shadow.inherit = False
+    # ---------------
+    
+    # Apply color and other line styles
+    line = shape.line
+    line.fill.solid()
+    if 'color_hex' in style:
+        line.fill.fore_color.rgb = RGBColor(*hex_to_rgb(style['color_hex']))
+    else:
+        line.fill.fore_color.rgb = RGBColor(0, 0, 0)
+        
+    return shape
+    
+def hex_to_rgb(hex_color):
+    """Converts a hex color string (e.g., '#RRGGBB') to an (R, G, B) tuple."""
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-#             rect = patches.Rectangle(
-#                 (left_cm, top_cm), width_cm, height_cm,
-#                 linewidth=1, edgecolor='r', facecolor='skyblue', alpha=0.6
-#             )
-#             ax.add_patch(rect)
-#             ax.text(
-#                 left_cm + width_cm / 2, top_cm + height_cm / 2,
-#                 elem.get('label', ''), ha='center', va='center', color='black', fontsize=6
-#             )
-#         except AttributeError:
-#             print(f"Error: Could not draw '{elem.get('label', 'Unnamed')}' due to an invalid dimension. Check its spec.")
-#             continue # 跳過有問題的元件，繼續繪製其他部分
+def calculate_geometry(spec, slide_width_cm, slide_height_cm):
+    """
+    Calculates the final left, top, width, and height for an element.
+    It can derive missing values, e.g., calculate 'left' if 'right' and 'width' are given.
+    """
+    final_spec = spec.copy()
 
-#     plt.grid(True, linestyle='--', alpha=0.5)
-#     plt.show()
+    # --- Horizontal Calculation ---
+    if 'width' not in final_spec:
+        # If no width, calculate it from left and right
+        if 'left' in final_spec and 'right' in final_spec:
+            final_spec['width'] = Cm(slide_width_cm - final_spec['left'].cm - final_spec['right'].cm)
+    elif 'left' not in final_spec:
+        # If no left, calculate it from right and width
+        if 'right' in final_spec and 'width' in final_spec:
+            final_spec['left'] = Cm(slide_width_cm - final_spec['right'].cm - final_spec['width'].cm)
 
-# --- 2. 預覽函式 (已升級為可顯示圖片內容) ---
-def preview_layout():
-    """使用 Matplotlib 繪製排版示意圖，並顯示圖片內容。"""
-    fig, ax = plt.subplots(figsize=(SLIDE_WIDTH.cm / 2.54, SLIDE_HEIGHT.cm / 2.54))
-    ax.set_xlim(0, SLIDE_WIDTH.cm)
-    ax.set_ylim(0, SLIDE_HEIGHT.cm)
-    ax.invert_yaxis()
-    ax.set_title('Layout Preview (with Images)')
-    ax.set_xlabel('Width (cm)')
-    ax.set_ylabel('Top (cm)')
-
-    # 建立一個包含所有要繪製元件的列表
-    elements_to_draw = [
-        {'label': 'Date', **HEADER_SPECS['date']},
-        {'label': 'Player BG Box', 'left': MARGIN_LEFT, 'top': PLAYER_BG_Y, 'width': CONTENT_WIDTH, 'height': PLAYER_BG_HEIGHT},
-        {'label': 'Player Name', **PLAYER_SPECS['name']},
-        {'label': 'Flick Shot Title', **FLICK_SHOT_SPECS['title']},
-        {'label': 'Fatigue Title', **FATIGUE_SPECS['title']},
-        {'label': 'Page Num', **FOOTER_SPECS['page_num']},
-    ]
-    # 將所有圖片規格合併，以便處理
-    all_image_specs = {**HEADER_SPECS, **FLICK_SHOT_SPECS, **FATIGUE_SPECS}
-    for spec in all_image_specs.values():
-        if isinstance(spec, dict) and 'path' in spec:
-            spec_with_height = {'height': spec.get('height', Cm(4.5)), **spec}
-            elements_to_draw.append(spec_with_height)
-
-    # 遍歷所有元件並繪製
-    for elem in elements_to_draw:
-        try:
-            left_cm = elem['left'].cm
-            top_cm = elem['top'].cm
-            width_cm = elem['width'].cm
-            height_cm = elem['height'].cm
-
-            # ✨ 新增的邏輯：檢查元件是否為圖片
-            if 'path' in elem:
-                try:
-                    image_data = None
-                    # 如果是 SVG，先轉換成 PNG
-                    if elem['path'].lower().endswith('.svg'):
-                        png_output = io.BytesIO()
-                        cairosvg.svg2png(url=elem['path'], write_to=png_output)
-                        png_output.seek(0)
-                        image_data = plt.imread(png_output)
-                    # 如果是 PNG 或其他格式，直接讀取
-                    else:
-                        image_data = plt.imread(elem['path'])
-                    
-                    # 在指定位置顯示圖片
-                    ax.imshow(image_data, extent=[left_cm, left_cm + width_cm, top_cm, top_cm + height_cm])
-
-                except FileNotFoundError:
-                    print(f"Preview warning: Image file not found at '{elem['path']}'. Drawing placeholder.")
-                    # 如果找不到圖片，則畫一個紅色錯誤框
-                    rect = patches.Rectangle((left_cm, top_cm), width_cm, height_cm, linewidth=2, edgecolor='red', facecolor='pink')
-                    ax.add_patch(rect)
-                    ax.text(left_cm + width_cm / 2, top_cm + height_cm / 2, f"File Not Found:\n{elem.get('label', '')}", ha='center', va='center', color='red', fontsize=6)
+    # --- Vertical Calculation ---
+    if 'height' not in final_spec:
+        # If no height, calculate it from top and bottom
+        if 'top' in final_spec and 'bottom' in final_spec:
+            final_spec['height'] = Cm(slide_height_cm - final_spec['top'].cm - final_spec['bottom'].cm)
+    elif 'top' not in final_spec:
+        # If no top, calculate it from bottom and height
+        if 'bottom' in final_spec and 'height' in final_spec:
+            final_spec['top'] = Cm(slide_height_cm - final_spec['bottom'].cm - final_spec['height'].cm)
             
-            # ✨ 如果不是圖片，則畫藍色佔位符
-            else:
-                rect = patches.Rectangle((left_cm, top_cm), width_cm, height_cm, linewidth=1, edgecolor='r', facecolor='skyblue', alpha=0.6)
-                ax.add_patch(rect)
-                ax.text(left_cm + width_cm / 2, top_cm + height_cm / 2, elem.get('label', ''), ha='center', va='center', color='black', fontsize=6)
+    return final_spec
+    
+def add_formatted_text(slide, spec):
+    """
+    A powerful function to add a textbox based on a detailed specification.
+    Supports auto-sizing and rich font formatting from hex or RGB.
+    """
+    # Use placeholder dimensions if auto-sizing, otherwise use specified dimensions
+    if spec.get('auto_size', False):
+        width = height = Cm(1) 
+    else:
+        final_geom = calculate_geometry(spec, SLIDE_WIDTH.cm, SLIDE_HEIGHT.cm)
+        width = final_geom.get('width', Cm(5))
+        height = final_geom.get('height', Cm(1))
 
-        except Exception as e:
-            print(f"Error drawing '{elem.get('label', 'Unnamed')}': {e}")
-            continue
+    tb = slide.shapes.add_textbox(spec['left'], spec['top'], width, height)
+    p = tb.text_frame.paragraphs[0]
+    p.text = spec.get('text', '') # Use .get for safety
 
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.show()
+    # Apply font settings from the spec
+    if 'font' in spec and isinstance(spec['font'], dict):
+        font_spec = spec['font']
+        p.font.name = font_spec.get('name', None)
+        p.font.size = font_spec.get('size', Pt(12))
+        p.font.bold = font_spec.get('bold', False)
+        p.font.italic = font_spec.get('italic', False)
+        
+        # ================== NEW LOGIC FOR COLOR ==================
+        # Prioritize hex color, fall back to RGB
+        if 'color_hex' in font_spec:
+            rgb_tuple = hex_to_rgb(font_spec['color_hex'])
+            p.font.color.rgb = RGBColor(*rgb_tuple)
+        elif 'color_rgb' in font_spec:
+            p.font.color.rgb = RGBColor(*font_spec['color_rgb'])
+        # =======================================================
+            
+    # Apply alignment
+    p.alignment = spec.get('alignment', PP_ALIGN.LEFT)
+    
+    # Apply auto-sizing at the end
+    if spec.get('auto_size', False):
+        tb.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+        
+    return tb
 
+def add_styled_shape(slide, spec):
+    """
+    Adds a shape with advanced styling (fill, border, corner radius)
+    based on a detailed specification.
+    """
+    geom = calculate_geometry(spec, SLIDE_WIDTH.cm, SLIDE_HEIGHT.cm)
+    style = spec.get('style', {})
+    shape_type = spec.get('shape_type', MSO_SHAPE.RECTANGLE)
 
-# --- 3. PPT 生成主函式 (已完整修正結構與邏輯) ---
+    # Create the shape
+    shape = slide.shapes.add_shape(shape_type, geom['left'], geom['top'], geom['width'], geom['height'])
+
+    # --- THE FIX ---
+    # Add this line to disable the default shadow effect
+    shape.shadow.inherit = False
+    # ---------------
+
+    # Apply fill styling
+    if 'fill_color_hex' in style:
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(*hex_to_rgb(style['fill_color_hex']))
+    else:
+        shape.fill.background()
+
+    # Apply border (line) styling
+    if 'border_color_hex' in style or 'border_width_pt' in style:
+        line = shape.line
+        line.fill.solid()
+        if 'border_color_hex' in style:
+            line.fill.fore_color.rgb = RGBColor(*hex_to_rgb(style['border_color_hex']))
+        line.width = style.get('border_width_pt', Pt(1))
+
+    # Apply corner radius if the shape is a rounded rectangle
+    if shape_type == MSO_SHAPE.ROUNDED_RECTANGLE and 'corner_radius' in style:
+        shape.adjustments[0] = style['corner_radius']
+        
+    return shape
+
+def add_smart_picture(slide, spec):
+    """
+    Adds a picture to the slide, automatically handling SVG or PNG/JPG.
+    If 'height' is provided in the spec, it sets a fixed size.
+    Otherwise, it scales the image based on 'width' while maintaining aspect ratio.
+    """
+    image_path = spec['path']
+    print(f"Adding image: {os.path.basename(image_path)}")
+
+    image_source = None
+    
+    # Check if the file path ends with .svg (case-insensitive)
+    if image_path.lower().endswith('.svg'):
+        # It's an SVG: convert to PNG in memory
+        png_output = io.BytesIO()
+        cairosvg.svg2png(url=image_path, write_to=png_output, output_width=2048)
+        png_output.seek(0)
+        image_source = png_output
+    else:
+        # It's a PNG, JPG, etc.: use the file path directly
+        image_source = image_path
+
+    # --- NEW LOGIC TO HANDLE FIXED HEIGHT ---
+    # Check if a specific height is provided in the spec
+    if 'height' in spec:
+        # If yes, use both width and height (this may distort the image)
+        print(f"  ... constraining to fixed size: {spec['width'].cm:.2f}cm x {spec['height'].cm:.2f}cm")
+        slide.shapes.add_picture(
+            image_source, 
+            spec['left'], 
+            spec['top'],
+            width=spec['width'], 
+            height=spec['height']
+        )
+    else:
+        # If no height is given, only use width and maintain aspect ratio
+        print(f"  ... scaling to width: {spec['width'].cm:.2f}cm (auto height)")
+        slide.shapes.add_picture(
+            image_source, 
+            spec['left'], 
+            spec['top'], 
+            width=spec['width']
+        )
+        
+def add_custom_box(slide, spec):
+    """
+    Adds a complex styled box, such as one with a 3-sided border and rounded corners.
+    """
+    # Calculate the final geometry for the shape
+    geom = calculate_geometry(spec, SLIDE_WIDTH.cm, SLIDE_HEIGHT.cm)
+    style = spec.get('style', {})
+    shape_type = spec.get('shape_type', MSO_SHAPE.RECTANGLE)
+
+    # --- Step A: Create the main shape ---
+    main_shape = slide.shapes.add_shape(
+        shape_type, 
+        geom['left'], geom['top'], geom['width'], geom['height']
+    )
+    main_shape.shadow.inherit = False
+
+    # Apply fill and border from the spec
+    fill_color_hex = style.get('fill_color_hex', '#FFFFFF') # Default to white
+    border_color_hex = style.get('border_color_hex', '#000000') # Default to black
+    border_width_pt = style.get('border_width_pt', Pt(1))
+
+    main_shape.fill.solid()
+    main_shape.fill.fore_color.rgb = RGBColor(*hex_to_rgb(fill_color_hex))
+    
+    main_shape.line.fill.solid()
+    main_shape.line.fill.fore_color.rgb = RGBColor(*hex_to_rgb(border_color_hex))
+    main_shape.line.width = border_width_pt
+
+    # Apply corner radius if specified
+    if shape_type == MSO_SHAPE.ROUND_TOP_CORNERS_RECTANGLE and 'corner_radius' in style:
+        main_shape.adjustments[0] = style.get('corner_radius', 0.1)
+
+    # --- Step B: The trick to hide the bottom border ---
+    if spec.get('hide_bottom_border', False):
+        cover_left = geom['left']
+        cover_top = geom['top'] + geom['height'] - border_width_pt
+        cover_width = geom['width']
+        cover_height = border_width_pt
+
+        cover_shape = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE, cover_left, cover_top, cover_width, cover_height
+        )
+        
+        # Style the cover-up shape to be invisible
+        cover_shape.fill.solid()
+        cover_shape.fill.fore_color.rgb = RGBColor(*hex_to_rgb(fill_color_hex))
+        cover_shape.line.fill.background()
+
+    return main_shape
+
+# --- 3. PPT 生成主函式 (已全面重構和清理) ---
 def create_report(output_filename="science_report.pptx"):
     """根據以上所有設定，生成最終的 PowerPoint 報告。"""
     prs = pptx.Presentation()
     prs.slide_width = SLIDE_WIDTH
     prs.slide_height = SLIDE_HEIGHT
-    slide = prs.slides.add_slide(prs.slide_layouts[6]) # 空白版面
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
 
-    # 1. --- Header ---
+    # --- 1. Header ---
     print("Adding Header...")
     add_smart_picture(slide, HEADER_SPECS['logo'])
-    
-    date_spec = HEADER_SPECS['date']
-    tb = slide.shapes.add_textbox(date_spec['left'], date_spec['top'], date_spec['width'], date_spec['height'])
-    tb.text_frame.paragraphs[0].text = date_spec['text']
-    tb.text_frame.paragraphs[0].font.size = Pt(11)
-    tb.text_frame.paragraphs[0].alignment = PP_ALIGN.RIGHT
-    
-    line = slide.shapes.add_shape(MSO_SHAPE.LINE_INVERSE, MARGIN_LEFT, HEADER_SPECS['line_top'], CONTENT_WIDTH, Pt(1))
-    line.line.fill.solid()
-    line.line.fill.fore_color.rgb = RGBColor(220, 220, 220)
+    add_formatted_text(slide, HEADER_SPECS['date'])
+    # add_line(slide, {'left': MARGIN_LEFT, 'top': HEADER_SPECS['line_top'], 'width': CONTENT_WIDTH, 'style': {'width_pt': Pt(1), 'color_hex': '#E5E5E5'}})
 
-    # 2. --- Player Background ---
+    # --- 2. Player Background and Info ---
     print("Adding Player Info...")
-    # Add the main rounded rectangle outline
-    bg_box_spec = {'left': MARGIN_LEFT, 'top': PLAYER_BG_Y, 'width': CONTENT_WIDTH, 'height': PLAYER_BG_HEIGHT}
-    bg_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, **bg_box_spec)
-    bg_box.fill.background()
-    bg_box.line.fill.solid()
-    bg_box.line.fill.fore_color.rgb = RGBColor(220, 220, 220)
-    bg_box.line.width = Pt(1.5)
-    bg_box.adjustments[0] = 0.15
+    # Use the new helper function to add the styled background box
+    add_styled_shape(slide, PLAYER_SPECS['background_box'])
 
-    # Add Player Name and Details (this part is the same)
-    for key in ['name', 'details']:
-        spec = PLAYER_SPECS[key]
-        tb = slide.shapes.add_textbox(spec['left'], spec['top'], spec['width'], spec['height'])
-        tb.text_frame.text = spec['text']
-        if key == 'name':
-            tb.text_frame.paragraphs[0].font.size = Pt(24)
-            tb.text_frame.paragraphs[0].font.bold = True
-        elif key == 'details':
-            tb.text_frame.paragraphs[0].font.size = Pt(11)
+    # Add all player text info
+    for key in ['name', 'details', 'mouse_pref_title', 'Mouse_info', 'Mouse_brand']:
+        add_formatted_text(slide, PLAYER_SPECS[key])
+        
+    # Add the vertical and horizontal separator lines
+    for key in ['vertical_separator', 'horizontal_separator']:
+        if key in PLAYER_SPECS: # Check if the line spec exists before adding
+            add_line(slide, PLAYER_SPECS[key])
 
-    # Add the vertical separator line (this part is the same)
-    line = slide.shapes.add_shape(MSO_SHAPE.LINE_INVERSE, PLAYER_SPECS['line_left'], PLAYER_SPECS['line_top'], Pt(1), PLAYER_SPECS['line_height'])
-    line.line.fill.solid()
-    line.line.fill.fore_color.rgb = RGBColor(220, 220, 220)
+    # Add and format the mouse preferences table
+    # if 'mouse_pref_table' in PLAYER_SPECS:
+    #     table_spec = PLAYER_SPECS['mouse_pref_table']
+    #     table_geom = calculate_geometry(table_spec, SLIDE_WIDTH.cm, SLIDE_HEIGHT.cm)
+    #     shape = slide.shapes.add_table(len(table_spec['data']), len(table_spec['data'][0]), table_geom['left'], table_geom['top'], table_geom['width'], Cm(1.5))
+    #     table = shape.table
+    #     for i, width in enumerate(table_spec['col_widths']):
+    #         table.columns[i].width = width
+    #     for r, row_data in enumerate(table_spec['data']):
+    #         for c, cell_text in enumerate(row_data):
+    #             cell = table.cell(r, c)
+    #             cell.fill.background()
+    #             p = cell.text_frame.paragraphs[0]
+    #             p.text = cell_text
+    #             p.font.size = Pt(11)
+    #             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+    #             if c == 0:
+    #                 p.font.color.rgb = RGBColor(*hex_to_rgb("#757575"))
+    #                 p.alignment = PP_ALIGN.LEFT
+    #             else:
+    #                 p.font.color.rgb = RGBColor(0,0,0)
+    #                 p.alignment = PP_ALIGN.RIGHT
     
-    # ================== NEW LOGIC FOR MOUSE PREFERENCES ==================
-    # Add the new title: "Mouse 1 Preferences"
-    title_spec = PLAYER_SPECS['mouse_pref_title']
-    tb = slide.shapes.add_textbox(title_spec['left'], title_spec['top'], title_spec['width'], title_spec['height'])
-    tb.text_frame.text = title_spec['text']
-    tb.text_frame.paragraphs[0].font.size = Pt(16)
-    # tb.text_frame.paragraphs[0].font.bold = True
+    # --- 3. Main Content Sections ---
+    add_styled_shape(slide, FLICK_SHOT_SPECS['section_header'])
+    all_sections = {'Flick Shot': FLICK_SHOT_SPECS, 'Fatigue Test': FATIGUE_SPECS}
+    for section_name, section_specs in all_sections.items():
+        print(f"Adding {section_name} Section...")
+        print(section_name, section_specs)
+        # for spec in section_specs.values():
+        #     print(spec)
+        #     if isinstance(spec, dict): # Process only dictionary specs
+        #         if 'text' in spec:
+        #             add_formatted_text(slide, spec)
+        #         elif 'path' in spec:
+        #             add_smart_picture(slide, spec)
+        for key in section_specs.keys():
+            print(key)
+            if '_title' in key:
+                add_formatted_text(slide, section_specs[key])
+                print(key)
+            elif '_image' in key:
+                
+                add_smart_picture(slide, section_specs[key])
+            elif '_separator' in key:
+                add_line(slide, section_specs[key])
+    # Use the new function to create the styled header box
+    # Use the correct function that reads the 'shape_type' from your config
     
-    # Add the red line separator
-    red_line_spec = PLAYER_SPECS['mouse_pref_title'] # Use title spec for positioning
-    line = slide.shapes.add_shape(
-        MSO_SHAPE.LINE_INVERSE, 
-        red_line_spec['left'], PLAYER_SPECS['mouse_pref_line_top'], 
-        red_line_spec['width'], Pt(1.5)
-    )
-    line.line.fill.solid()
-    line.line.fill.fore_color.rgb = RGBColor(237, 28, 36) # Red color
 
-    # Add and format the 2x2 table
-    table_spec = PLAYER_SPECS['mouse_pref_table']
-    table_data = table_spec['data']
-    rows, cols = len(table_data), len(table_data[0])
-    
-    shape = slide.shapes.add_table(
-        rows, cols, 
-        table_spec['left'], table_spec['top'], 
-        table_spec['width'], Cm(1.5) # Height is less important here
-    )
-    table = shape.table
-
-    # Set column widths
-    for i, width in enumerate(table_spec['col_widths']):
-        table.columns[i].width = width
-
-    # Populate and format each cell
-    for r, row_data in enumerate(table_data):
-        for c, cell_text in enumerate(row_data):
-            cell = table.cell(r, c)
-            
-            # Make cell background transparent
-            cell.fill.background()
-            
-            p = cell.text_frame.paragraphs[0]
-            p.text = cell_text
-            p.font.size = Pt(11)
-            cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-            
-            # Left column (c=0) formatting
-            if c == 0:
-                p.font.color.rgb = RGBColor(166, 166, 166) # Grey text
-                p.alignment = PP_ALIGN.LEFT
-            # Right column (c=1) formatting
-            else:
-                p.font.color.rgb = RGBColor(0, 0, 0) # Black text
-                p.alignment = PP_ALIGN.RIGHT
-
-    # 3. --- Flick Shot Section ---
-    print("Adding Flick Shot Section...")
-    # Add the main section title
-    title_spec = FLICK_SHOT_SPECS['title']
-    tb = slide.shapes.add_textbox(title_spec['left'], title_spec['top'], title_spec['width'], title_spec['height'])
-    tb.text_frame.paragraphs[0].text = title_spec['text']
-    tb.text_frame.paragraphs[0].font.size = Pt(16)
-
-    # --- Add all the small titles above the charts ---
-    for key in ['hand_path_title', 'speed_profile_title', 'performance_title', 'forearm_muscles_title']:
-        spec = FLICK_SHOT_SPECS[key]
-        tb = slide.shapes.add_textbox(spec['left'], spec['top'], spec['width'], spec['height'])
-        tb.text_frame.text = spec['text']
-        tb.text_frame.paragraphs[0].font.size = Pt(11)
-
-    # --- Add all the images using the corrected key names ---
-    image_keys = [
-        'hand_path_image', 'speed_profile_image', 'performance_image', 
-        'forearm_muscles_image', 'muscle_charts_combined'
-    ]
-    for key in image_keys:
-        add_smart_picture(slide, FLICK_SHOT_SPECS[key])
-
-    # 4. --- Fatigue Test Section ---
-    print("Adding Fatigue Test Section...")
-    # Add the main red title box
-    title_spec = FATIGUE_SPECS['title']
-    geometry_spec = {k: v for k, v in title_spec.items() if k != 'text'}
-    title_shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, **geometry_spec)
-    title_shape.fill.solid()
-    title_shape.fill.fore_color.rgb = RGBColor(237, 28, 36)
-    title_shape.text_frame.text = title_spec['text']
-    p = title_shape.text_frame.paragraphs[0]
-    p.font.color.rgb = RGBColor(255, 255, 255)
-    p.font.bold = True
-    p.font.size = Pt(14)
-
-    # --- Add all the small titles above the charts ---
-    for key in ['fatigue_index_title', 'muscle_activation_title']:
-        spec = FATIGUE_SPECS[key]
-        tb = slide.shapes.add_textbox(spec['left'], spec['top'], spec['width'], spec['height'])
-        tb.text_frame.text = spec['text']
-        tb.text_frame.paragraphs[0].font.size = Pt(11)
-
-    # --- Add all the images using the corrected key names ---
-    image_keys = ['fatigue_index_image', 'muscle_activation_image']
-    for key in image_keys:
-        add_smart_picture(slide, FATIGUE_SPECS[key])
-
-    # --- Add the (x / x) text at the bottom ---
-    spec = FATIGUE_SPECS['bottom_text']
-    tb = slide.shapes.add_textbox(spec['left'], spec['top'], spec['width'], spec['height'])
-    tb.text_frame.text = spec['text']
-    p = tb.text_frame.paragraphs[0]
-    p.font.size = Pt(10)
-    p.alignment = PP_ALIGN.CENTER
-
-    # 5. --- Footer ---
+    # --- 4. Footer ---
     print("Adding Footer...")
-    footer_spec = FOOTER_SPECS['page_num']
-    tb = slide.shapes.add_textbox(footer_spec['left'], footer_spec['top'], footer_spec['width'], footer_spec['height'])
-    p = tb.text_frame.paragraphs[0]
-    p.text = footer_spec['text']
-    p.font.size = Pt(10)
-    p.alignment = PP_ALIGN.RIGHT
+    add_formatted_text(slide, FOOTER_SPECS['page_num'])
 
-    # 6. --- Save Presentation ---
+    # --- 5. Save Presentation ---
     prs.save(output_filename)
     print(f"Report successfully saved as '{output_filename}'")
 
 # --- Main Execution ---
 if __name__ == '__main__':
     create_placeholder_images()
-    preview_layout()
+    # preview_layout()
     create_report()

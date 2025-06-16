@@ -75,7 +75,7 @@ def plot_median_freq_slope_comparison(group1: dict, group2: dict,
     # x = np.arange(len(keys)) * 1.5  # 放大 x 軸間距
     # width = 0.3  # 稍微窄一點避免重疊
 
-    fig, ax = plt.subplots(figsize=(max(8, len(keys) * 1.2), 6))
+    fig, ax = plt.subplots(figsize=(max(8, len(keys) * 2.7), 4.4))
     # bars1 = ax.bar(x - width/2, values1, width, label=label_list[0], color="#3B3B3B")
     # bars2 = ax.bar(x + width/2, values2, width, label=label_list[1], color="#CC0040")
     
@@ -96,7 +96,7 @@ def plot_median_freq_slope_comparison(group1: dict, group2: dict,
     
     # ax.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='gray', alpha=0.8)
     # ax.set_ylabel(ylabel)
-    ax.set_title(title, fontsize=20, pad=20, fontweight='bold') # pad 參數控制標題與圖表的間距
+    # ax.set_title(title, fontsize=20, pad=20, fontweight='bold') # pad 參數控制標題與圖表的間距
     # ax.text(0.5, -0.15, title, fontsize=16, ha='center', va='top', transform=ax.transAxes)
 
     ax.tick_params(axis='y', left=False, labelleft=False)
@@ -169,7 +169,7 @@ def plot_performance_comparison(
     rows = math.ceil(num_metrics / cols)
 
     # 建立對應數量的子圖
-    fig, axs = plt.subplots(rows, cols, figsize=(cols * 3, rows * 6), squeeze=False)
+    fig, axs = plt.subplots(rows, cols, figsize=(cols * 3, rows * 5), squeeze=False)
     axs = axs.flatten()
 
     # 為每個指標畫一張子圖

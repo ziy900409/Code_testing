@@ -1827,9 +1827,9 @@ def plot_standardized_signals_cloud_compare(
     # --- Plot Formatting ---
     if plot_success_count > 0:
         # 設置 title
-        ax.text(x=0.0, y=1.1, s=title, fontsize=32,
-                transform=ax.transAxes,
-                ha='left', va='bottom')
+        # ax.text(x=0.0, y=1.1, s=title, fontsize=32,
+        #         transform=ax.transAxes,
+        #         ha='left', va='bottom')
         # ax.set_title(title, fontsize=20, loc='left')
         # ax.legend(loc="best")
         # 設置背景格式
