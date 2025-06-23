@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 import math
+from matplotlib.ticker import MaxNLocator
 plt.rcParams['font.sans-serif'] =  ['Roboto']  
 plt.rcParams['axes.unicode_minus'] = False  # 正常顯示負號
 plt.rcParams['figure.dpi'] = 150
@@ -89,7 +90,7 @@ def plot_median_freq_slope_comparison(group1: dict, group2: dict,
     bars1 = ax.bar(x - offset, values1, width, label=label_list[0],
                    edgecolor="#CC0040",   # 用斜線顏色
                    facecolor='none',
-                   hatch='\\\\',
+                   hatch='\\\\\\',
                    linewidth=0.1          # ✅ 非常細的外框線
                    )
     bars2 = ax.bar(x + offset, values2, width, label=label_list[1], color="#CC0040")
@@ -150,12 +151,13 @@ def plot_performance_comparison(
     data: Dict[str, Dict[str, float]],
     title: str = "Performance Comparison (Pre vs. Post)",
     pre_post_labels: List[str] = ['實驗前', '實驗後'],
-    pre_post_colors: List[str] = ['#CC0040', '#CC0040'],
-    custom_texts: Optional[Dict[str, Tuple[str, str]]] = None
+    # pre_post_colors: List[str] = ['#CC0040', '#CC0040'],
+    custom_texts: Optional[Dict[str, Tuple[str, str]]] = None,
+    color: List[str] = ['#CC0040', '#212121', '#F1A012']
 ):
     # 設定中文字型與負號正確顯示
-    plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
-    plt.rcParams['axes.unicode_minus'] = False
+    # plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
+    # plt.rcParams['axes.unicode_minus'] = False
 
     # 取得所有的指標名稱，例如 'Accuracy', 'TTK (ms)'
     metrics = list(data.keys())
@@ -185,15 +187,18 @@ def plot_performance_comparison(
         x = np.arange(1)
         width = 0.2
         offset = 0.12
-
+        if color and len(metrics) == len(color):
+            color_ind = color[i]
+        else:
+            color_ind = '#CC0040'
         # 畫 pre 的 bar（外框）
         bars1 = ax.bar(x - offset,
                        [value_pre],
                        width,
                        label=pre_post_labels[0],
-                       edgecolor=pre_post_colors[0],
+                       edgecolor=color_ind,
                        facecolor='none',
-                       hatch='\\\\',
+                       hatch='\\\\\\',
                        linewidth=0.1)
 
         # 畫 pos 的 bar（實心）
@@ -201,7 +206,7 @@ def plot_performance_comparison(
                        [value_pos],
                        width,
                        label=pre_post_labels[1],
-                       color=pre_post_colors[1])
+                       color=color_ind)
 
         # 隱藏上、左、右邊框，只保留下邊框並設顏色與寬度
         ax.spines['top'].set_visible(False)
@@ -286,7 +291,7 @@ def plot_performance_comparison(
         ax.yaxis.tick_right()
         # ax.set_ylabel(y_axis_label, fontsize=16, labelpad=30, rotation=270, color="#868686")
         
-        ax.tick_params(axis='y', right=False, labelright=True, labelsize=9, labelcolor="#5A5A5A")
+        ax.tick_params(axis='y', right=False, labelright=True, labelsize=12, labelcolor="#5A5A5A")
 
         # X 軸左右預留空間
         ax.set_xlim(-0.4, 0.4)
@@ -322,24 +327,393 @@ def plot_performance_comparison(
 # ==========================================================
 # 以下為一個可以用來測試上述函式的範例
 # ==========================================================
-# if __name__ == '__main__':
-#     performance_data = {
-#         "Accuracy": {'pre': 0.62, 'pos': 0.73},
-#         "Efficiency Ratio": {'pre': 0.81, 'pos': 0.85},
-#         "TTK (ms)": {'pre': 60.11, 'pos': 51.88}
-#     }
+if __name__ == '__main__':
+    performance_data = {
+        "Accuracy": {'pre': 0.62, 'pos': 0.73},
+        "Efficiency Ratio": {'pre': 0.81, 'pos': 0.85},
+        "TTK (ms)": {'pre': 60.11, 'pos': 51.88}
+    }
     
-#     # 建立一個自訂標籤的對照表
-#     custom_label_texts = {
-#         "Accuracy": ("準確度", "(%)"),
-#         "Efficiency Ratio": ("效率指標", ""), # 如果沒有單位，可以留空
-#         "TTK (ms)": ("擊殺時間", "(ms)")
-#     }
+    # 建立一個自訂標籤的對照表
+    custom_label_texts = {
+        "Accuracy": ("準確度", "(%)"),
+        "Efficiency Ratio": ("效率指標", ""), # 如果沒有單位，可以留空
+        "TTK (ms)": ("擊殺時間", "(ms)")
+    }
 
-#     # 呼叫函式時，傳入這個對照表
-#     plot_performance_comparison(
-#         data=performance_data,
-#         title="整體效能比較 (實驗前 vs. 實驗後)",
-#         custom_texts=custom_label_texts # 在這裡傳入
-#     )
+    # 呼叫函式時，傳入這個對照表
+    plot_performance_comparison(
+        data=performance_data,
+        title="整體效能比較 (實驗前 vs. 實驗後)",
+        custom_texts=custom_label_texts # 在這裡傳入
+    )
+# %%
 
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import List, Dict, Tuple, Optional
+
+def plot_grouped_bar_chart(
+    data: List[Dict],
+    y_axis_label: str = "Performance",
+    output_path: str = "grouped_bar_chart.png",
+    fixed_x_range: Tuple[float, float] = (0, 214), # Your fixed X-axis range
+    fixed_bar_width: float = 9.0 # Your fixed width for a single bar
+):
+    """
+    Creates a bar chart with a fixed X-axis range and fixed bar widths.
+    The spacing between groups is calculated dynamically to fit.
+    """
+    # --- 1. Setup ---
+        
+    if not data:
+        print("❌ Error: No data provided.")
+        return
+    
+    group_names = [item['group_name'] for item in data]
+    num_groups = len(group_names)
+
+    fig, ax = plt.subplots(figsize=(18, 5)) # Keep a consistent output image size
+
+    # --- 2. Bar Positioning (NEW DYNAMIC SPACING LOGIC) ---
+    x_min, x_max = fixed_x_range
+    ax.set_xlim(x_min, x_max) # Apply the fixed range
+
+    # Calculate the total width occupied by all bars
+    total_bars_width = num_groups * 2 * fixed_bar_width 
+    
+    # Check if the bars can physically fit in the given range
+    if total_bars_width >= (x_max - x_min):
+        print(f"❌ Error: The fixed bar widths ({total_bars_width}) exceed the fixed X-axis range ({x_max - x_min}).")
+        print("  Please reduce the number of groups or the fixed_bar_width.")
+        return
+
+    # Calculate the remaining space to be used for gaps
+    total_gap_space = (x_max - x_min) - total_bars_width
+    
+    # Divide the gap space evenly. There is always one more gap than the number of groups.
+    # (e.g., 2 groups have 3 gaps: margin-group1-gap-group2-margin)
+    gap_size = total_gap_space / (num_groups + 1)
+    
+    # Calculate the positions for each group's center
+    offset = fixed_bar_width / 2
+    x_positions = []
+    for i in range(num_groups):
+        # The center of group i is the starting margin + previous bars and gaps + half of the current group's width
+        group_center = gap_size * (i + 1) + fixed_bar_width * (2 * i) + fixed_bar_width
+        x_positions.append(group_center)
+    # --- 3. Y-Axis Automatic Scaling (NEW LOGIC) ---
+    
+    # First, find the min and max values across ALL data to determine the scale
+    all_values = []
+    for item in data:
+        all_values.append(item.get('pre', 0))
+        all_values.append(item.get('post', 0))
+    
+    min_val = min(all_values)
+    max_val = max(all_values)
+    
+    # Set a preliminary Y-axis range with some padding
+    ax.set_ylim(bottom=min(0, min_val * 1.2), top=max_val * 1.2)
+
+    # Use MaxNLocator to automatically find 5 nice intervals (which creates 6 tick marks/lines)
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=5, prune='both'))
+    
+    # --- 4. Styling the Chart ---
+    # ax.set_ylabel(y_axis_label, fontsize=12)
+    # ax.set_ylim(bottom=0, top=100) 
+
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(group_names, fontsize=44, color='#757575')
+    ax.tick_params(axis='x', pad=15, length=0)
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['bottom'].set_color('#5A5A5A')
+    ax.spines['bottom'].set_linewidth(2)
+
+    ax.yaxis.grid(True, linestyle='-', color='#5A5A5A', zorder=0, alpha=0.7)
+    # ax.set_yticklabels(fontsize=20, color='#757575')
+    # 將 Y 軸刻度顯示在右側
+    ax.yaxis.tick_right()
+    # Add a thicker, solid line specifically at the Y=0 position to emphasize it
+    ax.axhline(y=0, color='#5A5A5A', linewidth=4, zorder=0, alpha=0.7)
+    
+    # --- 3. Draw Bars for Each Group ---
+    for i, item in enumerate(data):
+        ax.bar(
+            x_positions[i] - offset,
+            item['pre'],
+            fixed_bar_width, # Use the fixed bar width
+            edgecolor=item['color'],
+            facecolor='none',
+            hatch=item.get('hatch', '///'),
+            linewidth=0.5,
+            zorder=3 
+        )
+        ax.bar(
+            x_positions[i] + offset,
+            item['post'],
+            fixed_bar_width, # Use the fixed bar width
+            color=item['color'],
+            zorder=3 
+        )
+
+    
+    ax.tick_params(axis='y', right=False, labelright=True, labelsize=36, labelcolor="#5A5A5A")
+
+    # --- 5. Save and Show ---
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, transparent=True)
+    plt.show()
+    plt.close(fig)
+    print(f"Grouped bar chart with fixed spacing saved to '{output_path}'")
+if __name__ == '__main__':
+    # Example with 4 groups
+    data_4_groups = [
+        {'group_name': 'Mouse A', 'pre': 85, 'post': 40, 'color': '#CC0040', 'hatch': '\\\\'},
+        {'group_name': 'Mouse B', 'pre': 95, 'post': 50, 'color': '#000000', 'hatch': '\\\\'},
+        # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
+        # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
+    ]
+    
+    # The function will automatically calculate the spacing to fit 4 groups
+    # with bars of width 9 into the 0-214 range.
+    plot_grouped_bar_chart(
+        data=data_4_groups,
+        fixed_x_range=(0, 214),
+        fixed_bar_width=9.0,
+        output_path="chart_4_groups_fixed.png"
+    )
+# %%
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def create_radar_chart(labels, data_series, output_path):
+    """
+    Creates and saves a final, styled radar chart.
+    Y-axis labels are now guaranteed to be on the top layer.
+    """
+    num_vars = len(labels)
+    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+    angles += angles[:1]
+
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+    ax.set_ylim(0, 110)
+    ax.grid(False)
+
+    # --- Set Y-axis Ticks and Labels ---
+    y_tick_positions = [20, 40, 60, 80, 100]
+    ax.set_yticks(y_tick_positions)
+    ax.set_yticklabels([str(y) for y in y_tick_positions], color="#959595", size=8)
+    ax.set_rlabel_position(0)
+    
+    # --- THIS IS THE FIX (Part 1) ---
+    # Set a high zorder on the Y-axis labels to bring them to the front.
+    for label in ax.get_yticklabels():
+        label.set_verticalalignment('top')
+        label.set_zorder(10) # A high number ensures it's on top of data fills
+    # --------------------------------
+
+    # --- Manually draw grids and axes (with low zorder) ---
+    for y_value in y_tick_positions:
+        grid_points = [y_value] * len(angles)
+        if y_value == 100:
+            ax.plot(angles, grid_points, color='#E5E5E5', linestyle='-', linewidth=1.5, zorder=1)
+        else:
+            ax.plot(angles, grid_points, color='#E5E5E5', linestyle='-', linewidth=0.5, zorder=1)
+        
+        ax.fill(angles, grid_points, color='#F2F2F2', zorder=-10) # zorder places it in the background
+
+    for angle in angles[:-1]:
+        ax.plot([angle, angle], [0, 100], color='#E5E5E5', linestyle='-', linewidth=1, zorder=1)
+
+    # --- Plot the actual data series ---
+    for series in data_series:
+        values = series['values'] + series['values'][:1]
+        
+        # --- THIS IS THE FIX (Part 2) ---
+        # Set a higher zorder for the data line, and a lower zorder for the fill
+        ax.plot(angles, values, color=series['color'], linewidth=1, label=series['label'], zorder=3)
+        # ax.fill(angles, values, color=series['color'], alpha=0.25, zorder=2)
+        # --------------------------------
+
+    # --- Final appearance settings ---
+    ax.set_thetagrids(np.degrees(angles[:-1]), [])
+    ax.spines['polar'].set_visible(False)
+
+    # --- Save the figure ---
+    plt.savefig(output_path, dpi=300, transparent=True, bbox_inches='tight')
+    plt.show()
+    plt.close(fig)
+# --- Main execution block to generate the chart ---
+if __name__ == '__main__':
+    
+    pentagon_labels = ['Focus', 'Accuracy', 'Speed', 'Stamina', 'Control']
+
+    pre_data = {
+        'label': 'Pre',
+        'values': [35, 25, 70, 85, 30],
+        'color': '#000000' # Black
+    }
+    
+    post_data = {
+        'label': 'Post',
+        'values': [65, 80, 15, 45, 25],
+        'color': '#CC0040' # Red
+    }
+
+    create_radar_chart(
+        labels=pentagon_labels, 
+        data_series=[pre_data, post_data], 
+        output_path='my_pentagonal_radar_chart.png'
+    )
+# %%
+
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import List, Dict
+import math # Make sure math is imported
+
+def plot_pixel_perfect_bars(
+    data: List[Dict],
+    bar_width_px: int = 35, # The fixed width of a single bar in pixels
+    y_axis_label: str = "Performance",
+    output_path: str = "pixel_perfect_chart.png",
+    dpi: int = 300
+):
+    """
+    Creates a bar chart with fixed bar widths and precise pixel spacing between groups.
+    The total width of the chart is dynamic based on the number of groups.
+    """
+    # --- 1. Validate Input ---
+    num_groups = len(data)
+    if num_groups > 4:
+        print(f"❌ Error: This layout supports a maximum of 4 data groups. You provided {num_groups}.")
+        return
+    if num_groups == 0:
+        print("❌ Error: No data provided.")
+        return
+
+    # --- 2. Define Layout Spacing in Pixels based on Rules ---
+    inner_spacing_px = 0
+    if num_groups == 2:
+        inner_spacing_px = 44
+    elif num_groups == 3:
+        inner_spacing_px = 41
+    elif num_groups == 4:
+        inner_spacing_px = 32
+    
+    # Let's assume the outer spacing (left/right margins) is equal to the inner spacing for a balanced look.
+    outer_spacing_px = inner_spacing_px if num_groups > 1 else 44 # Use a default margin for a single group
+
+    # --- 3. Calculate All Pixel Dimensions ---
+    # The space for one group (e.g., a "Pre" and "Post" bar). Let's make them touch.
+    group_block_width_px = bar_width_px * 2 
+    
+    # Calculate the total width needed for the figure
+    total_bar_widths = num_groups * group_block_width_px
+    total_inner_spacing = max(0, num_groups - 1) * inner_spacing_px
+    total_outer_spacing = 2 * outer_spacing_px
+    total_figure_width_px = total_bar_widths + total_inner_spacing + total_outer_spacing
+
+    # Convert total pixel width to inches for figsize
+    figure_width_inches = total_figure_width_px / dpi
+    figure_height_inches = 4 # A fixed height
+
+    # --- 4. Create the Plot ---
+    fig, ax = plt.subplots(figsize=(figure_width_inches, figure_height_inches), dpi=dpi)
+    
+    # Set the x-axis limits to match our pixel calculations
+    ax.set_xlim(0, total_figure_width_px)
+    
+    # --- 5. Draw Bars at Precise Positions ---
+    x_tick_positions = []
+    current_x = outer_spacing_px # Start after the left margin
+    
+    for item in data:
+        # Calculate the center of the current group block
+        group_center = current_x + (group_block_width_px / 2)
+        x_tick_positions.append(group_center)
+        
+        # Calculate positions for the two bars within the group
+        pre_bar_x = group_center - (bar_width_px / 2)
+        post_bar_x = group_center + (bar_width_px / 2)
+
+        # Draw the "Pre" bar (hatched)
+        ax.bar(pre_bar_x, item['pre'], bar_width_px, align='center', edgecolor=item['color'], facecolor='none', hatch=item.get('hatch', '///'), linewidth=1.5)
+        # Draw the "Post" bar (solid)
+        ax.bar(post_bar_x, item['post'], bar_width_px, align='center', color=item['color'])
+        
+        # Move the starting point for the next group
+        current_x += group_block_width_px + inner_spacing_px
+        
+    # --- 6. Styling the Chart (similar to before) ---
+    ax.set_ylabel(y_axis_label, fontsize=12)
+    ax.set_ylim(bottom=0, top=100)
+    
+    ax.set_xticks(x_tick_positions)
+    ax.set_xticklabels([item['group_name'] for item in data], fontsize=14, color='grey')
+    ax.tick_params(axis='x', length=0)
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_color('lightgray')
+
+    ax.yaxis.grid(True, linestyle='--', color='lightgray', zorder=-10)
+    ax.tick_params(axis='y', length=0)
+
+    # --- 7. Save and Show ---
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=dpi, transparent=True)
+    plt.show()
+    plt.close(fig)
+    print(f"Pixel-perfect bar chart saved to '{output_path}'")
+if __name__ == '__main__':
+    # 1. Define the data in the new list format
+    performance_data = [
+        {
+            'group_name': 'Mouse 1',
+            'pre': 85,
+            'post': 40,
+            'color': '#CC0040',
+            'hatch': '///'
+        },
+        {
+            'group_name': 'Mouse 2',
+            'pre': 95,
+            'post': 50,
+            'color': '#000000',
+            'hatch': '\\\\\\'
+        },
+        {
+            'group_name': 'Mouse 3',
+            'pre': 85,
+            'post': 40,
+            'color': '#F1A012',
+            'hatch': '///'
+        },
+        {
+            'group_name': 'Mouse 4',
+            'pre': 95,
+            'post': 50,
+            'color': '#7A4EDF',
+            'hatch': '\\\\\\'
+        }
+    ]
+
+    # 2. Call the new function
+    plot_pixel_perfect_bars(
+        data=performance_data, 
+        y_axis_label="TTK (ms)", # Example label
+        output_path="performance_comparison.png"
+    )       
+    
+    

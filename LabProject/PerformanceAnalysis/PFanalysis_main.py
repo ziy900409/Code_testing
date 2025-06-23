@@ -356,7 +356,7 @@ emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
         raw_dataset_labels=["Pre", "Pos"],
         directions_to_process=["left"],
         figure_title="Cloud Comparison: Alpha vs Beta (Left Stats)",
-        target_length=141,
+        target_length=101,
         selected_emg_channels=select_muscle,
         color_hex_codes=color_codes
     )
@@ -366,10 +366,12 @@ emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
         raw_dataset_labels=["Pre", "Pos"],
         directions_to_process=["right"],
         figure_title="Cloud Comparison: Alpha vs Beta (Right Stats)",
-        target_length=141,
+        target_length=101,
         selected_emg_channels=select_muscle,
         color_hex_codes=color_codes
     )
+
+
 # %%
 
 """
@@ -471,8 +473,8 @@ key_table = {
         "pos": pos_excldueCen_df["Frame Span"].mean()
         },
     "OneShotTTK": {
-        "pre": pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]["Frame Span"].mean(),
-        "pos": pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]["Frame Span"].mean()
+        "pre": pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]["Frame Span"].mean()*10,
+        "pos": pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]["Frame Span"].mean()*10
         },
     "Kill": {
         "pre": len(pre_excldueCen_df["Frame Span"]),

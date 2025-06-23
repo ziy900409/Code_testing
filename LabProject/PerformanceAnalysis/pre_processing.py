@@ -1819,7 +1819,7 @@ def plot_standardized_signals_cloud_compare(
             # plotted_colors.add(current_color_idx)
 
             ax.plot(iters, avg, color=color, linewidth=2)
-            ax.fill_between(iters, lower, upper, color=color, alpha=0.2)
+            ax.fill_between(iters, lower, upper, color=color, alpha=0.15)
             plot_success_count += 1
         else:
             print(f"Could not successfully process or calculate statistics for {label}.")
@@ -1845,13 +1845,13 @@ def plot_standardized_signals_cloud_compare(
         # 設置 X 軸格式
         ax.set_xlim(left=0, right=100)
         ax.set_xlabel(xlabel, fontsize=20, color="#868686")
-        ax.tick_params(axis='x', labelsize=14, which='both', length=0, labelcolor="#868686")
+        ax.tick_params(axis='x', labelsize=12, which='both', length=0, labelcolor="#868686")
         # 設置 Y 軸格式
         ax.set_ylabel(ylabel, fontsize=20, labelpad=30, rotation=270, color="#868686")
         ax.yaxis.set_label_coords(-0.07, 0.5)  # (x, y) → y=0.0 對齊 X 軸
         
         ax.yaxis.tick_right()                  # 把刻度值也放右邊
-        ax.tick_params(axis='y', labelsize=14, which='both', length=0, labelcolor="#868686")
+        ax.tick_params(axis='y', labelsize=12, which='both', length=0, labelcolor="#868686")
         
         plt.tight_layout()
         plt.show()

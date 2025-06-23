@@ -1536,7 +1536,7 @@ def process_emg_data_with_direction(pre_excldueCen_df,
 
     # 步驟 4: 數據提取、插值與分類
     interpolated_data = {"right": defaultdict(dict), "left": defaultdict(dict)} # 使用 defaultdict 以簡化後續賦值
-    num_points_interpolated = 141 # 這是您指定的插值點數
+    num_points_interpolated = 101 # 這是您指定的插值點數
 
     for index, row in df_shot_one.iterrows():
         group_id = row.get('Group ID', f"UnknownGroup_{index}") # 使用 .get() 避免 KeyError
@@ -1563,7 +1563,7 @@ def process_emg_data_with_direction(pre_excldueCen_df,
             print(f"警告：跳過 Group ID {group_id}，因起始影格 ({start_frame}) < 20。")
             continue
         
-        emg_start_index = int((start_frame - 20) * 10)
+        emg_start_index = int((start_frame) * 10)
         emg_end_index = int(end_frame * 10)
 
         target_group_storage_key = None # "right" or "left"
@@ -2238,7 +2238,7 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
         transform=fig.transFigure, clip_on=False
     )
     fig.patches.append(rect)
-    time_axis = np.linspace(-40, 100, target_length)
+    time_axis = np.linspace(0, 100, target_length)
     palette = plt.get_cmap('tab10')
 
     for i_subplot, emg_channel_name in enumerate(channels_for_subplots):
@@ -2248,6 +2248,7 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
         ax.text(-0.08, 0.92, str(i_subplot + 1), transform=ax.transAxes,
                 fontsize=20, color='white',
                 horizontalalignment='center', verticalalignment='center', # 將對齊方式改為置中
+                fontname='Roboto',  # 字型設定
                 bbox=dict(boxstyle='circle,pad=0.4', facecolor='black', edgecolor='none'))
         plotted_anything_on_ax = False
 
@@ -2274,7 +2275,7 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
                 
                 # ax.plot(time_axis, mean_signal, color=color, label=f'{current_label} (n={num_trials})', linewidth=1.5)
                 ax.plot(time_axis, mean_signal, color=color, linewidth=1.5)
-                ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.15)
+                ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.1)
             
         if plotted_anything_on_ax:
             # ax.legend(fontsize=9, loc='best')
@@ -2293,8 +2294,8 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
             fig.add_artist(vline)
             
             ax.grid(True, linestyle=(0, (10, 5)), alpha=0.5, linewidth=0.5)
-            ax.set_xlim(-40, 100)
-            ax.axvline(x=0, color='black', linestyle='--', linewidth=0.5)
+            ax.set_xlim(0, 100)
+            # ax.axvline(x=0, color='black', linestyle='--', linewidth=0.5)
             ax.tick_params(axis='y', labelsize=10)
 
             is_bottom_row = (i_subplot // cols) == rows - 1
@@ -2322,19 +2323,19 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
 
             if is_bottom_row:
                 ax.set_xlabel(x_axis_label, color='#868686', fontsize=16)
-                ax.tick_params(axis='x',labelcolor='#868686', labelsize=14, which='both', length=0)
+                ax.tick_params(axis='x',labelcolor='#868686', labelsize=12, which='both', length=0)
             else:
                 ax.tick_params(axis='x', which='both', length=0)
             
             # if is_left_col:
-            ax.set_ylabel(y_axis_label, fontsize=16, labelpad=30, rotation=270, color="#868686")
-            ax.yaxis.set_label_coords(-0.06, 0.38)  # (x, y) → y=0.0 對齊 X 軸 
+            ax.set_ylabel(y_axis_label, fontsize=16, labelpad=30, color="#868686")
+            ax.yaxis.set_label_coords(-0.10, 0.37)  # (x, y) → y=0.0 對齊 X 軸 
             ax.tick_params(axis='y', labelsize=14, labelcolor='#868686', which='both', length=0)
             ax.yaxis.set_label_position("right")   # 把標籤放右邊
                  
         else:
             ax.text(0.5, 0.5, "No data for this channel", ha="center", va="center", transform=ax.transAxes, color="grey")
-            ax.set_xlim(-40, 100)
+            ax.set_xlim(0, 100)
             if (i_subplot // cols) == rows - 1: ax.set_xlabel(x_axis_label, fontsize=12)
             if (i_subplot % cols) == 0: ax.set_ylabel(y_axis_label, fontsize=12)
 
@@ -2342,7 +2343,9 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
         fig.delaxes(axs[i_ax // cols, i_ax % cols])
 
     # fig.suptitle(figure_title, fontsize=18, fontweight='bold', y=0.99 if rows == 1 else 1.00)
-    plt.tight_layout(rect=[0.01, 0, 0.99, 1 if rows > 1 else 0.92])
+    # plt.tight_layout(rect=[0.01, 0, 0.99, 1 if rows > 1 else 0.92])
+    top_boundary = 0.95 
+    plt.tight_layout(rect=[0.01, 0, 0.99, top_boundary])
     plt.subplots_adjust(hspace=0.4, wspace=0.3)  # hspace 控制上下距離，wspace 控制左右距離
 
     plt.show()

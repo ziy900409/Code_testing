@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Jun 21 22:28:15 2025
+
+@author: Hsin.YH.Yang
+"""
+
 import pptx
 from pptx.util import Pt, Cm
 from pptx.enum.shapes import MSO_SHAPE
@@ -62,16 +69,18 @@ FOOTER_Y = Cm(28.5)
 # -- Header --
 HEADER_SPECS = {
     'logo': {
+        'type': 'figure',
         'label': 'Company Logo',
-        'path': 'placeholders/page2/logo.svg', # Change to your actual logo path
+        'path': 'placeholders/summary_page/logo.svg', # Change to your actual logo path
         'left': MARGIN_LEFT,
         'top': HEADER_Y,
         'width': Cm(4.5184),
         'height': Cm(0.5295)
     },
     'date': {
+        'type': 'text',
         'text': f'Measured on {datetime.date.today().strftime("%Y-%m-%d")}',
-        'left': Cm(17.0911),
+        'left': Cm(16.96165),
         'top': Cm(0.7766),
         # 'height': Cm(0.3177),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -90,9 +99,24 @@ HEADER_SPECS = {
 # -- Body: Player Background --
 PLAYER_BG_HEIGHT = Cm(3.8)
 PLAYER_SPECS = {
-    'name': {
+    'background_box': { # 外框底
+        'type': 'block',
+        'shape_type': MSO_SHAPE.ROUNDED_RECTANGLE,
+        'left': Cm(0.6354),
+        'top': Cm(1.9062),
+        'width': Cm(19.7327),
+        'height': Cm(5.0126),
+        'style': {
+            'fill_color_hex': '#F2F2F2',
+            'border_color_hex': '#E5E5E5',
+            'border_width_pt': Pt(1),
+            'corner_radius': 0.025
+            }
+        },
+    'name': { # 選手名字
+        'type': 'text',
         'text': 'Robert Fox',
-        'left': Cm(0.93545),
+        'left': Cm(0.97075),
         'top': Cm(2.2945),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
@@ -104,9 +128,10 @@ PLAYER_SPECS = {
         },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
-    'details': {
+    'details': { # 性別、隊伍
+        'type': 'text',
         'text': 'Male • From Fnatic',
-        'left': Cm(0.93545),
+        'left': Cm(0.97075),
         'top': Cm(3.4594),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
@@ -118,10 +143,32 @@ PLAYER_SPECS = {
         },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
-    'mouse_pref_title': {
-        'text': 'Mouse 1 Preferences',
-        'left': Cm(15.16135),
-        'top': Cm(2.3298),
+    'vertical_separator': { #分割名字與 Game perferences
+        'type': 'line',
+        'left': Cm(8.4367),
+        'top': Cm(2.2592),
+        'height': Cm(1.765),
+        'style': {
+            'width_pt': Pt(1),          # Translates from '1px'
+            'color_hex': '#E5E5E5'      # Translates from your primary color
+        }
+    },
+    'horizontal_separator': {
+        'type': 'line',
+        'left': Cm(1.2002),
+        'top': Cm(4.3066),
+        'width': Cm(18.6031),  # <-- 修改處：使用 'width' 來定義水平線的長度
+        # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
+        'style': {
+            'width_pt': Pt(1),
+            'color_hex': '#E5E5E5'
+            }
+        },
+    'game_perference_title': {
+        'type': 'text',
+        'text': 'Game Perferences',
+        'left': Cm(8.6838),
+        'top': Cm(2.2592),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
             'name': 'Roboto', # You can even specify the font name
@@ -132,11 +179,11 @@ PLAYER_SPECS = {
         },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
-    # 'mouse_pref_line_top': Cm(PLAYER_BG_Y.cm + 1.2),
-    'Mouse_brand': {
-        'text': 'Mouse brand\n\nMouse model',
-        'left': Cm(15.16135),
-        'top': Cm(3.177),
+    'game_brand': {
+        'type': 'text',
+        'text': 'Most plated game:\n\nIn-game sensitivity:\nOther games you play:',
+        'left': Cm(12.09025),
+        'top': Cm(2.3651),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
             'name': 'Roboto', # You can even specify the font name
@@ -147,10 +194,11 @@ PLAYER_SPECS = {
         },
         'alignment': PP_ALIGN.LEFT # And alignment
     },
-    'Mouse_info': {
-        'text': 'BenQ ZOWIE\n\nEC (S)',
+    'game_info': {
+        'type': 'text',
+        'text': 'WWWWWWWWWWWWWWW\n\n3\nWWWWWWWWWWWW',
         'left': Cm(19.07965),
-        'top': Cm(3.177),
+        'top': Cm(2.3651),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
             'name': 'Roboto', # You can even specify the font name
@@ -161,31 +209,246 @@ PLAYER_SPECS = {
         },
         'alignment': PP_ALIGN.RIGHT # And alignment
     },
-    'vertical_separator': {
-        'left': Cm(14.826),
-        'top': Cm(2.2592),
-        'height': Cm(2.1886),
-        'style': {
-            'width_pt': Pt(1),          # Translates from '1px'
-            'color_hex': '#E5E5E5'      # Translates from your primary color
-        }
-    },
-    'horizontal_separator': {
-        'left': Cm(15.4261),
-        'top': Cm(2.9652),
-        'width': Cm(4.236),  # <-- 修改處：使用 'width' 來定義水平線的長度
+    'mouse_1_pref_title': {
+        'type': 'text',
+        'text': 'Mouse 1 Preferences',
+        'left': Cm(0.93545),
+        'top': Cm(4.6243),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    'horizontal_1_separator': {
+        'type': 'line',
+        'left': Cm(1.2002),
+        'top': Cm(5.2597),
+        'width': Cm(9.01915),  # <-- 修改處：使用 'width' 來定義水平線的長度
         # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
         'style': {
             'width_pt': Pt(1),
             'color_hex': '#CC0040'
             }
         },
-    'background_box': {
-        'shape_type': MSO_SHAPE.ROUNDED_RECTANGLE,
+    # 'mouse_pref_line_top': Cm(PLAYER_BG_Y.cm + 1.2),
+    'Mouse_1_brand': {
+        'type': 'text',
+        'text': 'Mouse brand\n\nMouse model',
+        'left': Cm(0.93545),
+        'top': Cm(5.4715),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+    },
+    'Mouse_1_info': {
+        'type': 'text',
+        'text': 'BenQ ZOWIE\n\nEC (S)',
+        'left': Cm(9.4604),
+        'top': Cm(5.4715),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.RIGHT # And alignment
+    },
+    # mouse 2
+    'mouse_2_pref_title': {
+        'type': 'text',
+        'text': 'Mouse 2 Preferences',
+        'left': Cm(10.493278),
+        'top': Cm(4.6243),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    'horizontal_2_separator': {
+        'type': 'line',
+        'left': Cm(10.758028),
+        'top': Cm(5.2597),
+        'width': Cm(9.01915),  # <-- 修改處：使用 'width' 來定義水平線的長度
+        # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
+        'style': {
+            'width_pt': Pt(1),
+            'color_hex': '#212121'
+            }
+        },
+    # 'mouse_pref_line_top': Cm(PLAYER_BG_Y.cm + 1.2),
+    'Mouse_2_brand': {
+        'type': 'text',
+        'text': 'Mouse brand\n\nMouse model',
+        'left': Cm(10.493278),
+        'top': Cm(5.4715),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+    },
+    'Mouse_2_info': {
+        'type': 'text',
+        'text': 'BenQ ZOWIE\n\nEC (S)',
+        'left': Cm(19.04435),
+        'top': Cm(5.4715),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+        },
+        'alignment': PP_ALIGN.RIGHT # And alignment
+    },
+    
+}
+
+# -- Body: SUMMARY --
+FLICK_SHOT_SPECS = {
+    'horizontal_separator': {
+        'type': 'line',
         'left': Cm(0.6354),
-        'top': Cm(1.9415),
-        'width': Cm(19.8033),
-        'height': Cm(2.8593),
+        'top': Cm(7.413),
+        'width': Cm(19.7327),  # <-- 修改處：使用 'width' 來定義水平線的長度
+        # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
+        'style': {
+            'width_pt': Pt(1),
+            'color_hex': '#CC0040'
+            }
+        },
+    # Col 1 of charts
+    'summary_title': {
+        'type': 'text',
+        'text': 'Summary',
+        'left': Cm(0.6354),
+        'top': Cm(7.9072),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#CC0040' # From color
+        },
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    
+    'radar_text_1': {
+        'type': 'text',
+        'text': 'Accuracy',
+        'left': Cm(5.1185),
+        'top': Cm(9.394036),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+            },
+        'alignment': PP_ALIGN.CENTER # And alignment
+        },
+    'radar_text_2': {
+        'type': 'text',
+        'text': 'Speed',
+        'left': Cm(0.6354),
+        'top': Cm(12.350764),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+            },
+        'alignment': PP_ALIGN.CENTER # And alignment
+        },
+    'radar_text_3': {
+        'type': 'text',
+        'text': 'Fatigue',
+        'left': Cm(2.374278),
+        'top': Cm(16.665836),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+            },
+        'alignment': PP_ALIGN.CENTER # And alignment
+        },
+    'radar_text_4': {
+        'type': 'text',
+        'text': 'Micro adjustment',
+        'left': Cm(7.739878),
+        'top': Cm(16.665836),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+            },
+        'alignment': PP_ALIGN.CENTER # And alignment
+        },
+    'radar_text_5': {
+        'type': 'text',
+        'text': 'Summary',
+        'left': Cm(9.337203),
+        'top': Cm(12.350764),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(10),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+            },
+        'alignment': PP_ALIGN.CENTER # And alignment
+        },
+    'radar_image': {
+        'type': 'figure',
+        'label': 'Radar Image',
+        'path': "placeholders/summary_page/radar_fig.png",
+        'left': Cm(1.6354),
+        'top': Cm(9.6956),
+        'width': Cm(8),
+        'height': Cm(8)
+        },
+    # Col 2 of charts
+    'background_box': { # 外框底
+        'type': 'block',
+        'shape_type': MSO_SHAPE.ROUNDED_RECTANGLE,
+        'left': Cm(11.3666),
+        'top': Cm(8.8956),
+        'width': Cm(9.0015),
+        'height': Cm(8.6838),
         'style': {
             'fill_color_hex': '#F2F2F2',
             'border_color_hex': '#E5E5E5',
@@ -193,62 +456,20 @@ PLAYER_SPECS = {
             'corner_radius': 0.025
             }
         },
-}
-
-# -- Body: Flick Shot --
-FLICK_SHOT_SPECS = {
-    'horizontal_separator': {
-        'left': Cm(0.6354),
-        'top': Cm(5.295),
-        'width': Cm(19.8033),  # <-- 修改處：使用 'width' 來定義水平線的長度
-        # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
-        'style': {
-            'width_pt': Pt(1),
-            'color_hex': '#CC0040'
-            }
-        },
-    'flick_title': {
-        'text': 'Flick Shot (Pre & Post)',
-        'left': Cm(0.6354),
-        'top': Cm(5.7892),
-        'auto_size': True,  # <-- Tell the script to auto-fit the text
-        'font': {
-            'name': 'Roboto', # You can even specify the font name
-            'size': Pt(12),
-            'bold': True,
-            'italic': False,      # From font-style: normal
-            'color_hex': '#CC0040' # From color
-        },
-        'alignment': PP_ALIGN.LEFT # And alignment
-        },
-    # Row 1 of charts
-    'hand_path_title': {
-        'text': 'Hand Path',
-        'left': Cm(0.6354),
-        'top': Cm(6.9541),
-        'auto_size': True,  # <-- Tell the script to auto-fit the text
-        'font': {
-            'name': 'Roboto', # You can even specify the font name
-            'size': Pt(12),
-            'bold': True,
-            'italic': False,      # From font-style: normal
-            'color_hex': '#000000' # From color
-        },
-        'alignment': PP_ALIGN.LEFT # And alignment
-        },
-    'hand_path_image': {
+    'summary_legend': {
+        'type': 'figure',
         'label': 'Hand Path Image',
-        'path': "placeholders/page2/Hand Path W175_H137_0623.png",
-        'left': Cm(0.6354),
-        'top': Cm(7.7307),
-        'width': Cm(6.0716),
-        'height': Cm(4.8361)
+        'path': "placeholders/summary_page/summary_legend.svg",
+        'left': Cm(17.7206),
+        'top': Cm(9.2839),
+        'width': Cm(2.2592),
+        'height': Cm(0.3177)
         },
-    
-    'speed_profile_title': {
-        'text': 'Speed Profile',
-        'left': Cm(7.2365),
-        'top': Cm(6.9894),
+    'chart_1_title': {
+        'type': 'text',
+        'text': 'TTK',
+        'left': Cm(11.59605),
+        'top': Cm(9.3192),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
             'name': 'Roboto', # You can even specify the font name
@@ -256,135 +477,133 @@ FLICK_SHOT_SPECS = {
             'bold': True,
             'italic': False,      # From font-style: normal
             'color_hex': '#000000' # From color
-        },
+            },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
-    'speed_profile_image': {
-        'label': 'Speed Profile Image',
-        'path': 'placeholders/page2/speed_profile (2).png',
-        'left': Cm(7.2365),
-        'top': Cm(7.8366),
-        'width': Cm(6.3893),
-        'height': Cm(4.5537)
-        },
-    
-    'performance_title': {
-        'text': 'Performance',
-        'left': Cm(14.12),
-        'top': Cm(6.9894),
+    'chart_1_unit': {
+        'type': 'text',
+        'text': '(ms)',
+        'left': Cm(12.54915),
+        'top': Cm(9.40745),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
             'name': 'Roboto', # You can even specify the font name
-            'size': Pt(12),
-            'bold': True,
-            'italic': False,      # From font-style: normal
-            'color_hex': '#000000' # From color
-        },
-        'alignment': PP_ALIGN.LEFT # And alignment
-        },
-    'performance_image': {
-        'label': 'Performance Image',
-        'path': 'placeholders/page2/performance (2).png',
-        'left': Cm(14.12),
-        'top': Cm(7.8366),
-        'width': Cm(6.2128),
-        'height': Cm(4.5537)
-        },
-
-    # Row 2 of charts (Forearm Muscles)
-    'forearm_muscles_title': {
-        'text': 'Forearm Muscles',
-        'left': Cm(3.4947),
-        'top': Cm(13.1316),
-        'auto_size': True,  # <-- Tell the script to auto-fit the text
-        'font': {
-            'name': 'Roboto', # You can even specify the font name
-            'size': Pt(10),
-            'bold': False,
-            'italic': False,      # From font-style: normal
-            'color_hex': '#000000' # From color
-        },
-        'alignment': PP_ALIGN.LEFT # And alignment
-        },
-    'type_title': {
-        'text': 'Type',
-        'left': Cm(1.2002),
-        'top': Cm(13.1316),
-        'auto_size': True,  # <-- Tell the script to auto-fit the text
-        'font': {
-            'name': 'Roboto', # You can even specify the font name
-            'size': Pt(10),
+            'size': Pt(8),
             'bold': False,
             'italic': False,      # From font-style: normal
             'color_hex': '#757575' # From color
-        },
+            },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
-    'section_header': {
-        # The correct shape name from your library's list
-        'shape_type': MSO_SHAPE.ROUND_2_SAME_RECTANGLE,
-        'left': Cm(0.6354),
-        'top': Cm(12.8845),
-        'width': Cm(6.1775),
-        'height': Cm(0.9178),
-        'hide_bottom_border': True, # This flag is used by the add_custom_box, we can ignore it for add_styled_shape
-        'style': {
-            'fill_color_hex': '#FFFFFF',
-            'border_color_hex': '#E5E5E5',
-            'border_width_pt': Pt(1),
-            'corner_radius': 0.2
-            }
+    'chart_1_image': {
+        'type': 'figure',
+        'label': 'Speed Profile Image',
+        'path': 'placeholders/summary_page/chart_4_groups_fixed.png',
+        'left': Cm(11.8608),
+        'top': Cm(10),
+        'width': Cm(8.0484),
+        'height': Cm(1.9768)
         },
-    'section_block': {
-        # The correct shape name from your library's list
-        'shape_type': MSO_SHAPE.RECTANGLE,
-        'left': Cm(0.6354),
-        'top': Cm(13.8023),
-        'width': Cm(6.1775),
-        'height': Cm(8.0484),
-        'hide_bottom_border': True, # This flag is used by the add_custom_box, we can ignore it for add_styled_shape
-        'style': {
-            'fill_color_hex': '#FFFFFF',
-            'border_color_hex': '#E5E5E5',
-            'border_width_pt': Pt(1),
-            'corner_radius': 0
-            }
+    'chart_2_title': {
+        'type': 'text',
+        'text': 'Shot Counts',
+        'left': Cm(11.59605),
+        'top': Cm(12.0726),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+            },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
-    'forearm_muscles_image': {
-        'label': 'Forearm Muscles Image',
-        'path': 'placeholders/page2/Forearm Muscles W175_H228_NoEdge.svg',
-        'left': Cm(0.6354),
-        'top': Cm(13.8023),
-        'width': Cm(6.1775),
-        'height': Cm(8.0484)
+    'chart_2_unit': {
+        'type': 'text',
+        'text': '(quantity)',
+        'left': Cm(14.06705),
+        'top': Cm(12.16085),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+            },
+        'alignment': PP_ALIGN.LEFT # And alignment
         },
-    'muscle_charts_image': {
-        'label': 'Muscle Charts (Combined)',
-        'path': 'placeholders/page2/muscle_charts_combined (2).png',
-        'left': Cm(7.2365),
-        'top': Cm(12.7645),
-        'width': Cm(13.2022),
-        'height': Cm(9.18)
-        }
+    'chart_2_image': {
+        'type': 'figure',
+        'label': 'Speed Profile Image',
+        'path': 'placeholders/summary_page/chart_4_groups_fixed.png',
+        'left': Cm(11.8608),
+        'top': Cm(12.7374),
+        'width': Cm(8.0484),
+        'height': Cm(1.9768)
+        },
+    'chart_3_title': {
+        'type': 'text',
+        'text': 'Accuracy',
+        'left': Cm(11.59605),
+        'top': Cm(14.826),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(12),
+            'bold': True,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#000000' # From color
+            },
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    'chart_3_unit': {
+        'type': 'text',
+        'text': '(%)',
+        'left': Cm(13.50225),
+        'top': Cm(14.91425),
+        'auto_size': True,  # <-- Tell the script to auto-fit the text
+        'font': {
+            'name': 'Roboto', # You can even specify the font name
+            'size': Pt(8),
+            'bold': False,
+            'italic': False,      # From font-style: normal
+            'color_hex': '#757575' # From color
+            },
+        'alignment': PP_ALIGN.LEFT # And alignment
+        },
+    'chart_3_image': {
+        'type': 'figure',
+        'label': 'Speed Profile Image',
+        'path': 'placeholders/summary_page/chart_4_groups_fixed.png',
+        'left': Cm(11.8608),
+        'top': Cm(15.5108),
+        'width': Cm(8.0484),
+        'height': Cm(1.9768)
+        },
+    
     }
     
 
-# -- Body: Fatigue Test --
+# -- Body: Table --
 FATIGUE_SPECS = {
     'horizontal_separator': {
+        'type': 'line',
         'left': Cm(0.6354),
-        'top': Cm(22.3449),
-        'width': Cm(19.8033),  # <-- 修改處：使用 'width' 來定義水平線的長度
+        'top': Cm(18.0736),
+        'width': Cm(19.7327),  # <-- 修改處：使用 'width' 來定義水平線的長度
         # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
         'style': {
             'width_pt': Pt(1),
             'color_hex': '#CC0040'
             }
         },
-    'fatigue_title': {
-        'text': 'Fatigue Test',
+    'table_title': {
+        'type': 'text',
+        'text': 'Table',
         'left': Cm(0.6354),
-        'top': Cm(22.8391),
+        'top': Cm(18.5678),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
         'font': {
             'name': 'Roboto', # You can even specify the font name
@@ -396,59 +615,64 @@ FATIGUE_SPECS = {
         'alignment': PP_ALIGN.LEFT # And alignment
         },
     
-    'fatigue_index_title': {
-        'text': 'Fatigue Index',
-        'left': Cm(4.0948),
-        'top': Cm(23.31565),
-        'auto_size': True,  # <-- Tell the script to auto-fit the text
-        'font': {
-            'name': 'Roboto', # You can even specify the font name
-            'size': Pt(10),
-            'bold': True,
-            'italic': False,      # From font-style: normal
-            'color_hex': '#000000' # From color
-        },
-        'alignment': PP_ALIGN.LEFT # And alignment
-        },
-    'fatigue_index_image': {
-        'label': 'Fatigue Index Image',
-        'path': 'placeholders/page2/fatigue_index (2).png',
-        'left': Cm(0.6354),
-        'top': Cm(24.00985),
-        'width': Cm(9.54865),
-        'height': Cm(3.883)
-        },
+    # 'fatigue_index_title': {
+    #     'type': 'text',
+    #     'text': 'Fatigue Index',
+    #     'left': Cm(4.1301),
+    #     'top': Cm(23.31565),
+    #     'auto_size': True,  # <-- Tell the script to auto-fit the text
+    #     'font': {
+    #         'name': 'Roboto', # You can even specify the font name
+    #         'size': Pt(10),
+    #         'bold': True,
+    #         'italic': False,      # From font-style: normal
+    #         'color_hex': '#000000' # From color
+    #     },
+    #     'alignment': PP_ALIGN.LEFT # And alignment
+    #     },
+    # 'fatigue_index_image': {
+    #     'type': 'figure',
+    #     'label': 'Fatigue Index Image',
+    #     'path': 'placeholders/fatigue_index (2).png',
+    #     'left': Cm(0.6707),
+    #     'top': Cm(24.00985),
+    #     'width': Cm(9.54865),
+    #     'height': Cm(3.883)
+    #     },
     
-    'muscle_activation_title': {
-        'text': 'Muscle Activation Level',
-        'left': Cm(13.43165),
-        'top': Cm(23.31565),
-        'auto_size': True,  # <-- Tell the script to auto-fit the text
-        'font': {
-            'name': 'Roboto', # You can even specify the font name
-            'size': Pt(10),
-            'bold': True,
-            'italic': False,      # From font-style: normal
-            'color_hex': '#000000' # From color
-        },
-        'alignment': PP_ALIGN.LEFT # And alignment
-        },
-    'muscle_activation_image': {
-        'label': 'Muscle Activation Image',
-        'path': 'placeholders/page2/muscle_activation (2).png',
-        'left': Cm(10.78415),
-        'top': Cm(24.00985),
-        'width': Cm(9.54865),
-        'height': Cm(3.883)
-        },
+    # 'muscle_activation_title': {
+    #     'type': 'text',
+    #     'text': 'Muscle Activation Level',
+    #     'left': Cm(13.46695),
+    #     'top': Cm(23.31565),
+    #     'auto_size': True,  # <-- Tell the script to auto-fit the text
+    #     'font': {
+    #         'name': 'Roboto', # You can even specify the font name
+    #         'size': Pt(10),
+    #         'bold': True,
+    #         'italic': False,      # From font-style: normal
+    #         'color_hex': '#000000' # From color
+    #     },
+    #     'alignment': PP_ALIGN.LEFT # And alignment
+    #     },
+    # 'muscle_activation_image': {
+    #     'type': 'figure',
+    #     'label': 'Muscle Activation Image',
+    #     'path': 'placeholders/muscle_activation (2).png',
+    #     'left': Cm(10.81945),
+    #     'top': Cm(24.00985),
+    #     'width': Cm(9.54865),
+    #     'height': Cm(3.883)
+    #     },
     
-    'bottom_text': {
-        'text': '(x / x)',
-        'left': MARGIN_LEFT,
-        'top': Cm(FATIGUE_TEST_Y.cm + 5.8),
-        'width': CONTENT_WIDTH,
-        'height': Cm(0.7)
-        }
+    # 'bottom_text': {
+    #     'type': 'text',
+    #     'text': '(x / x)',
+    #     'left': MARGIN_LEFT,
+    #     'top': Cm(FATIGUE_TEST_Y.cm + 5.8),
+    #     'width': CONTENT_WIDTH,
+    #     'height': Cm(0.7)
+    #     }
 }
 
 # -- Footer --
@@ -721,7 +945,7 @@ def add_custom_box(slide, spec):
     return main_shape
 
 # --- 3. PPT 生成主函式 (已全面重構和清理) ---
-def create_report(output_filename="science_report.pptx"):
+def create_report(output_filename="summary_page.pptx"):
     """根據以上所有設定，生成最終的 PowerPoint 報告。"""
     prs = pptx.Presentation()
     prs.slide_width = SLIDE_WIDTH
@@ -735,67 +959,52 @@ def create_report(output_filename="science_report.pptx"):
     # add_line(slide, {'left': MARGIN_LEFT, 'top': HEADER_SPECS['line_top'], 'width': CONTENT_WIDTH, 'style': {'width_pt': Pt(1), 'color_hex': '#E5E5E5'}})
 
     # --- 2. Player Background and Info ---
-    print("Adding Player Info...")
-    # Use the new helper function to add the styled background box
-    add_styled_shape(slide, PLAYER_SPECS['background_box'])
-
-    # Add all player text info
-    for key in ['name', 'details', 'mouse_pref_title', 'Mouse_info', 'Mouse_brand']:
-        add_formatted_text(slide, PLAYER_SPECS[key])
-        
-    # Add the vertical and horizontal separator lines
-    for key in ['vertical_separator', 'horizontal_separator']:
-        if key in PLAYER_SPECS: # Check if the line spec exists before adding
+    
+    for key in PLAYER_SPECS:
+        print(PLAYER_SPECS[key]['type'])
+        if 'block' in PLAYER_SPECS[key]['type']:
+            print(PLAYER_SPECS[key])
+            add_styled_shape(slide, PLAYER_SPECS['background_box'])
+    for key in PLAYER_SPECS:
+        if 'text' in PLAYER_SPECS[key]['type']:
+            print(PLAYER_SPECS[key])
+            add_formatted_text(slide, PLAYER_SPECS[key])
+    for key in PLAYER_SPECS:
+        if 'line' in PLAYER_SPECS[key]['type']:
             add_line(slide, PLAYER_SPECS[key])
-
-    # Add and format the mouse preferences table
-    # if 'mouse_pref_table' in PLAYER_SPECS:
-    #     table_spec = PLAYER_SPECS['mouse_pref_table']
-    #     table_geom = calculate_geometry(table_spec, SLIDE_WIDTH.cm, SLIDE_HEIGHT.cm)
-    #     shape = slide.shapes.add_table(len(table_spec['data']), len(table_spec['data'][0]), table_geom['left'], table_geom['top'], table_geom['width'], Cm(1.5))
-    #     table = shape.table
-    #     for i, width in enumerate(table_spec['col_widths']):
-    #         table.columns[i].width = width
-    #     for r, row_data in enumerate(table_spec['data']):
-    #         for c, cell_text in enumerate(row_data):
-    #             cell = table.cell(r, c)
-    #             cell.fill.background()
-    #             p = cell.text_frame.paragraphs[0]
-    #             p.text = cell_text
-    #             p.font.size = Pt(11)
-    #             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-    #             if c == 0:
-    #                 p.font.color.rgb = RGBColor(*hex_to_rgb("#757575"))
-    #                 p.alignment = PP_ALIGN.LEFT
-    #             else:
-    #                 p.font.color.rgb = RGBColor(0,0,0)
-    #                 p.alignment = PP_ALIGN.RIGHT
+            
     
     # --- 3. Main Content Sections ---
+    # for key in ['section_block', 'section_header']:    
+    #     add_styled_shape(slide, FLICK_SHOT_SPECS[key])
     
-    for key in ['section_block', 'section_header']:    
-        add_styled_shape(slide, FLICK_SHOT_SPECS[key])
+    # for key in FLICK_SHOT_SPECS:
+    #     print(key)
+        
+    
     all_sections = {'Flick Shot': FLICK_SHOT_SPECS, 'Fatigue Test': FATIGUE_SPECS}
     for section_name, section_specs in all_sections.items():
         print(f"Adding {section_name} Section...")
         print(section_name, section_specs)
-        # for spec in section_specs.values():
-        #     print(spec)
-        #     if isinstance(spec, dict): # Process only dictionary specs
-        #         if 'text' in spec:
-        #             add_formatted_text(slide, spec)
-        #         elif 'path' in spec:
-        #             add_smart_picture(slide, spec)
+        for key in section_specs.keys():
+            if 'block' in section_specs[key]['type']:
+                # print(FLICK_SHOT_SPECS[key])
+                add_styled_shape(slide, section_specs[key])
+        for key in section_specs.keys():
+            if 'figure' in section_specs[key]['type']:
+                add_smart_picture(slide, section_specs[key])
+        for key in section_specs.keys():
+            if 'line' in section_specs[key]['type']:
+                add_line(slide, section_specs[key])
         for key in section_specs.keys():
             print(key)
-            if '_title' in key:
+            if 'text' in section_specs[key]['type']:
                 add_formatted_text(slide, section_specs[key])
                 print(key)
-            elif '_image' in key:
-                
-                add_smart_picture(slide, section_specs[key])
-            elif '_separator' in key:
-                add_line(slide, section_specs[key])
+        
+        
+    
+    
     # Use the new function to create the styled header box
     # Use the correct function that reads the 'shape_type' from your config
     
