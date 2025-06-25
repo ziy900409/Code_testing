@@ -21,14 +21,15 @@ import calculate_func as cal
 import emg_function as emg
 import PFanalysis_core as core
 import plot_table as ta
+from collections import defaultdict
 
 # %% parameters setting
 
 # === in game parameters ===
 DPI = 800
-sensitivity = 1.0
+sensitivity = 0.58
 yaw = 0.022  # CS2 預設值
-yaw = 0.07 # Valorant 靈敏度
+# yaw = 0.07 # Valorant 靈敏度
 
 # === motion capture system setting ===
 # Define filter cutoffs (Hz). Use None or 0 to disable for a specific type.
@@ -107,16 +108,27 @@ csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
 
 c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
                       'FleRad': 'Flexor Carpi Radialis',
-                     'Triceps': 'Triceps Brachii',
+                      'Triceps': 'Triceps Brachii',
                       'Triceps': 'Triceps Brachii',
                       'ExtUlnar': 'Extensor Carpi Ulnaris',
                       'ExtUlnar': 'Extensor Carpi Ulnaris',
-                     'DorInter': '1st Dorsal Interosseous', 
-                     'AbdDigMin': 'Abductor Digiti Quinti',
-                     #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
-                     'ExtInd': 'Extensor Indicis',
-                     'Biceps': 'Biceps Brachii',
-                     }
+                      'DorInter': '1st Dorsal Interosseous', 
+                      'AbdDigMin': 'Abductor Digiti Quinti',
+                      #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
+                      'ExtInd': 'Extensor Indicis',
+                      'Biceps': 'Biceps Brachii',
+                      }
+
+# c3d_recolumns_name = {'Mini Sensor (2).ExtRad 2.ExtRad': 'Extensor Carpi Radialis',
+#                       'Mini Sensor (3).FleRad 3.FleRad': 'Flexor Carpi Radialis',
+#                       'Mini Sensor (4).Triceps 4.Triceps': 'Triceps Brachii',
+#                       'Quattro Sensor (5).ExtUlnar 5.ExtUlnar': 'Extensor Carpi Ulnaris',
+#                       'Quattro Sensor (5).DorInter 5.DorInter': '1st Dorsal Interosseous', 
+#                       'Quattro Sensor (5).AbdDigMin 5.AbdDigMin': 'Abductor Digiti Quinti',
+#                       #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
+#                       'Quattro Sensor (5).ExtInd 5.ExtInd': 'Extensor Indicis',
+#                       'Avanti Sensor (1).Biceps 1.Biceps': 'Biceps Brachii',
+#                       }
 
 c3d_analog_cha = ["ExtRad", "FleRad",
                   "ExtUlnar", "DorInter", "AbdDigMin", "ExtInd",
@@ -130,8 +142,10 @@ muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brac
 color_codes = ["#CC0040", "#3B3B3B",
              # "#F1A012", "#7A4EDF"
              ]
-select_muscle = ["DorInter.IM EMG4", "AbdDigMin.IM EMG5",
-                 "FleRad.IM EMG2", 'ExtUlnar.IM EMG3']
+select_muscle = ['Quattro Sensor (5).ExtUlnar 5.ExtUlnar',
+                 'Quattro Sensor (5).DorInter 5.DorInter', 
+                 'Quattro Sensor (5).AbdDigMin 5.AbdDigMin',
+                 'Quattro Sensor (5).ExtInd 5.ExtInd',]
 
 # %%
 
@@ -189,9 +203,33 @@ mouse D
 
 # %%
 
-pre_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
-fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
-pos_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
+# pre_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
+# fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
+# pos_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
+
+mvc_path = r"D:/BenQ_Project/01_UR_lab/00_BQE/2025_06 Lab Opening/motion/S1_MVC.c3d"
+pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Pre_Spider30_EC.c3d"
+fatigue_path = r"D:/BenQ_Project/01_UR_lab/00_BQE/2025_06 Lab Opening/motion/S1_Spider180_EC01.c3d"
+pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_EC.c3d"
+
+# pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Pre_Spider30_ES.c3d"
+# fatigue_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Spider180_ES.c3d"
+# pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_ES.c3d"
+
+
+
+# mvc_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_MVC.c3d"
+# pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Pre_Spider30_ES.c3d"
+# fatigue_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Spider180_ES.c3d"
+# pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Post_Spider30_ES.c3d"
+
+# pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Pre_Spider30_S2.c3d"
+# fatigue_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Spider180_S2.c3d"
+# pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Post_Spider30_S2.c3d"
+
+
+
+
 
 # pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
 # fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
@@ -206,9 +244,33 @@ pos_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major
 # pos_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pre_01_AddEMG.c3d"
 
 
-pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path, MOTION_CONFIG, EMG_CONFIG)
+pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path, MOTION_CONFIG, EMG_CONFIG,
+                                                                                                                   sens=1, yaw_range = 10, pitch_range = 20)
+
+
 fati_results_c3d, fati_emg_results = core.fatigue_main(fatigue_path, MOTION_CONFIG, EMG_CONFIG)
-pos_df, pos_metadata, pos_excldueCen_df, pos_standardized_speeds, pos_fft_results, pos_emg_results = core.pro_main(pos_path, MOTION_CONFIG, EMG_CONFIG)
+pos_df, pos_metadata, pos_excldueCen_df, pos_standardized_speeds, pos_fft_results, pos_emg_results = core.pro_main(pos_path, MOTION_CONFIG, EMG_CONFIG,
+                                                                                                                   sens=1, yaw_range = 13, pitch_range = 10)
+
+ # 計算 MVC input MVC file
+
+MVC_emg_results = emg.process_emg_core(mvc_path, # 檔案物件的 path
+                                       EMG_CONFIG, # 包含所有處理參數的字典
+                                       smoothing_method="lowpass", # smoothing 參數
+                                       original_filename=None,
+                                       )
+pre_MVC_value = defaultdict(dict)
+pos_MVC_value = defaultdict(dict)
+for key in MVC_emg_results["Smoothing"]:
+    pre_MVC_value[key] = max(pre_emg_results["Smoothing"][key])
+    pos_MVC_value[key] = max(pos_emg_results["Smoothing"][key])
+
+
+
+for key in pre_MVC_value:
+    print(key)
+    pre_emg_results["Smoothing"][key] = pre_emg_results["Smoothing"][key]/ pre_MVC_value[key] *100
+    pos_emg_results["Smoothing"][key] = pos_emg_results["Smoothing"][key]/ pos_MVC_value[key] *100
 
 # %% 單個結果
 """
@@ -254,7 +316,10 @@ emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[fati_results_c3d],
                                 title_name="Muscle Fatigue Analysis",
                                 dataset_labels=['fatigue'],
                                 selected_keys = [
-                                'Biceps.IM EMG8', 'Triceps.IM EMG9', 'DorInter_1st.IM EMG4', 'AbdDigMin.IM EMG5'
+                                'Quattro Sensor (5).ExtUlnar 5.ExtUlnar',
+                                'Quattro Sensor (5).DorInter 5.DorInter', 
+                                'Quattro Sensor (5).AbdDigMin 5.AbdDigMin',
+                                'Quattro Sensor (5).ExtInd 5.ExtInd',
                                 ]
                                 )
 
@@ -267,9 +332,28 @@ emg.plot_multiple_emg_data_over_time(
     y_axis_label="Averaged EMG Amplitude (AU)",
     show_trendline=True, # New parameter to control trendline plotting
     selected_keys = [
-        'Biceps.IM EMG8', 'Triceps.IM EMG9', 'DorInter_1st.IM EMG4', 'AbdDigMin.IM EMG5'
+        'Quattro Sensor (5).ExtUlnar 5.ExtUlnar',
+        'Quattro Sensor (5).DorInter 5.DorInter', 
+        'Quattro Sensor (5).AbdDigMin 5.AbdDigMin',
+        'Quattro Sensor (5).ExtInd 5.ExtInd',
         ],
 )
+
+# emg.plot_multiple_emg_data_over_time(
+#     list_of_emg_data = [pre_emg_results],
+#     configs=[EMG_CONFIG],
+#     max_subplot_cols=2,
+#     title_name=None,
+#     dataset_labels=['fatigue'],
+#     y_axis_label="Averaged EMG Amplitude (AU)",
+#     show_trendline=True, # New parameter to control trendline plotting
+#     selected_keys = [
+#         'Quattro Sensor (5).ExtUlnar 5.ExtUlnar',
+#         'Quattro Sensor (5).DorInter 5.DorInter', 
+#         'Quattro Sensor (5).AbdDigMin 5.AbdDigMin',
+#         'Quattro Sensor (5).ExtInd 5.ExtInd',
+#         ],
+# )
 
 interpolated_data = emg.process_emg_data_with_direction(pre_oneshot_df,
                                                         pre_emg_results,
@@ -301,17 +385,17 @@ plotter_instance = emg.EMGPlotter(interpolated_data,
 #     share_y_axis=True
 # )
 
-# 示例 2: 兩組肌肉 (兩行，每行兩個子圖 Left/Right)
-muscles_to_plot_fig2 = {
-    "Upper Limb": ['Biceps.IM EMG8', 'Triceps.IM EMG9'],
-    "Hand Intrinsic": ['DorInter.IM EMG4', 'AbdDigMin.IM EMG5']
-}
-print(f"\nPlotting cloud summary for: {muscles_to_plot_fig2}")
-plotter_instance.plot_emg_summary_by_direction_with_cloud(
-    muscle_groups_to_plot=muscles_to_plot_fig2,
-    main_title="EMG Activity: Upper Limb & Hand (X: -40 to 100)",
-    share_y_axis=False # 嘗試 share_y_axis=False 來看看效果
-    )
+# # 示例 2: 兩組肌肉 (兩行，每行兩個子圖 Left/Right)
+# muscles_to_plot_fig2 = {
+#     "Upper Limb": ['Biceps.IM EMG8', 'Triceps.IM EMG9'],
+#     "Hand Intrinsic": ['DorInter.IM EMG4', 'AbdDigMin.IM EMG5']
+# }
+# print(f"\nPlotting cloud summary for: {muscles_to_plot_fig2}")
+# plotter_instance.plot_emg_summary_by_direction_with_cloud(
+#     muscle_groups_to_plot=muscles_to_plot_fig2,
+#     main_title="EMG Activity: Upper Limb & Hand (X: -40 to 100)",
+#     share_y_axis=False # 嘗試 share_y_axis=False 來看看效果
+#     )
 
 # 示例 3: 包含空肌肉列表的行 (應跳過該行)
 # muscles_to_plot_fig3 = {
@@ -349,6 +433,19 @@ ta.plot_median_freq_slope_comparison(group1, group2,
                                      turn=False,
                                      custom_xticklabels=['Muscle 1', 'Muscel 2',
                                                          'Muscle 3', 'Muscel 4'])
+
+group1 = pre_emg_results["Amplitudes_Slope"]
+group2 = pos_emg_results["Amplitudes_Slope"]
+ta.plot_median_freq_slope_comparison(group1, group2,
+                                     selected_keys=select_muscle,
+                                     title="Muscle Activation Level",
+                                     ylabel="Muscle Activation Level",
+                                     label_list=["pre", "pos"],
+                                     show_values=False,
+                                     turn=False,
+                                     custom_xticklabels=['Muscle 1', 'Muscel 2',
+                                                         'Muscle 3', 'Muscel 4'])
+
 
 # 向左移動，或是向右移動的差別
 emg.plot_multi_raw_datasets_cloud_comparison( # 使用新的函數名
@@ -467,14 +564,26 @@ pos_excldueCen_df = cal.cal_tra_efficiency(pos_df, # 原始資料
                                            pos_excldueCen_df)
 
 
+pre_speed_max_loc = []
+pos_speed_max_loc = []
+for key in pre_standardized_speeds.keys():
+    if np.argmax(pre_standardized_speeds[key]) != 0:
+        pre_speed_max_loc.append(np.argmax(pre_standardized_speeds[key]))
+        
+for key in pos_standardized_speeds.keys():
+    if np.argmax(pos_standardized_speeds[key]) != 0:
+        pos_speed_max_loc.append(np.argmax(pos_standardized_speeds[key]))
+ 
+
+
 key_table = {
     "TTK": {
-        "pre": pre_excldueCen_df["Frame Span"].mean(),
-        "pos": pos_excldueCen_df["Frame Span"].mean()
+        "pre": pre_excldueCen_df["Frame Span"].mean()*1/200,
+        "pos": pos_excldueCen_df["Frame Span"].mean()*1/200
         },
     "OneShotTTK": {
-        "pre": pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]["Frame Span"].mean()*10,
-        "pos": pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]["Frame Span"].mean()*10
+        "pre": pre_excldueCen_df[pre_excldueCen_df['Shot Count']==1]["Frame Span"].mean()*1/200,
+        "pos": pos_excldueCen_df[pos_excldueCen_df['Shot Count']==1]["Frame Span"].mean()*1/200
         },
     "Kill": {
         "pre": len(pre_excldueCen_df["Frame Span"]),
@@ -498,19 +607,24 @@ key_table = {
     "Efficiency Ratio": {
         "pre": pre_excldueCen_df["Efficiency Ratio"].mean(),
         "pos": pos_excldueCen_df["Efficiency Ratio"].mean()
+        },
+    "max_loc" : {
+        "pre": np.mean(pre_speed_max_loc),
+        "pos": np.mean(pos_speed_max_loc)
         }
     }
 
+
 # %% 依照以上表格繪製bar 圖
 # 1. 定義您想要繪製的欄位名稱
-keys_to_plot = ['TTK', 'Accuracy', ""]
+keys_to_plot = ['TTK', 'Accuracy']
 
 # 2. 使用字典推導式，建立一個只包含這些欄位的新字典
 filtered_data = {key: key_table[key] for key in keys_to_plot if key in key_table}
 
 # 建立一個自訂標籤的對照表
 custom_label_texts = {
-        "TTK": ("TTK", "(ms)"),
+        "TTK": ("TTK", "(s)"),
         "Accuracy": ("Accuracy", "(%)"),
         # "Efficiency Ratio": ("效率指標", ""), # 如果沒有單位，可以留空
         

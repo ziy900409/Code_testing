@@ -47,6 +47,8 @@ def process_emg_core(
     # window_width=None, # 如果需要
     # overlap_len=None   # 如果需要
 ):
+    
+    # config = EMG_CONFIG
     if not os.path.exists(data_file_path):
         logging.error(f"檔案路徑不存在: {data_file_path}")
         raise FileNotFoundError(f"檔案路徑不存在: {data_file_path}")
@@ -112,6 +114,7 @@ def process_emg_core(
                 raise ValueError(f"在 C3D 檔案 '{original_filename}' 中，根據 DEFAULT_C3D_RECOLUMNS_NAME 的 keys 未找到任何 EMG 頻道。")
             
             analog_data_subset = c3d_instance['data']['analogs'][0, num_columns_indices, :]
+            
             # 使用原始 C3D 標籤名創建 DataFrame，然後再重命名
             raw_data_from_c3d = pd.DataFrame(np.transpose(analog_data_subset), columns=emg_signal_columns)
             
@@ -371,7 +374,8 @@ def process_emg_core(
         if len(lowpassed_signal) > 0:
             resampled_lowpass = signal.resample(lowpassed_signal, downsample_len_global)
             lowpass_filtered_data_df.iloc[:, i] = resampled_lowpass[:downsample_len_global]
-            std_data = resampled_lowpass[:downsample_len_global] / max(resampled_lowpass[:downsample_len_global]) * 100
+            std_data = abs(resampled_lowpass[:downsample_len_global] )
+            # / max(resampled_lowpass[:downsample_len_global]) * 100
             emg_results["Smoothing"][emg_col_name] = std_data
         else:
             lowpass_filtered_data_df.iloc[:, i] = np.zeros(downsample_len_global)
@@ -411,7 +415,8 @@ def process_emg_core(
             # 新增標準化的方法
             if len(averaged_values_for_channel) == num_averaged_points_global:
                 averaged_data_df.iloc[:, i] = averaged_values_for_channel
-                averaged_values_for_channel = averaged_values_for_channel / max(averaged_values_for_channel) * 100
+                # averaged_values_for_channel = averaged_values_for_channel 
+                # / max(averaged_values_for_channel) * 100
                 emg_results["AverageData"][emg_col_name] = averaged_values_for_channel
                 time_axis = np.arange(len(averaged_values_for_channel))
                 # 計算趨勢線的斜率
@@ -420,7 +425,8 @@ def process_emg_core(
                 temp_array = np.full(num_averaged_points_global, np.nan)
                 temp_array[:len(averaged_values_for_channel)] = averaged_values_for_channel
                 averaged_data_df.iloc[:, i] = temp_array
-                temp_array = temp_array / max(temp_array) * 100
+                # temp_array = temp_array 
+                # / max(temp_array) * 100
                 emg_results["AverageData"][emg_col_name] = temp_array
                 time_axis = np.arange(len(temp_array))
                 # 計算趨勢線的斜率
@@ -1563,8 +1569,8 @@ def process_emg_data_with_direction(pre_excldueCen_df,
             print(f"警告：跳過 Group ID {group_id}，因起始影格 ({start_frame}) < 20。")
             continue
         
-        emg_start_index = int((start_frame) * 10)
-        emg_end_index = int(end_frame * 10)
+        emg_start_index = int((start_frame) * 5)
+        emg_end_index = int(end_frame * 5)
 
         target_group_storage_key = None # "right" or "left"
         if direction_quadrant in ['Q1', 'Q4']:
@@ -2156,10 +2162,19 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
     # show_trendline 參數已移除，因為雲圖的均值線已是主要趨勢
 ) -> None:
     """
+    
+    
     比較多個 'processed_data_directional' 格式的數據集，以雲圖形式展示。
     對於每個指定的 EMG 頻道，會在一個子圖上繪製所有數據集（按指定方向聚合後）的對應雲圖。
     X 軸範圍固定為 -40 到 100。
     """
+    # raw_datasets_list=[interpolated_data, interpolated_data_1]
+    # raw_dataset_labels=["Pre", "Pos"]
+    # directions_to_process=["right"]
+    # figure_title="Cloud Comparison: Alpha vs Beta (Right Stats)"
+    # target_length=101
+    # selected_emg_channels=select_muscle
+    # color_hex_codes=color_codes
     if not raw_datasets_list or not isinstance(raw_datasets_list, list):
         print("Plotting Error: 'raw_datasets_list' must be a non-empty list.")
         return
@@ -2274,8 +2289,11 @@ def plot_multi_raw_datasets_cloud_comparison( #更改了函數名以反映其繪
                 current_label = labels_for_stats_datasets[dataset_idx]
                 
                 # ax.plot(time_axis, mean_signal, color=color, label=f'{current_label} (n={num_trials})', linewidth=1.5)
+                a = range(0, 101)
+                # ax.plot(time_axis, a, color=color, linewidth=1.5)
+                # 
                 ax.plot(time_axis, mean_signal, color=color, linewidth=1.5)
-                ax.fill_between(time_axis, lower_bound, upper_bound, color=color, alpha=0.1)
+                ax.fill_between(a, lower_bound, upper_bound, color=color, alpha=0.1)
             
         if plotted_anything_on_ax:
             # ax.legend(fontsize=9, loc='best')

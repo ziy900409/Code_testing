@@ -115,7 +115,7 @@ PLAYER_SPECS = {
         },
     'name': { # 選手名字
         'type': 'text',
-        'text': 'Robert Fox',
+        'text': 'michu',
         'left': Cm(0.97075),
         'top': Cm(2.2945),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -130,7 +130,7 @@ PLAYER_SPECS = {
         },
     'details': { # 性別、隊伍
         'type': 'text',
-        'text': 'Male • From Fnatic',
+        'text': 'Male • From Poland',
         'left': Cm(0.97075),
         'top': Cm(3.4594),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -196,7 +196,7 @@ PLAYER_SPECS = {
     },
     'game_info': {
         'type': 'text',
-        'text': 'WWWWWWWWWWWWWWW\n\n3\nWWWWWWWWWWWW',
+        'text': 'CS2\n\n1\nNAN',
         'left': Cm(19.07965),
         'top': Cm(2.3651),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -253,7 +253,7 @@ PLAYER_SPECS = {
     },
     'Mouse_1_info': {
         'type': 'text',
-        'text': 'BenQ ZOWIE\n\nEC (S)',
+        'text': 'BenQ ZOWIE\n\nMousa A (M)',
         'left': Cm(9.4604),
         'top': Cm(5.4715),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -311,7 +311,7 @@ PLAYER_SPECS = {
     },
     'Mouse_2_info': {
         'type': 'text',
-        'text': 'BenQ ZOWIE\n\nEC (S)',
+        'text': 'BenQ ZOWIE\n\nEC2 (M)',
         'left': Cm(19.04435),
         'top': Cm(5.4715),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -498,7 +498,7 @@ FLICK_SHOT_SPECS = {
     'chart_1_image': {
         'type': 'figure',
         'label': 'Speed Profile Image',
-        'path': 'placeholders/summary_page/chart_4_groups_fixed.png',
+        'path': 'placeholders/summary_page/TTK.png',
         'left': Cm(11.8608),
         'top': Cm(10),
         'width': Cm(8.0484),
@@ -537,7 +537,7 @@ FLICK_SHOT_SPECS = {
     'chart_2_image': {
         'type': 'figure',
         'label': 'Speed Profile Image',
-        'path': 'placeholders/summary_page/chart_4_groups_fixed.png',
+        'path': 'placeholders/summary_page/ShotCounts.png',
         'left': Cm(11.8608),
         'top': Cm(12.7374),
         'width': Cm(8.0484),
@@ -576,7 +576,7 @@ FLICK_SHOT_SPECS = {
     'chart_3_image': {
         'type': 'figure',
         'label': 'Speed Profile Image',
-        'path': 'placeholders/summary_page/chart_4_groups_fixed.png',
+        'path': 'placeholders/summary_page/Accuracy.png',
         'left': Cm(11.8608),
         'top': Cm(15.5108),
         'width': Cm(8.0484),

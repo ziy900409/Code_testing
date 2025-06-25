@@ -236,17 +236,28 @@ def read_c3d(path: str,
 
         # Use linear interpolation first
         df = df.interpolate(method='cubic', axis=0, limit_direction='both') # limit_direction helps with start/end NaNs
+        valid_points_count = df.notna().sum()
+
+        # 檢查是否有任何一個欄位的數據點少於 4 個
+        if valid_points_count.min() < 4:
+            # 數據不足，降級使用 'linear' 方法
+            # print(f"Warning: Insufficient data for cubic interpolation. Falling back to linear.") # 可選：印出警告訊息
+            df_interpolated = df.interpolate(method='linear', axis=0, limit_direction='both')
+        else:
+           # 數據充足，使用 'cubic' 方法
+           df_interpolated = df.interpolate(method='cubic', axis=0, limit_direction='both')
+
 
         # Use ffill and bfill to handle any remaining NaNs (e.g., at the very start/end if limit_direction='both' wasn't enough)
-        df.ffill(inplace=True)
-        df.bfill(inplace=True)
+        df_interpolated.ffill(inplace=True)
+        df_interpolated.bfill(inplace=True)
 
         # Final check if any NaNs persist (shouldn't happen with ffill/bfill, but as a safeguard)
-        if df.isnull().values.any():
+        if df_interpolated.isnull().values.any():
             print("Warning: NaNs remain after interpolation and fill. Filling with 0.")
-            df.fillna(0, inplace=True) # Fill any persistent NaNs with 0 as a last resort
+            df_interpolated.fillna(0, inplace=True) # Fill any persistent NaNs with 0 as a last resort
 
-        return df.values
+        return df_interpolated.values
 
     # --- Helper Function for Marker Processing ---
     def _process_markers(c3d_data: ezc3d.c3d, marker_cutoff: Optional[float], filter_order: int,
@@ -287,6 +298,7 @@ def read_c3d(path: str,
         # --- Interpolation ---
         print("Interpolating marker data...")
         marker_data_interp = {key: _interpolate_data(value) for key, value in marker_data_raw.items()}
+       
 
         # --- Filtering ---
         print("Filtering marker data...")
@@ -445,6 +457,7 @@ def read_c3d(path: str,
     print(f"Reading C3D file: {path}")
     try:
         # extract_forceplat_data=True helps ezc3d parse FP specific parameters
+        # path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_EC.c3d"
         c = ezc3d.c3d(path, extract_forceplat_data=True)
     except FileNotFoundError:
         print(f"Error: C3D file not found at {path}")

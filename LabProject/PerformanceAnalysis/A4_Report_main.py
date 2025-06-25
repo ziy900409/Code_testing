@@ -12,7 +12,7 @@ import datetime
 import io
 import cairosvg
 
-
+folder_path = "/shox/S2"
 
 # --- 0. 自動建立佔位符圖片 (已修正) ---
 def create_placeholder_images():
@@ -91,7 +91,7 @@ HEADER_SPECS = {
 PLAYER_BG_HEIGHT = Cm(3.8)
 PLAYER_SPECS = {
     'name': {
-        'text': 'Robert Fox',
+        'text': 'shox',
         'left': Cm(0.93545),
         'top': Cm(2.2945),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -105,7 +105,7 @@ PLAYER_SPECS = {
         'alignment': PP_ALIGN.LEFT # And alignment
         },
     'details': {
-        'text': 'Male • From Fnatic',
+        'text': 'Male • From France',
         'left': Cm(0.93545),
         'top': Cm(3.4594),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -119,7 +119,7 @@ PLAYER_SPECS = {
         'alignment': PP_ALIGN.LEFT # And alignment
         },
     'mouse_pref_title': {
-        'text': 'Mouse 1 Preferences',
+        'text': 'Mouse 2 Preferences',
         'left': Cm(15.16135),
         'top': Cm(2.3298),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -148,7 +148,7 @@ PLAYER_SPECS = {
         'alignment': PP_ALIGN.LEFT # And alignment
     },
     'Mouse_info': {
-        'text': 'BenQ ZOWIE\n\nEC (S)',
+        'text': 'BenQ ZOWIE\n\nS2 (M)',
         'left': Cm(19.07965),
         'top': Cm(3.177),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -177,7 +177,7 @@ PLAYER_SPECS = {
         # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
         'style': {
             'width_pt': Pt(1),
-            'color_hex': '#CC0040'
+            'color_hex': '#000000' # 1 CC0040 # 2 000000
             }
         },
     'background_box': {
@@ -261,7 +261,7 @@ FLICK_SHOT_SPECS = {
         },
     'speed_profile_image': {
         'label': 'Speed Profile Image',
-        'path': 'placeholders/page2/speed_profile (2).png',
+        'path': 'placeholders/page2' + folder_path + '/speed_profile (2).png',
         'left': Cm(7.2365),
         'top': Cm(7.8366),
         'width': Cm(6.3893),
@@ -282,9 +282,19 @@ FLICK_SHOT_SPECS = {
         },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
+    
+    'performance_legend_image': {
+        'label': 'Performance Image',
+        'path': 'placeholders/page2/description (1).png',
+        'left': Cm(18.3207),
+        'top': Cm(7.2012),
+        'width': Cm(2.2239),
+        'height': Cm(0.3177)
+        },
+    
     'performance_image': {
         'label': 'Performance Image',
-        'path': 'placeholders/page2/performance (2).png',
+        'path': 'placeholders/page2' + folder_path + '/performance (2).png',
         'left': Cm(14.12),
         'top': Cm(7.8366),
         'width': Cm(6.2128),
@@ -360,7 +370,7 @@ FLICK_SHOT_SPECS = {
         },
     'muscle_charts_image': {
         'label': 'Muscle Charts (Combined)',
-        'path': 'placeholders/page2/muscle_charts_combined (2).png',
+        'path': 'placeholders/page2' + folder_path + '/muscle_charts_combined (2).png',
         'left': Cm(7.2365),
         'top': Cm(12.7645),
         'width': Cm(13.2022),
@@ -395,6 +405,14 @@ FATIGUE_SPECS = {
         },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
+    'fatigue_legend_image': {
+        'label': 'Performance Image',
+        'path': 'placeholders/page2/description (1).png',
+        'left': Cm(18.1795),
+        'top': Cm(23.0156),
+        'width': Cm(2.2239),
+        'height': Cm(0.3177)
+        },
     
     'fatigue_index_title': {
         'text': 'Fatigue Index',
@@ -412,7 +430,7 @@ FATIGUE_SPECS = {
         },
     'fatigue_index_image': {
         'label': 'Fatigue Index Image',
-        'path': 'placeholders/page2/fatigue_index (2).png',
+        'path': 'placeholders/page2' + folder_path + '/fatigue_index (2).png',
         'left': Cm(0.6354),
         'top': Cm(24.00985),
         'width': Cm(9.54865),
@@ -435,7 +453,7 @@ FATIGUE_SPECS = {
         },
     'muscle_activation_image': {
         'label': 'Muscle Activation Image',
-        'path': 'placeholders/page2/muscle_activation (2).png',
+        'path': 'placeholders/page2' + folder_path + '/muscle_activation (2).png',
         'left': Cm(10.78415),
         'top': Cm(24.00985),
         'width': Cm(9.54865),
@@ -454,7 +472,7 @@ FATIGUE_SPECS = {
 # -- Footer --
 FOOTER_SPECS = {
     'page_num': {
-        'text': '1/3',
+        'text': '3/3',
         'left': Cm(10.1664),
         'top': Cm(28.5224),
         'auto_size': True,  # <-- Tell the script to auto-fit the text

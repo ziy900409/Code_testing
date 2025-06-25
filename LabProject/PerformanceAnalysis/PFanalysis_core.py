@@ -163,8 +163,11 @@ import emg_function as emg
 # )
 
 # %%   
-def pro_main(data_path, motion_config, emg_config):
-    
+def pro_main(data_path, motion_config, emg_config,
+             sens=1, yaw_range = 13, pitch_range = 10):
+    # data_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_EC.c3d"
+    # motion_config = MOTION_CONFIG
+    # emg_config = EMG_CONFIG
     try:
         processed_data, metadata = pre.read_c3d(
             data_path,
@@ -207,8 +210,10 @@ def pro_main(data_path, motion_config, emg_config):
         
     # 將單位從mm轉換成視角
     df = pre.ConverUnit2Angle(processed_data, metadata,
-                              marker="R.I.Finger3"
-                              )
+                              marker="R.I.Finger3",
+                              DPI=800,
+                              sens=sens,
+                              yaw=0.022)
     # 2.1. 找出每一次目標擊殺的開槍數 -> 找出Z axis local minimal
     # 2.1.1. 以滑鼠點擊次數計算，使用Z軸局部最小值，如果兩次Z軸局部最小值的視角差
     #         小於某個閾值，則視為仍在瞄準同一個目標
@@ -230,11 +235,14 @@ def pro_main(data_path, motion_config, emg_config):
     # 2.2. 找出從中心出發的開槍軌跡
     excldueCen_grouped_df = pre.excludeCenter(df,
                                           grouped_df,
-                                          yaw_range = 10,
-                                          pitch_range = 10,
+                                          yaw_range = yaw_range,
+                                          pitch_range = pitch_range,
                                           show = True)
     # 只取一槍命中的數值
     oneshot_df = excldueCen_grouped_df[excldueCen_grouped_df['Shot Count']==1]
+    oneshot_df = oneshot_df[oneshot_df['Direction Quadrant'].isin(['Q2', 'Q3'])]
+    # oneshot_df = excldueCen_grouped_df[excldueCen_grouped_df['Direction Quadrant'].isin(['Q1', 'Q4'])]
+    
     
     # 做標準化處理
     if not excldueCen_grouped_df.empty:

@@ -472,9 +472,21 @@ def plot_grouped_bar_chart(
     print(f"Grouped bar chart with fixed spacing saved to '{output_path}'")
 if __name__ == '__main__':
     # Example with 4 groups
+    # data_4_groups = [
+    #     {'group_name': 'Mouse A', 'pre': 0.42, 'post': 0.36, 'color': '#CC0040', 'hatch': '\\\\'},
+    #     {'group_name': 'EC2', 'pre': 0.44, 'post': 0.37, 'color': '#000000', 'hatch': '\\\\'},
+    #     # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
+    #     # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
+    # ]
+    # data_4_groups = [
+    #     {'group_name': 'Mouse A', 'pre': 45, 'post': 49, 'color': '#CC0040', 'hatch': '\\\\'},
+    #     {'group_name': 'EC2', 'pre': 46, 'post': 48, 'color': '#000000', 'hatch': '\\\\'},
+    #     # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
+    #     # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
+    # ]
     data_4_groups = [
-        {'group_name': 'Mouse A', 'pre': 85, 'post': 40, 'color': '#CC0040', 'hatch': '\\\\'},
-        {'group_name': 'Mouse B', 'pre': 95, 'post': 50, 'color': '#000000', 'hatch': '\\\\'},
+        {'group_name': 'Mouse A', 'pre': 0.74, 'post': 0.78, 'color': '#CC0040', 'hatch': '\\\\'},
+        {'group_name': 'EC2', 'pre': 0.79, 'post': 0.76, 'color': '#000000', 'hatch': '\\\\'},
         # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
         # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
     ]
@@ -559,13 +571,13 @@ if __name__ == '__main__':
 
     pre_data = {
         'label': 'Pre',
-        'values': [35, 25, 70, 85, 30],
+        'values': [80, 75, 70, 85, 80],
         'color': '#000000' # Black
     }
     
     post_data = {
         'label': 'Post',
-        'values': [65, 80, 15, 45, 25],
+        'values': [83, 80, 60, 75, 90],
         'color': '#CC0040' # Red
     }
 
