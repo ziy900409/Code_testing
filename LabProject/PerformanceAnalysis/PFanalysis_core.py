@@ -164,7 +164,7 @@ import emg_function as emg
 
 # %%   
 def pro_main(data_path, motion_config, emg_config,
-             sens=1, yaw_range = 13, pitch_range = 10):
+             sens=1, yaw_range = 13, pitch_range = 10, rotation_angle=0):
     # data_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_EC.c3d"
     # motion_config = MOTION_CONFIG
     # emg_config = EMG_CONFIG
@@ -223,9 +223,9 @@ def pro_main(data_path, motion_config, emg_config,
             baseline_window_length=101, # <--- 調整窗口大小試試
             baseline_polyorder=3,
             order=5,
-            min_frame_gap=8,
+            min_frame_gap=16,
             min_z_diff=0.2,
-            z_processed_threshold=-1, # <--- 試用處理後 Z 值的門檻
+            z_processed_threshold=-0.5, # <--- 試用處理後 Z 值的門檻
             show=True,
             showVel=True
         )
@@ -237,6 +237,7 @@ def pro_main(data_path, motion_config, emg_config,
                                           grouped_df,
                                           yaw_range = yaw_range,
                                           pitch_range = pitch_range,
+                                          rotation_angle = rotation_angle,
                                           show = True)
     # 只取一槍命中的數值
     oneshot_df = excldueCen_grouped_df[excldueCen_grouped_df['Shot Count']==1]

@@ -88,7 +88,7 @@ def plot_median_freq_slope_comparison(group1: dict, group2: dict,
     #               edgecolor="#CC0040",edgecolor='none', facecolor='none', hatch='\\\\', linewidth=2)
     
     bars1 = ax.bar(x - offset, values1, width, label=label_list[0],
-                   edgecolor="#CC0040",   # 用斜線顏色
+                   edgecolor="#3B3B3B",   # 用斜線顏色
                    facecolor='none',
                    hatch='\\\\\\',
                    linewidth=0.1          # ✅ 非常細的外框線
@@ -196,7 +196,7 @@ def plot_performance_comparison(
                        [value_pre],
                        width,
                        label=pre_post_labels[0],
-                       edgecolor=color_ind,
+                       edgecolor="#3B3B3B",
                        facecolor='none',
                        hatch='\\\\\\',
                        linewidth=0.1)
@@ -484,9 +484,12 @@ if __name__ == '__main__':
     #     # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
     #     # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
     # ]
+    mouse1 = 'EC2'
+    mouse2 = 'EC1'
+    # TTK
     data_4_groups = [
-        {'group_name': 'Mouse A', 'pre': 0.74, 'post': 0.78, 'color': '#CC0040', 'hatch': '\\\\'},
-        {'group_name': 'EC2', 'pre': 0.79, 'post': 0.76, 'color': '#000000', 'hatch': '\\\\'},
+        {'group_name': mouse1, 'pre': 0.39, 'post': 0.475, 'color': '#CC0040', 'hatch': '\\\\'},
+        {'group_name': mouse2, 'pre': 0.368, 'post': 0.393, 'color': '#000000', 'hatch': '\\\\'},
         # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
         # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
     ]
@@ -497,7 +500,41 @@ if __name__ == '__main__':
         data=data_4_groups,
         fixed_x_range=(0, 214),
         fixed_bar_width=9.0,
-        output_path="chart_4_groups_fixed.png"
+        output_path="TTK.png"
+    )
+    
+    ## Shotcount
+    data_4_groups = [
+        {'group_name': mouse1, 'pre': 38, 'post': 31, 'color': '#CC0040', 'hatch': '\\\\'},
+        {'group_name': mouse2, 'pre': 37, 'post': 32, 'color': '#000000', 'hatch': '\\\\'},
+        # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
+        # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
+    ]
+    
+    # The function will automatically calculate the spacing to fit 4 groups
+    # with bars of width 9 into the 0-214 range.
+    plot_grouped_bar_chart(
+        data=data_4_groups,
+        fixed_x_range=(0, 214),
+        fixed_bar_width=9.0,
+        output_path="ShotCounts.png"
+    )
+    
+    ## accuracy
+    data_4_groups = [
+        {'group_name': mouse1, 'pre': 0.891, 'post': 0.667, 'color': '#CC0040', 'hatch': '\\\\'},
+        {'group_name': mouse2, 'pre': 0.894, 'post': 0.875, 'color': '#000000', 'hatch': '\\\\'},
+        # {'group_name': 'Mouse C', 'pre': 75, 'post': 60, 'color': '#F1A012', 'hatch': '\\\\'},
+        # {'group_name': 'Mouse D', 'pre': 80, 'post': 75, 'color': '#7A4EDF', 'hatch': '\\\\'}
+    ]
+    
+    # The function will automatically calculate the spacing to fit 4 groups
+    # with bars of width 9 into the 0-214 range.
+    plot_grouped_bar_chart(
+        data=data_4_groups,
+        fixed_x_range=(0, 214),
+        fixed_bar_width=9.0,
+        output_path="Accuracy.png"
     )
 # %%
 

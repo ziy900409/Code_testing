@@ -2,6 +2,8 @@
 """
 Created on Mon May  5 13:38:36 2025
 
+新增劃出所有時間線的方式
+
 @author: Hsin.YH.Yang
 """
 
@@ -26,9 +28,9 @@ from collections import defaultdict
 # %% parameters setting
 
 # === in game parameters ===
-DPI = 800
-sensitivity = 0.58
-yaw = 0.022  # CS2 預設值
+DPI = 800 # 來自靜態的設定
+sensitivity = 1.25 # 來自靜態的設定
+yaw = 0.022  # CS2 預設值 來自靜態的設定 來自於最常玩的遊戲
 # yaw = 0.07 # Valorant 靈敏度
 
 # === motion capture system setting ===
@@ -139,7 +141,11 @@ muscle_name = ['Extensor Carpi Radialis', 'Flexor Carpi Radialis', 'Triceps Brac
                'Extensor Carpi Ulnaris', '1st Dorsal Interosseous', 
                'Abductor Digiti Quinti', 'Extensor Indicis', 'Biceps Brachii']
 
-color_codes = ["#CC0040", "#3B3B3B",
+# color_codes = ["#CC0040", "#3B3B3B",
+#              # "#F1A012", "#7A4EDF"
+#              ]
+
+color_codes = ["#3B3B3B", "#CC0040",
              # "#F1A012", "#7A4EDF"
              ]
 select_muscle = ['Quattro Sensor (5).ExtUlnar 5.ExtUlnar',
@@ -207,29 +213,29 @@ mouse D
 # fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
 # pos_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
 
-mvc_path = r"D:/BenQ_Project/01_UR_lab/00_BQE/2025_06 Lab Opening/motion/S1_MVC.c3d"
-pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Pre_Spider30_EC.c3d"
-fatigue_path = r"D:/BenQ_Project/01_UR_lab/00_BQE/2025_06 Lab Opening/motion/S1_Spider180_EC01.c3d"
-pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_EC.c3d"
-
-# pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Pre_Spider30_ES.c3d"
-# fatigue_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Spider180_ES.c3d"
-# pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_ES.c3d"
+# mvc_path = r"E:\2025 IEM Cologne\mousetest\S04_MVC.c3d"
+# pre_path = r"E:\2025 IEM Cologne\mousetest\S04_S2_pre.c3d"
+# fatigue_path = r"E:\2025 IEM Cologne\mousetest\S04_S2_fatigue.c3d"
+# pos_path = r"E:\2025 IEM Cologne\mousetest\S04_S2_pos.c3d"
 
 
-
-# mvc_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_MVC.c3d"
-# pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Pre_Spider30_ES.c3d"
-# fatigue_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Spider180_ES.c3d"
-# pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Post_Spider30_ES.c3d"
-
-# pre_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Pre_Spider30_S2.c3d"
-# fatigue_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Spider180_S2.c3d"
-# pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S2_Post_Spider30_S2.c3d"
+# pre_path = r"E:\2025 IEM Cologne\mousetest\S04_FK_pre.c3d"
+# fatigue_path = r"E:\2025 IEM Cologne\mousetest\S04_FK_pre.c3d"
+# pos_path = r"E:\2025 IEM Cologne\mousetest\S04_FK_pos.c3d"
 
 
+# MVC 肌肉發力的參考值
+mvc_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_MVC.c3d"
 
+# 選第一隻滑鼠
+pre_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_PRE.c3d"
+fatigue_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_FATIGUE.c3d"
+pos_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_POST.c3d"
 
+# 加入檢查 EMG 訊號，至少檢查兩項
+pre_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_PRE.c3d"
+fatigue_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_FATIGUE.c3d"
+pos_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_POST.c3d"
 
 # pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
 # fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
@@ -243,14 +249,22 @@ pos_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post
 # fatigue_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_fatigue_01_AddEMG.c3d"
 # pos_path = r"C:\Users\Hsin.YH.Yang\Downloads\Dynamic measurement test c3d\S00_pre_01_AddEMG.c3d"
 
-
-pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path, MOTION_CONFIG, EMG_CONFIG,
-                                                                                                                   sens=1, yaw_range = 10, pitch_range = 20)
-
-
-fati_results_c3d, fati_emg_results = core.fatigue_main(fatigue_path, MOTION_CONFIG, EMG_CONFIG)
-pos_df, pos_metadata, pos_excldueCen_df, pos_standardized_speeds, pos_fft_results, pos_emg_results = core.pro_main(pos_path, MOTION_CONFIG, EMG_CONFIG,
-                                                                                                                   sens=1, yaw_range = 13, pitch_range = 10)
+# 是否可以用滑鼠拉一個方框
+pre_df, pre_metadata, pre_excldueCen_df, pre_standardized_speeds, pre_fft_results, pre_emg_results = core.pro_main(pre_path,
+                                                                                                                   MOTION_CONFIG,
+                                                                                                                   EMG_CONFIG,
+                                                                                                                   sens=sensitivity,
+                                                                                                                   yaw_range = 30,
+                                                                                                                   pitch_range = 12,
+                                                                                                                   rotation_angle = 0)
+fati_fft_results, fati_emg_results = core.fatigue_main(fatigue_path, MOTION_CONFIG, EMG_CONFIG)
+pos_df, pos_metadata, pos_excldueCen_df, pos_standardized_speeds, pos_fft_results, pos_emg_results = core.pro_main(pos_path,
+                                                                                                                   MOTION_CONFIG,
+                                                                                                                   EMG_CONFIG,
+                                                                                                                   sens=sensitivity,
+                                                                                                                   yaw_range = 35,
+                                                                                                                   pitch_range =15,
+                                                                                                                   rotation_angle = 0)
 
  # 計算 MVC input MVC file
 
@@ -310,7 +324,8 @@ pre.plot_standardized_signals_cloud_compare(
       )
 
 # 繪圖 median frequency
-emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[fati_results_c3d], 
+
+emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[fati_fft_results], 
                                 configs=[EMG_CONFIG], 
                                 max_subplot_cols=2, 
                                 title_name="Muscle Fatigue Analysis",
@@ -410,9 +425,22 @@ plotter_instance = emg.EMGPlotter(interpolated_data,
 #     # share_y_axis=True
 # )
 # %% 繪製柱狀圖
+# fati_fft_results, fati_emg_results
+# group1 = pre_fft_results["MedianFreq_Slope"]
+# group2 = pos_fft_results["MedianFreq_Slope"]
 
-group1 = pre_fft_results["MedianFreq_Slope"]
-group2 = pos_fft_results["MedianFreq_Slope"]
+group1 = fati_fft_results["MedianFreq_Slope"]
+
+group2 = defaultdict(dict)
+for key in fati_emg_results["Amplitudes_Slope"]:
+    group2[key] = float(fati_emg_results["Amplitudes_Slope"][key])*1000
+# ta.plot_median_freq_slope_comparison(group1, group2,
+#                                      selected_keys=select_muscle,
+#                                      title="Fatigue Index",
+#                                      label_list=["pre", "pos"],
+#                                      show_values=False,
+#                                      custom_xticklabels=['Muscle 1', 'Muscel 2',
+#                                                          'Muscle 3', 'Muscel 4'])
 
 ta.plot_median_freq_slope_comparison(group1, group2,
                                      selected_keys=select_muscle,
@@ -422,17 +450,17 @@ ta.plot_median_freq_slope_comparison(group1, group2,
                                      custom_xticklabels=['Muscle 1', 'Muscel 2',
                                                          'Muscle 3', 'Muscel 4'])
 
-group1 = pre_emg_results["Amplitudes_Slope"]
-group2 = pos_emg_results["Amplitudes_Slope"]
-ta.plot_median_freq_slope_comparison(group1, group2,
-                                     selected_keys=select_muscle,
-                                     title="Muscle Activation Level",
-                                     ylabel="Muscle Activation Level",
-                                     label_list=["pre", "pos"],
-                                     show_values=False,
-                                     turn=False,
-                                     custom_xticklabels=['Muscle 1', 'Muscel 2',
-                                                         'Muscle 3', 'Muscel 4'])
+# group1 = pre_emg_results["Amplitudes_Slope"]
+# group2 = pos_emg_results["Amplitudes_Slope"]
+# ta.plot_median_freq_slope_comparison(group1, group2,
+#                                      selected_keys=select_muscle,
+#                                      title="Muscle Activation Level",
+#                                      ylabel="Muscle Activation Level",
+#                                      label_list=["pre", "pos"],
+#                                      show_values=False,
+#                                      turn=False,
+#                                      custom_xticklabels=['Muscle 1', 'Muscel 2',
+#                                                          'Muscle 3', 'Muscel 4'])
 
 group1 = pre_emg_results["Amplitudes_Slope"]
 group2 = pos_emg_results["Amplitudes_Slope"]
@@ -637,7 +665,7 @@ ta.plot_performance_comparison(
         custom_texts=custom_label_texts
     )
 
-
+key_table_pd = pd.DataFrame(key_table)
 # 呼叫函數計算效率
 # grouped_df = cal.cal_tra_efficiency(pre_df, # 原始資料
 #                                     pre_excldueCen_df)

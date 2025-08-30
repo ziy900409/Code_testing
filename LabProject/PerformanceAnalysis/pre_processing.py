@@ -1469,38 +1469,260 @@ def standardize_group_signals(df, filtered_grouped_df, signal_column_name,
 
 # %%
 
+# def excludeCenter(df: pd.DataFrame,
+#                   grouped_df: pd.DataFrame,
+#                   yaw_range: float = 10,
+#                   pitch_range: float = 10,
+#                   show: bool = True) -> pd.DataFrame:
+#     """
+#     Filters kill action groups, retaining only those whose endpoint is outside the central view area.
+#     If show=True, displays two separate visualizations:
+#     1. Point Distribution Plot: Shows all points, retained group points, and the central exclusion zone.
+#     2. Arrow Plot: Shows movement direction arrows (from start frame to end frame) for retained groups.
+
+#     Args:
+#         df (pd.DataFrame): DataFrame containing the original data ('cum_yaw_deg', 'cum_pitch_deg').
+#         grouped_df (pd.DataFrame): Pre-calculated kill group DataFrame (must include 'Frames' list).
+#         yaw_range (float): Horizontal radius of the central area (degrees).
+#         pitch_range (float): Vertical radius of the central area (degrees).
+#         show (bool): Whether to display the visualization plots.
+
+#     Returns:
+#         pd.DataFrame: Filtered DataFrame containing only groups whose endpoint is not in the center.
+#     """
+
+#     # === 1. Define Central View Area ===
+#     try:
+#         # Using median as center calculation method
+#         yaw_center = df["cum_yaw_deg"].median()
+#         pitch_center = df["cum_pitch_deg"].median()
+#         print(f"[Based on Median] View center calculated: Yaw={yaw_center:.2f}°, Pitch={pitch_center:.2f}°")
+#         print(f"Central area defined: Yaw ±{yaw_range}°, Pitch ±{pitch_range}°")
+#     except KeyError as e:
+#         print(f"Error: Input df is missing required column {e}")
+#         return pd.DataFrame() # Return empty DataFrame or raise exception
+
+#     # === 2. Vectorized Filtering ===
+#     temp_grouped = grouped_df.copy()
+
+#     def get_last_frame(frames_list):
+#         if isinstance(frames_list, list) and len(frames_list) > 0:
+#             try:
+#                 return int(frames_list[-1])
+#             except (ValueError, TypeError):
+#                 return np.nan # Return NaN if conversion fails
+#         return np.nan
+
+#     if 'Frames' not in temp_grouped.columns:
+#         print("Error: grouped_df is missing the 'Frames' column")
+#         return pd.DataFrame()
+
+#     temp_grouped['last_frame'] = temp_grouped['Frames'].apply(get_last_frame)
+
+#     # Check if necessary coordinate columns exist in df
+#     if 'cum_yaw_deg' not in df.columns or 'cum_pitch_deg' not in df.columns:
+#         print("Error: df is missing 'cum_yaw_deg' or 'cum_pitch_deg' column")
+#         return pd.DataFrame()
+
+#     # Use map for efficient lookup
+#     yaw_map = df['cum_yaw_deg']
+#     pitch_map = df['cum_pitch_deg']
+
+#     temp_grouped['last_yaw'] = temp_grouped['last_frame'].map(yaw_map)
+#     temp_grouped['last_pitch'] = temp_grouped['last_frame'].map(pitch_map)
+
+#     # Mask for rows where coordinates could be successfully retrieved
+#     valid_coords_mask = temp_grouped['last_yaw'].notna() & temp_grouped['last_pitch'].notna()
+
+#     # Initialize mask for points within the center
+#     is_in_center_mask = pd.Series(False, index=temp_grouped.index)
+#     # Calculate 'is_in_center' only for rows with valid coordinates
+#     if valid_coords_mask.any():
+#         is_in_center_mask.loc[valid_coords_mask] = (
+#             (abs(temp_grouped.loc[valid_coords_mask, 'last_yaw'] - yaw_center) <= yaw_range) &
+#             (abs(temp_grouped.loc[valid_coords_mask, 'last_pitch'] - pitch_center) <= pitch_range)
+#         )
+
+#     # Keep rows that have valid coordinates AND are NOT in the center
+#     keep_mask = valid_coords_mask & (~is_in_center_mask)
+#     filtered_grouped_df = grouped_df.loc[keep_mask].reset_index(drop=True)
+
+#     # === 3. Calculate and Report Excluded Count ===
+#     original_count = len(grouped_df)
+#     filtered_count = len(filtered_grouped_df)
+#     excluded_count = original_count - filtered_count
+#     print(f"Original group count: {original_count}")
+#     print(f"Groups excluded due to **endpoint in center** or **invalid/missing data**: {excluded_count}")
+#     print(f"Filtered group count remaining: {filtered_count}")
+
+#     # === 4. Visualization (Clearly separated into two plots) ===
+#     if show:
+#         if filtered_grouped_df.empty:
+#             print("No filtered groups available for plotting.")
+#         else:
+#             # --- Prepare plotting data (calculate only once if possible) ---
+#             # Flatten list of lists, handle potential non-list entries or NaNs within lists
+#             all_retained_frames_flat = []
+#             for frames_list in filtered_grouped_df["Frames"]:
+#                 if isinstance(frames_list, list):
+#                     all_retained_frames_flat.extend([f for f in frames_list if pd.notna(f) and isinstance(f, (int, float))])
+
+#             # Get unique, valid frame indices that exist in the original DataFrame
+#             valid_retained_frames_idx = df.index.intersection(pd.unique(all_retained_frames_flat))
+
+#             # --- Plot 1: Point Distribution, Group Extents, and Center Area ---
+#             try:
+#                 plt.figure(figsize=(10, 8))
+#                 ax1 = plt.gca()
+#                 # Background points
+#                 ax1.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.1, s=5, color='gray', label="All Data Points") # English Label
+
+#                 # Points belonging to retained groups (blue)
+#                 if not valid_retained_frames_idx.empty:
+#                     ax1.scatter(df.loc[valid_retained_frames_idx, "cum_pitch_deg"], df.loc[valid_retained_frames_idx, "cum_yaw_deg"],
+#                                 color='blue', s=20, alpha=0.6, label="Retained Group Points", zorder=3) # English Label
+
+#                 # Optional: Mark retained group extents (red hollow circles)
+#                 red_circle_legend_added = False
+#                 for idx, row in filtered_grouped_df.iterrows():
+#                     group_frames = row["Frames"]
+#                     if not isinstance(group_frames, list) or not group_frames: continue
+#                     valid_group_indices = [f for f in group_frames if pd.notna(f) and isinstance(f, (int, float))]
+#                     group_indices_in_df = df.index.intersection(valid_group_indices)
+
+#                     if group_indices_in_df.empty: continue
+
+#                     try:
+#                         group_pitch = df.loc[group_indices_in_df, "cum_pitch_deg"]
+#                         group_yaw = df.loc[group_indices_in_df, "cum_yaw_deg"]
+#                         # Mark group extent with semi-transparent red border
+#                         ax1.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red',
+#                                     s=80, linewidths=1.5, alpha=0.7,
+#                                     label="Retained Group Extent" if not red_circle_legend_added else "", zorder=2) # English Label
+#                         if not red_circle_legend_added: red_circle_legend_added = True
+#                     except KeyError:
+#                         warnings.warn(f"Could not find some frame indices {group_indices_in_df} in df when plotting red circle for group {idx}.") # Use warnings
+
+#                 # Central exclusion zone (green dashed rectangle)
+#                 rect_pitch = [pitch_center - pitch_range, pitch_center + pitch_range, pitch_center + pitch_range, pitch_center - pitch_range, pitch_center - pitch_range]
+#                 rect_yaw = [yaw_center - yaw_range, yaw_center - yaw_range, yaw_center + yaw_range, yaw_center + yaw_range, yaw_center - yaw_range]
+#                 ax1.plot(rect_pitch, rect_yaw, color='green', linestyle='--', linewidth=2, label="Central Zone (Excluded Endpoints)") # English Label
+
+#                 # Chart elements
+#                 ax1.set_xlabel("Pitch Angle (°)") # English Label
+#                 ax1.set_ylabel("Yaw Angle (°)")   # English Label
+#                 ax1.set_title("Filtered Kill Groups Visualization (Points, Extents & Exclusion Zone)") # English Title
+#                 ax1.grid(True)
+#                 ax1.axis("equal") # Maintain aspect ratio
+#                 # Consolidate legend
+#                 handles, labels = ax1.get_legend_handles_labels()
+#                 by_label = dict(zip(labels, handles)) # Remove duplicate labels
+#                 ax1.legend(by_label.values(), by_label.keys())
+#                 plt.show() # Display the first plot
+#             except Exception as e:
+#                 print(f"Error occurred during plotting (Plot 1): {e}")
+
+
+#             # --- Plot 2: Movement Direction Arrows ---
+#             try:
+#                 plt.figure(figsize=(10, 8))
+#                 ax2 = plt.gca()
+#                 # Optional: Background points
+#                 ax2.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.05, s=5, color='gray', label="All Data Points (Background)") # English Label
+#                 # Optional: Retained group points (blue, for reference)
+#                 if not valid_retained_frames_idx.empty:
+#                     ax2.scatter(df.loc[valid_retained_frames_idx, "cum_pitch_deg"], df.loc[valid_retained_frames_idx, "cum_yaw_deg"],
+#                                 color='blue', s=10, alpha=0.3, label="Retained Group Points (Reference)", zorder=2) # English Label
+
+#                 arrow_drawn = False # Legend label control
+#                 # Iterate and draw arrows
+#                 for idx, row in filtered_grouped_df.iterrows():
+#                     group_frames = row["Frames"]
+#                     if isinstance(group_frames, list) and len(group_frames) >= 2:
+#                         try:
+#                             start_frame = int(group_frames[0])
+#                             end_frame = int(group_frames[-1])
+
+#                             # Get coordinates with error checking
+#                             if start_frame not in df.index or end_frame not in df.index:
+#                                 warnings.warn(f"Start frame {start_frame} or end frame {end_frame} for group {idx} not in DataFrame index.") # Use warnings
+#                                 continue
+
+#                             pitch_start = df.loc[start_frame, "cum_pitch_deg"]
+#                             yaw_start = df.loc[start_frame, "cum_yaw_deg"]
+#                             pitch_end = df.loc[end_frame, "cum_pitch_deg"]
+#                             yaw_end = df.loc[end_frame, "cum_yaw_deg"]
+
+#                             # Check for NaN coordinates
+#                             if pd.isna(pitch_start) or pd.isna(yaw_start) or pd.isna(pitch_end) or pd.isna(yaw_end):
+#                                 warnings.warn(f"Start or end coordinates are NaN for group {idx}.") # Use warnings
+#                                 continue
+
+#                             # Draw arrow (red dashed)
+#                             ax2.annotate(
+#                                 '', xy=(pitch_end, yaw_end), xytext=(pitch_start, yaw_start),
+#                                 arrowprops=dict(arrowstyle="->", color="red", alpha=0.5,
+#                                             linestyle="--", lw=1, shrinkA=5, shrinkB=5),
+#                                 zorder=3)
+#                             if not arrow_drawn:
+#                                 # Add legend entry only once
+#                                 ax2.plot([], [], color='red', alpha=0.5,
+#                                          linestyle="--",
+#                                          lw=1.5, label='Kill Action Direction (Start->End)') # English Label
+#                                 arrow_drawn = True
+#                         except (KeyError, ValueError, TypeError) as frame_err:
+#                             warnings.warn(f"Error processing frames {group_frames} for group {idx}: {frame_err}") # Use warnings
+#                             continue # Skip arrow for this group
+
+#                 # Chart elements
+#                 ax2.set_xlabel("Pitch Angle (°)") # English Label
+#                 ax2.set_ylabel("Yaw Angle (°)")   # English Label
+#                 ax2.set_title("Movement Direction Arrows of Filtered Kill Groups") # English Title
+#                 ax2.grid(True)
+#                 ax2.axis("equal") # Maintain aspect ratio
+#                 # Consolidate legend
+#                 handles, labels = ax2.get_legend_handles_labels()
+#                 by_label = dict(zip(labels, handles)) # Remove duplicate labels
+#                 if by_label: # Only show legend if there's something to show
+#                     ax2.legend(by_label.values(), by_label.keys())
+#                 plt.show() # Display the second plot
+#             except Exception as e:
+#                 print(f"Error occurred during plotting (Plot 2): {e}")
+
+#     # === 5. Return Result ===
+#     return filtered_grouped_df
+
+# %%
 def excludeCenter(df: pd.DataFrame,
                   grouped_df: pd.DataFrame,
                   yaw_range: float = 10,
                   pitch_range: float = 10,
+                  rotation_angle: float = 0,  # <== 新增參數
                   show: bool = True) -> pd.DataFrame:
     """
-    Filters kill action groups, retaining only those whose endpoint is outside the central view area.
-    If show=True, displays two separate visualizations:
-    1. Point Distribution Plot: Shows all points, retained group points, and the central exclusion zone.
-    2. Arrow Plot: Shows movement direction arrows (from start frame to end frame) for retained groups.
-
+    Filters kill action groups, retaining only those whose endpoint is outside the central view area (now supports rotated parallelogram).
+    
     Args:
         df (pd.DataFrame): DataFrame containing the original data ('cum_yaw_deg', 'cum_pitch_deg').
         grouped_df (pd.DataFrame): Pre-calculated kill group DataFrame (must include 'Frames' list).
-        yaw_range (float): Horizontal radius of the central area (degrees).
-        pitch_range (float): Vertical radius of the central area (degrees).
-        show (bool): Whether to display the visualization plots.
-
+        yaw_range (float): Horizontal half-width of the central area (degrees).
+        pitch_range (float): Vertical half-height of the central area (degrees).
+        rotation_angle (float): Rotation angle (degrees) of the central area parallelogram.
+        show (bool): Whether to display visualization plots.
+        
     Returns:
-        pd.DataFrame: Filtered DataFrame containing only groups whose endpoint is not in the center.
+        pd.DataFrame: Filtered DataFrame containing only groups whose endpoint is not in the central area.
     """
 
     # === 1. Define Central View Area ===
     try:
-        # Using median as center calculation method
         yaw_center = df["cum_yaw_deg"].median()
         pitch_center = df["cum_pitch_deg"].median()
         print(f"[Based on Median] View center calculated: Yaw={yaw_center:.2f}°, Pitch={pitch_center:.2f}°")
-        print(f"Central area defined: Yaw ±{yaw_range}°, Pitch ±{pitch_range}°")
+        print(f"Central area defined: Yaw ±{yaw_range}°, Pitch ±{pitch_range}°, Rotated by {rotation_angle}°")
     except KeyError as e:
         print(f"Error: Input df is missing required column {e}")
-        return pd.DataFrame() # Return empty DataFrame or raise exception
+        return pd.DataFrame()
 
     # === 2. Vectorized Filtering ===
     temp_grouped = grouped_df.copy()
@@ -1510,7 +1732,7 @@ def excludeCenter(df: pd.DataFrame,
             try:
                 return int(frames_list[-1])
             except (ValueError, TypeError):
-                return np.nan # Return NaN if conversion fails
+                return np.nan
         return np.nan
 
     if 'Frames' not in temp_grouped.columns:
@@ -1519,178 +1741,158 @@ def excludeCenter(df: pd.DataFrame,
 
     temp_grouped['last_frame'] = temp_grouped['Frames'].apply(get_last_frame)
 
-    # Check if necessary coordinate columns exist in df
     if 'cum_yaw_deg' not in df.columns or 'cum_pitch_deg' not in df.columns:
         print("Error: df is missing 'cum_yaw_deg' or 'cum_pitch_deg' column")
         return pd.DataFrame()
 
-    # Use map for efficient lookup
     yaw_map = df['cum_yaw_deg']
     pitch_map = df['cum_pitch_deg']
 
     temp_grouped['last_yaw'] = temp_grouped['last_frame'].map(yaw_map)
     temp_grouped['last_pitch'] = temp_grouped['last_frame'].map(pitch_map)
 
-    # Mask for rows where coordinates could be successfully retrieved
     valid_coords_mask = temp_grouped['last_yaw'].notna() & temp_grouped['last_pitch'].notna()
 
-    # Initialize mask for points within the center
+    # === 2b. Calculate rotated parallelogram corners ===
+    from matplotlib.path import Path
+    
+    theta = np.deg2rad(rotation_angle)
+    half_w = yaw_range
+    half_h = pitch_range
+    
+    local_corners = np.array([
+        [-half_w, -half_h],
+        [ half_w, -half_h],
+        [ half_w,  half_h],
+        [-half_w,  half_h],
+    ])
+    # rotation
+    rotation_matrix = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta),  np.cos(theta)],
+    ])
+    rotated_corners = local_corners @ rotation_matrix.T
+    # shift to center
+    rotated_corners[:, 0] += yaw_center
+    rotated_corners[:, 1] += pitch_center
+    
+    central_poly = Path(rotated_corners)
+
+    # === 2c. New center test ===
     is_in_center_mask = pd.Series(False, index=temp_grouped.index)
-    # Calculate 'is_in_center' only for rows with valid coordinates
     if valid_coords_mask.any():
-        is_in_center_mask.loc[valid_coords_mask] = (
-            (abs(temp_grouped.loc[valid_coords_mask, 'last_yaw'] - yaw_center) <= yaw_range) &
-            (abs(temp_grouped.loc[valid_coords_mask, 'last_pitch'] - pitch_center) <= pitch_range)
+        is_in_center_mask.loc[valid_coords_mask] = temp_grouped.loc[valid_coords_mask].apply(
+            lambda row: central_poly.contains_point((row['last_yaw'], row['last_pitch'])),
+            axis=1
         )
 
-    # Keep rows that have valid coordinates AND are NOT in the center
     keep_mask = valid_coords_mask & (~is_in_center_mask)
     filtered_grouped_df = grouped_df.loc[keep_mask].reset_index(drop=True)
 
-    # === 3. Calculate and Report Excluded Count ===
+    # === 3. Statistics ===
     original_count = len(grouped_df)
     filtered_count = len(filtered_grouped_df)
     excluded_count = original_count - filtered_count
     print(f"Original group count: {original_count}")
-    print(f"Groups excluded due to **endpoint in center** or **invalid/missing data**: {excluded_count}")
+    print(f"Groups excluded due to endpoint in rotated center area or invalid data: {excluded_count}")
     print(f"Filtered group count remaining: {filtered_count}")
 
-    # === 4. Visualization (Clearly separated into two plots) ===
+    # === 4. Visualization (unchanged, except central zone visualization updated) ===
     if show:
         if filtered_grouped_df.empty:
             print("No filtered groups available for plotting.")
         else:
-            # --- Prepare plotting data (calculate only once if possible) ---
-            # Flatten list of lists, handle potential non-list entries or NaNs within lists
+            # retained group points
             all_retained_frames_flat = []
             for frames_list in filtered_grouped_df["Frames"]:
                 if isinstance(frames_list, list):
                     all_retained_frames_flat.extend([f for f in frames_list if pd.notna(f) and isinstance(f, (int, float))])
-
-            # Get unique, valid frame indices that exist in the original DataFrame
             valid_retained_frames_idx = df.index.intersection(pd.unique(all_retained_frames_flat))
 
-            # --- Plot 1: Point Distribution, Group Extents, and Center Area ---
+            # plot 1
             try:
                 plt.figure(figsize=(10, 8))
                 ax1 = plt.gca()
-                # Background points
-                ax1.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.1, s=5, color='gray', label="All Data Points") # English Label
-
-                # Points belonging to retained groups (blue)
+                ax1.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.1, s=5, color='gray', label="All Data Points")
                 if not valid_retained_frames_idx.empty:
                     ax1.scatter(df.loc[valid_retained_frames_idx, "cum_pitch_deg"], df.loc[valid_retained_frames_idx, "cum_yaw_deg"],
-                                color='blue', s=20, alpha=0.6, label="Retained Group Points", zorder=3) # English Label
-
-                # Optional: Mark retained group extents (red hollow circles)
+                                color='blue', s=20, alpha=0.6, label="Retained Group Points", zorder=3)
+                # red hollow circles
                 red_circle_legend_added = False
                 for idx, row in filtered_grouped_df.iterrows():
                     group_frames = row["Frames"]
                     if not isinstance(group_frames, list) or not group_frames: continue
                     valid_group_indices = [f for f in group_frames if pd.notna(f) and isinstance(f, (int, float))]
                     group_indices_in_df = df.index.intersection(valid_group_indices)
-
                     if group_indices_in_df.empty: continue
+                    group_pitch = df.loc[group_indices_in_df, "cum_pitch_deg"]
+                    group_yaw = df.loc[group_indices_in_df, "cum_yaw_deg"]
+                    ax1.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red', s=80, linewidths=1.5, alpha=0.7,
+                                label="Retained Group Extent" if not red_circle_legend_added else "", zorder=2)
+                    if not red_circle_legend_added:
+                        red_circle_legend_added = True
 
-                    try:
-                        group_pitch = df.loc[group_indices_in_df, "cum_pitch_deg"]
-                        group_yaw = df.loc[group_indices_in_df, "cum_yaw_deg"]
-                        # Mark group extent with semi-transparent red border
-                        ax1.scatter(group_pitch, group_yaw, facecolors='none', edgecolors='red',
-                                    s=80, linewidths=1.5, alpha=0.7,
-                                    label="Retained Group Extent" if not red_circle_legend_added else "", zorder=2) # English Label
-                        if not red_circle_legend_added: red_circle_legend_added = True
-                    except KeyError:
-                        warnings.warn(f"Could not find some frame indices {group_indices_in_df} in df when plotting red circle for group {idx}.") # Use warnings
+                # draw rotated parallelogram
+                ax1.plot(rotated_corners[:,1].tolist() + [rotated_corners[0,1]],
+                         rotated_corners[:,0].tolist() + [rotated_corners[0,0]],
+                         color='green', linestyle='--', linewidth=2, label="Rotated Central Zone")
 
-                # Central exclusion zone (green dashed rectangle)
-                rect_pitch = [pitch_center - pitch_range, pitch_center + pitch_range, pitch_center + pitch_range, pitch_center - pitch_range, pitch_center - pitch_range]
-                rect_yaw = [yaw_center - yaw_range, yaw_center - yaw_range, yaw_center + yaw_range, yaw_center + yaw_range, yaw_center - yaw_range]
-                ax1.plot(rect_pitch, rect_yaw, color='green', linestyle='--', linewidth=2, label="Central Zone (Excluded Endpoints)") # English Label
-
-                # Chart elements
-                ax1.set_xlabel("Pitch Angle (°)") # English Label
-                ax1.set_ylabel("Yaw Angle (°)")   # English Label
-                ax1.set_title("Filtered Kill Groups Visualization (Points, Extents & Exclusion Zone)") # English Title
+                ax1.set_xlabel("Pitch Angle (°)")
+                ax1.set_ylabel("Yaw Angle (°)")
+                ax1.set_title("Filtered Kill Groups Visualization (Rotated Parallelogram Zone)")
                 ax1.grid(True)
-                ax1.axis("equal") # Maintain aspect ratio
-                # Consolidate legend
+                ax1.axis("equal")
                 handles, labels = ax1.get_legend_handles_labels()
-                by_label = dict(zip(labels, handles)) # Remove duplicate labels
+                by_label = dict(zip(labels, handles))
                 ax1.legend(by_label.values(), by_label.keys())
-                plt.show() # Display the first plot
+                plt.show()
             except Exception as e:
-                print(f"Error occurred during plotting (Plot 1): {e}")
+                print(f"Error during plotting (Plot 1): {e}")
 
-
-            # --- Plot 2: Movement Direction Arrows ---
+            # plot 2
             try:
                 plt.figure(figsize=(10, 8))
                 ax2 = plt.gca()
-                # Optional: Background points
-                ax2.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.05, s=5, color='gray', label="All Data Points (Background)") # English Label
-                # Optional: Retained group points (blue, for reference)
+                ax2.scatter(df["cum_pitch_deg"], df["cum_yaw_deg"], alpha=0.05, s=5, color='gray', label="All Data Points (Background)")
                 if not valid_retained_frames_idx.empty:
                     ax2.scatter(df.loc[valid_retained_frames_idx, "cum_pitch_deg"], df.loc[valid_retained_frames_idx, "cum_yaw_deg"],
-                                color='blue', s=10, alpha=0.3, label="Retained Group Points (Reference)", zorder=2) # English Label
-
-                arrow_drawn = False # Legend label control
-                # Iterate and draw arrows
+                                color='blue', s=10, alpha=0.3, label="Retained Group Points (Reference)", zorder=2)
+                arrow_drawn = False
                 for idx, row in filtered_grouped_df.iterrows():
                     group_frames = row["Frames"]
                     if isinstance(group_frames, list) and len(group_frames) >= 2:
-                        try:
-                            start_frame = int(group_frames[0])
-                            end_frame = int(group_frames[-1])
-
-                            # Get coordinates with error checking
-                            if start_frame not in df.index or end_frame not in df.index:
-                                warnings.warn(f"Start frame {start_frame} or end frame {end_frame} for group {idx} not in DataFrame index.") # Use warnings
-                                continue
-
-                            pitch_start = df.loc[start_frame, "cum_pitch_deg"]
-                            yaw_start = df.loc[start_frame, "cum_yaw_deg"]
-                            pitch_end = df.loc[end_frame, "cum_pitch_deg"]
-                            yaw_end = df.loc[end_frame, "cum_yaw_deg"]
-
-                            # Check for NaN coordinates
-                            if pd.isna(pitch_start) or pd.isna(yaw_start) or pd.isna(pitch_end) or pd.isna(yaw_end):
-                                warnings.warn(f"Start or end coordinates are NaN for group {idx}.") # Use warnings
-                                continue
-
-                            # Draw arrow (red dashed)
-                            ax2.annotate(
-                                '', xy=(pitch_end, yaw_end), xytext=(pitch_start, yaw_start),
-                                arrowprops=dict(arrowstyle="->", color="red", alpha=0.5,
-                                            linestyle="--", lw=1, shrinkA=5, shrinkB=5),
-                                zorder=3)
-                            if not arrow_drawn:
-                                # Add legend entry only once
-                                ax2.plot([], [], color='red', alpha=0.5,
-                                         linestyle="--",
-                                         lw=1.5, label='Kill Action Direction (Start->End)') # English Label
-                                arrow_drawn = True
-                        except (KeyError, ValueError, TypeError) as frame_err:
-                            warnings.warn(f"Error processing frames {group_frames} for group {idx}: {frame_err}") # Use warnings
-                            continue # Skip arrow for this group
-
-                # Chart elements
-                ax2.set_xlabel("Pitch Angle (°)") # English Label
-                ax2.set_ylabel("Yaw Angle (°)")   # English Label
-                ax2.set_title("Movement Direction Arrows of Filtered Kill Groups") # English Title
+                        start_frame = int(group_frames[0])
+                        end_frame = int(group_frames[-1])
+                        if start_frame not in df.index or end_frame not in df.index:
+                            continue
+                        pitch_start = df.loc[start_frame, "cum_pitch_deg"]
+                        yaw_start = df.loc[start_frame, "cum_yaw_deg"]
+                        pitch_end = df.loc[end_frame, "cum_pitch_deg"]
+                        yaw_end = df.loc[end_frame, "cum_yaw_deg"]
+                        if pd.isna(pitch_start) or pd.isna(yaw_start) or pd.isna(pitch_end) or pd.isna(yaw_end):
+                            continue
+                        ax2.annotate(
+                            '', xy=(pitch_end, yaw_end), xytext=(pitch_start, yaw_start),
+                            arrowprops=dict(arrowstyle="->", color="red", alpha=0.5, linestyle="--", lw=1, shrinkA=5, shrinkB=5),
+                            zorder=3)
+                        if not arrow_drawn:
+                            ax2.plot([], [], color='red', alpha=0.5, linestyle="--", lw=1.5, label='Kill Action Direction (Start->End)')
+                            arrow_drawn = True
+                ax2.set_xlabel("Pitch Angle (°)")
+                ax2.set_ylabel("Yaw Angle (°)")
+                ax2.set_title("Movement Direction Arrows of Filtered Kill Groups")
                 ax2.grid(True)
-                ax2.axis("equal") # Maintain aspect ratio
-                # Consolidate legend
+                ax2.axis("equal")
                 handles, labels = ax2.get_legend_handles_labels()
-                by_label = dict(zip(labels, handles)) # Remove duplicate labels
-                if by_label: # Only show legend if there's something to show
+                by_label = dict(zip(labels, handles))
+                if by_label:
                     ax2.legend(by_label.values(), by_label.keys())
-                plt.show() # Display the second plot
+                plt.show()
             except Exception as e:
-                print(f"Error occurred during plotting (Plot 2): {e}")
+                print(f"Error during plotting (Plot 2): {e}")
 
-    # === 5. Return Result ===
     return filtered_grouped_df
+
 # %%
 def plot_standardized_signals_cloud_compare(
         datasets,                   # List of signal dictionaries (required)

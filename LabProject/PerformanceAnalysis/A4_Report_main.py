@@ -12,7 +12,21 @@ import datetime
 import io
 import cairosvg
 
-folder_path = "/shox/S2"
+folder_path = "/James/EC1"
+personal_info = {
+    "name": "James Banks",
+    "per_info": "Male • ex-Pro",
+    "mouse_perf_color": '#000000', # #CC0040, #000000, #F1A012, #FE46FF 
+    "mouse_brand": "ZOWIE",
+    "mouse_model": "EC1 (M)",
+    "page": "3/3",
+    "measurement_date": "",
+    }
+
+if personal_info["measurement_date"]:
+    measure_data = str(personal_info["measurement_date"])
+else:
+    measure_data = str(datetime.date.today().strftime("%Y-%m-%d"))
 
 # --- 0. 自動建立佔位符圖片 (已修正) ---
 def create_placeholder_images():
@@ -70,7 +84,7 @@ HEADER_SPECS = {
         'height': Cm(0.5295)
     },
     'date': {
-        'text': f'Measured on {datetime.date.today().strftime("%Y-%m-%d")}',
+        'text': f'Measured on {measure_data}',
         'left': Cm(17.0911),
         'top': Cm(0.7766),
         # 'height': Cm(0.3177),
@@ -91,7 +105,7 @@ HEADER_SPECS = {
 PLAYER_BG_HEIGHT = Cm(3.8)
 PLAYER_SPECS = {
     'name': {
-        'text': 'shox',
+        'text': str(personal_info["name"]),
         'left': Cm(0.93545),
         'top': Cm(2.2945),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -105,7 +119,7 @@ PLAYER_SPECS = {
         'alignment': PP_ALIGN.LEFT # And alignment
         },
     'details': {
-        'text': 'Male • From France',
+        'text': str(personal_info["per_info"]),
         'left': Cm(0.93545),
         'top': Cm(3.4594),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -148,7 +162,7 @@ PLAYER_SPECS = {
         'alignment': PP_ALIGN.LEFT # And alignment
     },
     'Mouse_info': {
-        'text': 'BenQ ZOWIE\n\nS2 (M)',
+        'text': personal_info['mouse_brand'] + '\n\n' + personal_info['mouse_model'],
         'left': Cm(19.07965),
         'top': Cm(3.177),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -177,7 +191,7 @@ PLAYER_SPECS = {
         # 'height': Cm(PLAYER_BG_HEIGHT.cm - 0.6), # <-- 移除 'height'
         'style': {
             'width_pt': Pt(1),
-            'color_hex': '#000000' # 1 CC0040 # 2 000000
+            'color_hex': personal_info['mouse_perf_color'] # 1 CC0040 # 2 000000
             }
         },
     'background_box': {
@@ -259,6 +273,15 @@ FLICK_SHOT_SPECS = {
         },
         'alignment': PP_ALIGN.LEFT # And alignment
         },
+    'speed_profile_legend_image': {
+        'label': 'Performance Image',
+        'path': 'placeholders/page2/description (3).png',
+        'left': Cm(11.4372),
+        'top': Cm(7.2012),
+        'width': Cm(2.2239),
+        'height': Cm(0.3177)
+        },
+    
     'speed_profile_image': {
         'label': 'Speed Profile Image',
         'path': 'placeholders/page2' + folder_path + '/speed_profile (2).png',
@@ -472,7 +495,7 @@ FATIGUE_SPECS = {
 # -- Footer --
 FOOTER_SPECS = {
     'page_num': {
-        'text': '3/3',
+        'text': personal_info['page'],
         'left': Cm(10.1664),
         'top': Cm(28.5224),
         'auto_size': True,  # <-- Tell the script to auto-fit the text

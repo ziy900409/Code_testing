@@ -19,7 +19,27 @@ import datetime
 import io
 import cairosvg
 
+folder_path = "/James"
 
+personal_info = {
+    "name": "James Banks",
+    "per_info": "Male • ex-Pro",
+    # "mouse_perf_color": '#000000', # #CC0040, #000000, #F1A012, #FE46FF 
+    "game": "CS",
+    "Sens": "1.8",
+    "OtherGamne": "NAN",
+    "mouse_brand_1": "ZOWIE",
+    "mouse_model_1": "EC2 (M)",
+    "mouse_brand_2": "ZOWIE",
+    "mouse_model_2": "EC1 (L)",
+    "page": "1/3",
+    "measurement_date": "",
+    }
+
+if personal_info["measurement_date"]:
+    measure_data = str(personal_info["measurement_date"])
+else:
+    measure_data = str(datetime.date.today().strftime("%Y-%m-%d"))
 
 # --- 0. 自動建立佔位符圖片 (已修正) ---
 def create_placeholder_images():
@@ -115,7 +135,7 @@ PLAYER_SPECS = {
         },
     'name': { # 選手名字
         'type': 'text',
-        'text': 'michu',
+        'text': str(personal_info["name"]),
         'left': Cm(0.97075),
         'top': Cm(2.2945),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -130,7 +150,7 @@ PLAYER_SPECS = {
         },
     'details': { # 性別、隊伍
         'type': 'text',
-        'text': 'Male • From Poland',
+        'text': str(personal_info["per_info"]),
         'left': Cm(0.97075),
         'top': Cm(3.4594),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -196,7 +216,7 @@ PLAYER_SPECS = {
     },
     'game_info': {
         'type': 'text',
-        'text': 'CS2\n\n1\nNAN',
+        'text': personal_info['game'] +'\n\n' + personal_info['Sens'] + '\n' + personal_info['OtherGamne'],
         'left': Cm(19.07965),
         'top': Cm(2.3651),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -253,7 +273,7 @@ PLAYER_SPECS = {
     },
     'Mouse_1_info': {
         'type': 'text',
-        'text': 'BenQ ZOWIE\n\nMousa A (M)',
+        'text': personal_info['mouse_brand_1'] + '\n\n' + personal_info['mouse_model_1'],
         'left': Cm(9.4604),
         'top': Cm(5.4715),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -311,7 +331,7 @@ PLAYER_SPECS = {
     },
     'Mouse_2_info': {
         'type': 'text',
-        'text': 'BenQ ZOWIE\n\nEC2 (M)',
+        'text': personal_info['mouse_brand_2'] + '\n\n' + personal_info['mouse_model_2'],
         'left': Cm(19.04435),
         'top': Cm(5.4715),
         'auto_size': True,  # <-- Tell the script to auto-fit the text
@@ -498,7 +518,7 @@ FLICK_SHOT_SPECS = {
     'chart_1_image': {
         'type': 'figure',
         'label': 'Speed Profile Image',
-        'path': 'placeholders/summary_page/TTK.png',
+        'path': 'placeholders/summary_page' + folder_path + '/TTK.png',
         'left': Cm(11.8608),
         'top': Cm(10),
         'width': Cm(8.0484),
@@ -537,7 +557,7 @@ FLICK_SHOT_SPECS = {
     'chart_2_image': {
         'type': 'figure',
         'label': 'Speed Profile Image',
-        'path': 'placeholders/summary_page/ShotCounts.png',
+        'path': 'placeholders/summary_page' + folder_path + '/ShotCounts.png',
         'left': Cm(11.8608),
         'top': Cm(12.7374),
         'width': Cm(8.0484),
@@ -576,7 +596,7 @@ FLICK_SHOT_SPECS = {
     'chart_3_image': {
         'type': 'figure',
         'label': 'Speed Profile Image',
-        'path': 'placeholders/summary_page/Accuracy.png',
+        'path': 'placeholders/summary_page' + folder_path + '/Accuracy.png',
         'left': Cm(11.8608),
         'top': Cm(15.5108),
         'width': Cm(8.0484),
