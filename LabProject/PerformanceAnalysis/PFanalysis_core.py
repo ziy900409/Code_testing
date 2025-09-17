@@ -165,7 +165,7 @@ import emg_function as emg
 # %%   
 def pro_main(data_path, motion_config, emg_config,
              sens=1, yaw_range = 13, pitch_range = 10, rotation_angle=0):
-    # data_path = r"D:\BenQ_Project\01_UR_lab\00_BQE\2025_06 Lab Opening\motion\S1_Post_Spider30_EC.c3d"
+    # data_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_pos.c3d"
     # motion_config = MOTION_CONFIG
     # emg_config = EMG_CONFIG
     try:

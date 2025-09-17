@@ -225,17 +225,21 @@ mouse D
 
 
 # MVC 肌肉發力的參考值
-mvc_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_MVC.c3d"
+mvc_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_MVC.c3d"
 
 # 選第一隻滑鼠
-pre_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_PRE.c3d"
-fatigue_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_FATIGUE.c3d"
-pos_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_POST.c3d"
+# pre_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_PRE.c3d"
+# fatigue_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_FATIGUE.c3d"
+# pos_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_POST.c3d"
+pre_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_pre.c3d"
+fatigue_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_fatigue.c3d"
+pos_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_pos.c3d"
+
 
 # 加入檢查 EMG 訊號，至少檢查兩項
-pre_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_PRE.c3d"
-fatigue_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_FATIGUE.c3d"
-pos_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_POST.c3d"
+# pre_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_PRE.c3d"
+# fatigue_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_FATIGUE.c3d"
+# pos_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC1_POST.c3d"
 
 # pre_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S01_SpiderShot_ZA1_3.c3d"
 # fatigue_path = r"D:\Hsin\BenQ\testfile\PFanalysis\mouse A\S07_GridShot_HS_1.c3d"
