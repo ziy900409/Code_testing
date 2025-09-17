@@ -209,56 +209,62 @@ def read_c3d(path: str,
     # --- Helper Function for Interpolation ---
     def _interpolate_data(data: np.ndarray) -> np.ndarray:
         """
-        Interpolates missing data (represented by 0 or NaN) using linear interpolation
-        followed by forward and backward fill.
-
-        Warning: Replaces ALL zeros with NaN before interpolation. This might be
-                 undesirable if zero is a valid data point.
-
-        Args:
-            data (np.ndarray): Input data array (time along axis 0).
-
-        Returns:
-            np.ndarray: Interpolated data array.
+        對缺失值進行插值（將 0 與 NaN 視為缺失）：
+          - 每欄計算有效點數 n_valid
+            * n_valid == 0: 保留 NaN（或依需求改 0）
+            * n_valid == 1: ffill+bfill
+            * n_valid in {2,3}: linear
+            * n_valid >= 4: 先嘗試 cubic，失敗則退回 linear
+          - 最後再 ffill/bfill 作保底
+        回傳 ndarray（shape 與輸入相同）
         """
         if data is None or data.size == 0:
-            return np.array([]) # Return empty if input is empty
-
-        df = pd.DataFrame(data)
-        # Warning: Replacing all zeros with NaN might affect valid zero data points.
+            return np.array([])
+    
+        # 轉為 DataFrame、確保 index 單調與 dtype 為 float（避免 SciPy 內部掛掉）
+        df = pd.DataFrame(data).copy()
+        df.index = np.arange(len(df))
+        df = df.apply(pd.to_numeric, errors='coerce').astype(float)
+    
+        # 若 0 代表缺失，則置換；若 0 為有效值，請註解掉下一行
         df.replace(0, np.nan, inplace=True)
-
-        # Check if all values became NaN after replacing zeros
-        if df.isnull().all().all():
-             print("Warning: All data points became NaN after replacing zeros. Cannot interpolate.")
-             # Return original data (or perhaps zeros/NaNs based on desired behavior)
-             return data # Or df.fillna(0).values or data (which might be all zeros)
-
-        # Use linear interpolation first
-        df = df.interpolate(method='cubic', axis=0, limit_direction='both') # limit_direction helps with start/end NaNs
-        valid_points_count = df.notna().sum()
-
-        # 檢查是否有任何一個欄位的數據點少於 4 個
-        if valid_points_count.min() < 4:
-            # 數據不足，降級使用 'linear' 方法
-            # print(f"Warning: Insufficient data for cubic interpolation. Falling back to linear.") # 可選：印出警告訊息
-            df_interpolated = df.interpolate(method='linear', axis=0, limit_direction='both')
-        else:
-           # 數據充足，使用 'cubic' 方法
-           df_interpolated = df.interpolate(method='cubic', axis=0, limit_direction='both')
-
-
-        # Use ffill and bfill to handle any remaining NaNs (e.g., at the very start/end if limit_direction='both' wasn't enough)
-        df_interpolated.ffill(inplace=True)
-        df_interpolated.bfill(inplace=True)
-
-        # Final check if any NaNs persist (shouldn't happen with ffill/bfill, but as a safeguard)
-        if df_interpolated.isnull().values.any():
-            print("Warning: NaNs remain after interpolation and fill. Filling with 0.")
-            df_interpolated.fillna(0, inplace=True) # Fill any persistent NaNs with 0 as a last resort
-
-        return df_interpolated.values
-
+    
+        # 若整張表都成 NaN，則不做插值（保留原資料或改你要的行為）
+        if df.isna().all().all():
+            print("[WARN] All data points became NaN after zero->NaN; skip interpolation.")
+            return data
+    
+        valid_counts = df.notna().sum()
+        out = pd.DataFrame(index=df.index, columns=df.columns, dtype=float)
+    
+        # 逐欄處理，避免單一欄資料不足讓整張表報錯
+        for col in df.columns:
+            s = df[col]
+            n = int(valid_counts[col])
+    
+            if n == 0:
+                # 全 NaN：保留（或改成 0）
+                out[col] = s
+            elif n == 1:
+                # 單一有效點：用該點向前向後填滿
+                out[col] = s.ffill().bfill()
+            elif n in (2, 3):
+                # 點數不足支撐 cubic：改用 linear
+                out[col] = s.interpolate(method='linear', limit_direction='both')
+            else:
+                # n >= 4：先試 cubic，不行再退 linear
+                try:
+                    # 對 Series 做插值，比 DataFrame 一次性插值更不易踩到 SciPy 的邊界條件錯誤
+                    out[col] = s.interpolate(method='cubic', limit_direction='both')
+                except Exception as e:
+                    # print(f"[FALLBACK] {col}: cubic failed -> {e}; use linear.")
+                    out[col] = s.interpolate(method='linear', limit_direction='both')
+    
+            # 保底：若仍有 NaN（長段缺失或端點），再 ffill/bfill
+            if out[col].isna().any():
+                out[col] = out[col].ffill().bfill()
+    
+        return out.values
     # --- Helper Function for Marker Processing ---
     def _process_markers(c3d_data: ezc3d.c3d, marker_cutoff: Optional[float], filter_order: int,
                          prefix_to_remove: Optional[List[str]], rename_map: Optional[Dict[str, str]]) -> Tuple[Dict[str, Any], Dict[str, Any], np.ndarray]:
