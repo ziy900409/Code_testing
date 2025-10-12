@@ -2,14 +2,17 @@
 """
 Created on Mon May  5 13:38:36 2025
 
-新增劃出所有時間線的方式
+使用流程:
+
+1. 參數定義： DPI, 遊戲靈敏度, 選擇 notch filter 的濾波頻率
+2. 設定需要分析的檔案
 
 @author: Hsin.YH.Yang
 """
 
 import sys
 # 路徑改成你放自己code的資料夾
-sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
+sys.path.append(r"D:\Hsin.YH.Yang\Github\Code_testing\LabProject\PerformanceAnalysis")
 # sys.path.append(r"D:\git\Code_testing\LabProject\PerformanceAnalysis")
 import pandas as pd
 import numpy as np
@@ -25,19 +28,10 @@ import PFanalysis_core as core
 import plot_table as ta
 from collections import defaultdict
 
+
+
 # %% parameters setting
 
-# === in game parameters ===
-DPI = 800 # 來自靜態的設定
-sensitivity = 1.25 # 來自靜態的設定
-yaw = 0.022  # CS2 預設值 來自靜態的設定 來自於最常玩的遊戲
-# yaw = 0.07 # Valorant 靈敏度
-
-# === motion capture system setting ===
-# Define filter cutoffs (Hz). Use None or 0 to disable for a specific type.
-marker_freq_cutoff = 20.0
-fp_freq_cutoff = 30.0
-analog_freq_cutoff = None # Example: Don't filter general analog
 rename_markers = {'MOS1': 'M1',
                 'MOS2': 'M2',
                 'MOS3': 'M3',
@@ -62,42 +56,6 @@ rename_markers = {'MOS1': 'M1',
                 'RLT1': 'R.P.Finger1',
                 'RLT2': 'R.P.Finger2',                
                 }
-# Remove prefixes
-remove_prefixes = ["S03", "MarkerSet:"] 
-
-# === EMG Setting ===
-down_freq = 1000
-c = 0.802
-# 帶通濾波頻率
-bandpass_cutoff = [20/0.802, 450/0.802]
-# 低通濾波頻率
-lowpass_freq = 10/c
-# 設定移動平均數與移動均方根之參數
-# 更改window length, 更改overlap length
-time_of_window = 0.1 # 窗格長度 (單位 second)
-overlap_len = 0.5 # 百分比 (%)
-# 設定 notch filter cutoff frequency
-
-notch_cutoff = [[59, 61],
-                [295.5, 296.5],
-                [369.5, 370.5],
-                [179, 181],
-                [299, 301],
-                [419, 421],
-                ]
-
-c3d_notch_cutoff = [[49, 51],
-                    [99.5, 100.5],
-                    [149.5, 150.5],
-                    [199.5, 200.5],
-                    [249.5, 250.5],
-                    [299.5, 300.5],
-                    [349.5, 350.5],
-                    [295, 297],
-                    [369, 371],
-                    [73, 75],
-                    [399, 401]
-                    ]
 
 csv_recolumns_name = {'Mini sensor 1: EMG 1': 'Extensor Carpi Radialis',
                      'Mini sensor 2: EMG 2': 'Flexor Carpi Radialis',
@@ -119,6 +77,19 @@ c3d_recolumns_name = {'ExtRad': 'Extensor Carpi Radialis',
                       #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
                       'ExtInd': 'Extensor Indicis',
                       'Biceps': 'Biceps Brachii',
+                      }
+
+c3d_recolumns_name = {'ExtRad_': 'Extensor Carpi Radialis',
+                      'FleRad_': 'Flexor Carpi Radialis',
+                      'Triceps_': 'Triceps Brachii',
+                      'Triceps_': 'Triceps Brachii',
+                      'ExtUlnar_': 'Extensor Carpi Ulnaris',
+                      'ExtUlnar_': 'Extensor Carpi Ulnaris',
+                      'DorInter_': '1st Dorsal Interosseous', 
+                      'AbdDigMin_': 'Abductor Digiti Quinti',
+                      #' AbdDigMin.IM EMG6': 'Abductor Digiti Quinti',
+                      'ExtInd_': 'Extensor Indicis',
+                      'Biceps_': 'Biceps Brachii',
                       }
 
 # c3d_recolumns_name = {'Mini Sensor (2).ExtRad 2.ExtRad': 'Extensor Carpi Radialis',
@@ -155,24 +126,50 @@ select_muscle = ['Quattro Sensor (5).ExtUlnar 5.ExtUlnar',
 
 # %%
 
+notch_cutoff = [[59, 61],
+                [295.5, 296.5],
+                [369.5, 370.5],
+                [179, 181],
+                [299, 301],
+                [419, 421],
+                ]
+
+c3d_notch_cutoff = [[49, 51],
+                    [99.5, 100.5],
+                    [149.5, 150.5],
+                    [199.5, 200.5],
+                    [249.5, 250.5],
+                    [299.5, 300.5],
+                    [349.5, 350.5],
+                    [295, 297],
+                    [369, 371],
+                    [73, 75],
+                    [399, 401]
+                    ]
+
+DPI = 800 # 來自靜態的設定
+sensitivity = 1.25 # 來自靜態的設定
+yaw = 0.022  # CS2 預設值 來自靜態的設定 來自於最常玩的遊戲
+# yaw = 0.07 # Valorant 靈敏度
+
 EMG_CONFIG = {
     "DEFAULT_DOWNSAMPLE_FREQ": 1000,
-    "DEFAULT_BANDPASS_CUTOFF": [20, 450],
-    "DEFAULT_LOWPASS_FREQ": 6,
+    "DEFAULT_BANDPASS_CUTOFF": [20/0.802, 450/0.802],
+    "DEFAULT_LOWPASS_FREQ": 6/0.802,
     "DEFAULT_CSV_NOTCH_CUTOFF_LIST": notch_cutoff, # 假設 50Hz 工頻
     "DEFAULT_C3D_NOTCH_CUTOFF_LIST": c3d_notch_cutoff, # 假設 60Hz 工頻
     "DEFAULT_CSV_RECOLUMNS_NAME": csv_recolumns_name, # 範例
     "DEFAULT_C3D_RECOLUMNS_NAME": c3d_recolumns_name, # 範例
     "EMG_CHANNEL_IDENTIFIER": muscle_name, # 用於辨識 EMG 頻道的關鍵字
-    "REMOVE_PREFIXES": remove_prefixes
+    "REMOVE_PREFIXES": ["S03", "MarkerSet:"]
 }
 
 MOTION_CONFIG = {
-    "REMOVE_PREFIXES": remove_prefixes, # 需要移除的前綴字
+    "REMOVE_PREFIXES": ["S03", "MarkerSet:"] , # 需要移除的前綴字
     "RENAME_MARKERS": rename_markers, # 重新命名的 Marmer name
-    "CUTOFF_FREQUENCY": marker_freq_cutoff, # 截止頻率
-    "FP_CUTOFF_FREQUENCY": fp_freq_cutoff, # 力版的截止頻率
-    "ANA_CUTOFF_FREQUENCY": analog_freq_cutoff, # Analog 截止頻率
+    "CUTOFF_FREQUENCY": 20.0, # 截止頻率
+    "FP_CUTOFF_FREQUENCY": 30.0, # 力版的截止頻率
+    "ANA_CUTOFF_FREQUENCY": None, # Analog 截止頻率
     "BUTTERWORTH_ORDER": 4 # Standard 4th order Butterworth
 
 }
@@ -209,31 +206,17 @@ mouse D
 
 # %%
 
-# pre_path = r"D:/BenQ_Project/01_UR_lab/2024_11 Shanghai CS Major/1. Motion/Major_weight/S06/20241206/S06_SpiderShot_S1_1.c3d"
-# fatigue_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S2_3.c3d"
-# pos_path = r"D:\BenQ_Project\01_UR_lab\2024_11 Shanghai CS Major\1. Motion\Major_weight\S06\20241206\S06_SpiderShot_S3_1.c3d"
-
-# mvc_path = r"E:\2025 IEM Cologne\mousetest\S04_MVC.c3d"
-# pre_path = r"E:\2025 IEM Cologne\mousetest\S04_S2_pre.c3d"
-# fatigue_path = r"E:\2025 IEM Cologne\mousetest\S04_S2_fatigue.c3d"
-# pos_path = r"E:\2025 IEM Cologne\mousetest\S04_S2_pos.c3d"
-
-
-# pre_path = r"E:\2025 IEM Cologne\mousetest\S04_FK_pre.c3d"
-# fatigue_path = r"E:\2025 IEM Cologne\mousetest\S04_FK_pre.c3d"
-# pos_path = r"E:\2025 IEM Cologne\mousetest\S04_FK_pos.c3d"
-
 
 # MVC 肌肉發力的參考值
-mvc_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_MVC.c3d"
+mvc_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 PF Analysis\DynamicTest\Modified C3D\Run_number_109_MVC_Rep_4.4_Modified.c3d"
 
 # 選第一隻滑鼠
 # pre_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_PRE.c3d"
 # fatigue_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_FATIGUE.c3d"
 # pos_path = r"D:\BenQ_Project\01_UR_lab\2025_07 IEM Cologne\James Banks_EC2_POST.c3d"
-pre_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_pre.c3d"
-fatigue_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_fatigue.c3d"
-pos_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_pos.c3d"
+pre_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 PF Analysis\DynamicTest\Modified C3D\SpiderShot_post_30s_mouse1_01_AddEMG.c3d"
+fatigue_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 PF Analysis\DynamicTest\Modified C3D\SpiderShot_180s_mouse1_01_AddEMG.c3d"
+pos_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 PF Analysis\DynamicTest\Modified C3D\SpiderShot_post_30s_mouse1_01_AddEMG.c3d"
 
 
 # 加入檢查 EMG 訊號，至少檢查兩項
@@ -335,10 +318,10 @@ emg.plot_multiple_mdf_over_time(list_of_fft_results_data=[fati_fft_results],
                                 title_name="Muscle Fatigue Analysis",
                                 dataset_labels=['fatigue'],
                                 selected_keys = [
-                                'Quattro Sensor (5).ExtUlnar 5.ExtUlnar',
-                                'Quattro Sensor (5).DorInter 5.DorInter', 
-                                'Quattro Sensor (5).AbdDigMin 5.AbdDigMin',
-                                'Quattro Sensor (5).ExtInd 5.ExtInd',
+                                'ExtUlnar',
+                                'DorInter', 
+                                'AbdDigMin',
+                                'ExtInd',
                                 ]
                                 )
 

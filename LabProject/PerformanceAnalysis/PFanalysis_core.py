@@ -7,7 +7,7 @@ Created on Sat May 24 16:41:25 2025
 import sys
 # 路徑改成你放自己code的資料夾
 # sys.path.append(r"D:\BenQ_Project\gitgit\Code_testing\LabProject\PerformanceAnalysis")
-sys.path.append(r"D:\git\Code_testing\LabProject\PerformanceAnalysis")
+sys.path.append(r"D:\Hsin.YH.Yang\Github\Code_testing\LabProject\PerformanceAnalysis")
 import pandas as pd
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -126,7 +126,7 @@ import emg_function as emg
 
 # # %%
 
-# EMG_CONFIG = {
+# emg_config = {
 #     "DEFAULT_DOWNSAMPLE_FREQ": 1000,
 #     "DEFAULT_BANDPASS_CUTOFF": [20, 450],
 #     "DEFAULT_LOWPASS_FREQ": 6,
@@ -165,7 +165,7 @@ import emg_function as emg
 # %%   
 def pro_main(data_path, motion_config, emg_config,
              sens=1, yaw_range = 13, pitch_range = 10, rotation_angle=0):
-    # data_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_pos.c3d"
+    # data_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 PF Analysis\DynamicTest\Modified C3D\SpiderShot_post_30s_mouse1_01_AddEMG.c3d"
     # motion_config = MOTION_CONFIG
     # emg_config = EMG_CONFIG
     try:

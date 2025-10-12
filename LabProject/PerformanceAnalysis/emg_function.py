@@ -477,6 +477,9 @@ def calculate_fft_for_emg(
     回傳:
     - dict: 包含 FFT 結果的字典。
     """
+    # data_file_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 PF Analysis\DynamicTest\Modified C3D\SpiderShot_post_30s_mouse1_01_AddEMG.c3d"
+    # data_file_path = r"D:\Hsin.YH.Yang\01_UR_Lab\2025_07 IEM Cologne\Vicon\S04_FK_pos.c3d"
+    # config = emg_config
     
     if not os.path.exists(data_file_path):
         logging.error(f"檔案路徑不存在: {data_file_path}")
